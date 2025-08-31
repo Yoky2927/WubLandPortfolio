@@ -1,0 +1,522 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ========== BASE STYLES ========== */
+@layer base {
+  body {
+    @apply transition-colors duration-300 bg-black text-white font-poppins;
+  }
+
+  body.light {
+    @apply bg-white text-black;
+  }
+
+  body.dark {
+    @apply bg-gradient-to-r from-gray-900 via-black to-gray-900 text-white;
+  }
+}
+
+@layer utilities {
+    /* Custom breakpoint for extra small screens (xs) - screens smaller than 640px */
+    @media (max-width: 639px) {
+        .xs\:px-4 {
+            padding-left: 1rem;
+            padding-right: 1rem;
+        }
+        .xs\:px-3 {
+            padding-left: 0.75rem;
+            padding-right: 0.75rem;
+        }
+        .xs\:text-lg {
+            font-size: 1.125rem;
+            line-height: 1.75rem;
+        }
+        .xs\:text-base {
+            font-size: 1rem;
+            line-height: 1.5rem;
+        }
+        .xs\:pt-\[10\%\] {
+            padding-top: 10%;
+        }
+        .xs\:pt-\[15\%\] {
+            padding-top: 15%;
+        }
+        .xs\:pt-\[20\%\] {
+            padding-top: 20%;
+        }
+        .xs\:pt-\[25\%\] {
+            padding-top: 25%;
+        }
+        .xs\:px-\[5\%\] {
+            padding-left: 5%;
+            padding-right: 5%;
+        }
+        .xs\:px-\[10\%\] {
+            padding-left: 10%;
+            padding-right: 10%;
+        }
+    }
+}
+
+/* ========== COMPONENTS ========== */
+@layer components {
+.Cards {
+    @apply shadow-xl overflow-hidden relative transition-all duration-500 hover:shadow-2xl hover:-translate-y-1;
+    @apply w-full max-w-xs mx-auto h-auto min-h-[450px] md:min-h-[500px] transition-transform duration-300 hover:scale-[1.02];
+    min-width: 280px;
+       }
+
+    /* For medium screens and up */
+    @media (min-width: 768px) {
+        .Cards {
+            @apply w-[calc(50%-1rem)]; /* 16px gap equivalent */
+        }
+    }
+
+    /* For large screens and up */
+    @media (min-width: 1024px) {
+        .Cards {
+            @apply w-80; /* 320px */
+        }
+    }
+
+    /* Extra small screen adjustments */
+    @media (max-width: 480px) {
+        .Cards {
+            @apply min-h-[470px] max-w-[90vw]; /* Slightly smaller on very small screens */
+        }
+    }
+
+    /* Fix for card width issues between 777px and 1021px */
+    @media (min-width: 777px) and (max-width: 1021px) {
+        .Cards {
+            min-width: 300px !important;
+            width: 300px !important;
+        }
+    }
+
+    .Cards.dark {
+        @apply bg-gradient-to-br from-[#332500]/80 to-[#1a1200] border border-amber-400/20;
+    }
+
+    .Cards.light {
+        @apply bg-white border border-gray-100;
+    }
+
+    .TestimonialsCard {
+        @apply shadow-2xl transition-all duration-500 w-full md:w-[450px] h-auto min-h-[150px] rounded-lg p-4 flex items-start relative z-10;
+    }
+
+    .TestimonialsCard-dark {
+        @apply bg-gradient-to-r from-gray-900 via-gray-800 to-gray-900 text-white;
+    }
+
+    .TestimonialsCard-light {
+        @apply bg-white text-black;
+    }
+
+    .TestimonialsProfile {
+        @apply w-16 h-16 sm:w-24 sm:h-24 md:w-28 md:h-28 lg:w-32 lg:h-32 rounded-full mr-4 flex-shrink-0 object-cover;
+    }
+
+    /* Hover effects for testimonial cards */
+    .testimonial-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
+    }
+
+    .dark .testimonial-card:hover {
+        box-shadow: 0 20px 40px rgba(255, 255, 255, 0.1);
+    }
+
+    /* Testimonial text styling */
+    .testimonial-text {
+        @apply text-sm sm:text-base italic ;
+    }
+
+    .testimonial-author {
+        @apply font-semibold text-right mt-3 text-sm sm:text-base;
+    }
+
+
+
+    /* Responsive adjustments for testimonials */
+    @media (max-width: 768px) {
+        .TestimonialsCard {
+            @apply min-h-[130px] p-3;
+        }
+
+        .TestimonialsProfile {
+            @apply w-14 h-14 sm:w-16 sm:h-16 mr-3;
+        }
+    }
+
+    @media (max-width: 640px) {
+        .TestimonialsCard {
+            @apply min-h-[120px] p-3;
+        }
+
+        .testimonial-text {
+            @apply text-xs sm:text-sm;
+        }
+
+        .testimonial-author {
+            @apply text-xs sm:text-sm mt-2;
+        }
+    }
+
+}
+
+/* Simple up and down floating animation for all diamonds */
+@keyframes float-up-down {
+    0%, 100% {
+        transform: translate(-50%, -50%) translateY(0px);
+    }
+    50% {
+        transform: translate(-50%, -50%) translateY(-15px);
+    }
+}
+
+
+.animate-float-up-down {
+    animation: float-up-down 3s ease-in-out infinite;
+}
+
+
+/* Diamond shape styling with glow */
+.diamond-shape {
+    filter: drop-shadow(0 2px 4px rgba(211, 164, 16, 0.6));
+}
+
+/* Backdrop blur consistency */
+.backdrop-blur-md {
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+}
+
+/* Keep existing animations */
+@keyframes bounce-custom {
+    0%, 100% {
+        transform: translateY(36px);
+    }
+    50% {
+        transform: translateY(46px);
+    }
+}
+
+@keyframes bounce-custom-2 {
+    0%, 100% {
+        transform: translateY(46px);
+    }
+    50% {
+        transform: translateY(56px);
+    }
+}
+
+@keyframes umbral {
+    0% {
+        stop-color: #d3a5102e;
+    }
+    50% {
+        stop-color: rgba(211, 165, 16, 0.519);
+    }
+    100% {
+        stop-color: #d3a5102e;
+    }
+}
+
+.animate-bounce-custom {
+    animation: bounce-custom 4s ease-in-out infinite;
+    transform: translateY(36px);
+}
+
+.animate-bounce-custom-2 {
+    animation: bounce-custom-2 4s ease-in-out infinite;
+    transform: translateY(46px);
+    animation-delay: 0.5s;
+}
+
+.animate-umbral {
+    animation: umbral 4s infinite;
+}
+
+/* Ensure navigation dots are visible */
+.loader-svg-container {
+    position: relative;
+    z-index: 10;
+}
+
+/* Improved visibility for dots */
+.bg-amber-200 {
+    background-color: #fde68a;
+}
+
+.bg-amber-400 {
+    background-color: #fbbf24;
+}
+
+.bg-amber-600 {
+    background-color: #d97706;
+}
+
+.bg-amber-700 {
+    background-color: #b45309;
+}
+
+/* ========== NAVIGATION ========== */
+.NavBar {
+  @apply h-[135px] w-full sm:w-[800px] md:w-[1040px] mx-auto flex items-center justify-between px-0;
+}
+
+.NavBarBottom {
+  @apply absolute bottom-0 left-1/2 transform -translate-x-1/2 bg-[#FFC511] h-[80px] w-[800px];
+}
+
+
+.dark .NavBarBottom {
+  @apply bg-[#332500]/50;
+}
+
+.NavBarBottom a {
+  position: relative;
+  display: inline-block;
+  padding-bottom: 4px; /* space for underline */
+  @apply transition-all duration-300 ease-in-out text-sm sm:text-base;
+}
+
+.NavBarBottom a::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 0;
+  height: 2px;
+  background-color: transparent;
+  transition: all 0.3s ease-in-out;
+}
+
+.NavBarBottom a:hover {
+  @apply text-white;
+}
+
+.NavBarBottom a:hover::after {
+  width: 100%;
+  background-color: white;
+}
+@media (max-width: 640px) {
+    .NavBarBottom {
+        @apply py-3;
+    }
+
+    .NavBarBottom a {
+        padding-bottom: 2px;
+    }
+}
+
+/* For very small screens, reduce gap further */
+@media (max-width: 400px) {
+    .NavBarBottom ul {
+        @apply gap-1;
+    }
+
+    .NavBarBottom a {
+        @apply text-xs;
+    }
+}
+.hide-scrollbar {
+    scrollbar-width: none; /* Firefox */
+    -ms-overflow-style: none; /* IE and Edge */
+}
+
+.hide-scrollbar::-webkit-scrollbar {
+    display: none; /* Chrome, Safari and Opera */
+}
+
+/* Optional: Add some padding to ensure items aren't cut off at edges */
+.NavBarBottom ul {
+    padding: 0 1rem;
+}
+
+/* For very small screens, you might want to adjust spacing */
+@media (max-width: 640px) {
+    .NavBarBottom ul {
+        padding: 0 0.5rem;
+    }
+}
+
+.logoTop{
+    @apply  sm:justify-end items-center space-y-2 sm:space-y-0 space-x-0 sm:space-x-4 md:w-44 md:h-44 sm:mt-0 lg:w-52 lg:h-52 sm:w-44 mb-4 sm:mb-0;
+}
+/* Shared nav-link style */
+.nav-link {
+  position: relative;
+  transition: all 0.3s ease-in-out;
+    @apply text-sm md:text-base;
+}
+.nav-link:hover {
+  color: #f59e0b; /* amber-400 */
+}
+
+.nav-link::after {
+  content: '';
+  @apply absolute bottom-0 left-1/2 w-0 h-0.5 bg-transparent transition-all duration-500 ease-in-out;
+}
+
+.nav-link:hover::after {
+  @apply left-0 w-full bg-amber-400;
+}
+
+/* ========== TYPOGRAPHY ========== */
+h1 {
+  @apply text-4xl font-bold mb-6 font-poppins;
+}
+h2 {
+  @apply text-3xl font-bold mb-3 font-poppins;
+}
+h3 {
+  @apply text-2xl font-bold mb-2 font-poppins;
+}
+span {
+  @apply text-amber-400;
+}
+
+/* ========== BUTTONS ========== */
+.Button2 {
+  @apply bg-transparent border border-amber-400 transition-all duration-500 transform hover:scale-105 hover:text-black hover:bg-amber-400 shadow-lg;
+}
+
+.button {
+  @apply px-3 py-1 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded
+  hover:bg-gray-300 dark:hover:bg-gray-600 font-poppins transition-all duration-300;
+}
+
+button:focus,
+button:focus-visible {
+  @apply outline-blue-500 outline-2 outline-offset-2;
+}
+
+/* ========== ANIMATIONS ========== */
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-20px); }
+}
+
+@keyframes float-slow {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  50% { transform: translateY(-20px) rotate(5deg); }
+}
+
+@keyframes twinkle {
+  0%, 100% { opacity: 0.7; }
+  50% { opacity: 1; }
+}
+
+.animate-float {
+  animation: float 6s ease-in-out infinite;
+}
+.animate-float-slow {
+  animation: float-slow 8s ease-in-out infinite;
+}
+.animate-twinkle {
+  animation: twinkle 3s ease-in-out infinite;
+}
+
+/* ========== HEADER ========== */
+header {
+  @apply relative w-full h-auto min-h-[870px] mb-10 flex justify-center items-start;
+}
+
+/* ========== TESTIMONIAL HOVER EFFECTS ========== */
+
+/* Floating light glow effect */
+.drop-glow {
+    filter: drop-shadow(0 0 15px rgba(245, 158, 11, 0.6));
+    animation: pulse-glow 3s ease-in-out infinite;
+    @apply -bottom-[15%] left-[20%] -translate-x-1/2 z-0 animate-float-slow;
+}
+
+@keyframes pulse-glow {
+    0%, 100% { filter: drop-shadow(0 0 15px rgba(245, 158, 11, 0.6)); }
+    50% { filter: drop-shadow(0 0 25px rgba(245, 158, 11, 0.9)); }
+}
+
+/* White shadow for dark mode testimonials */
+.hover-white-shadow {
+    transition: all 0.3s ease-in-out;
+}
+
+.dark .hover-white-shadow:hover {
+    box-shadow: 0 10px 30px rgba(255, 255, 255, 0.15);
+}
+/* Social Media Icons */
+.social-icon {
+  @apply transition-all duration-300 transform hover:scale-110;
+}
+
+/* Alternative: Use SVG filters for amber color */
+.group-hover\:filter-amber-400 {
+  filter:
+          brightness(0)
+          invert(72%)
+          sepia(90%)
+          saturate(500%)
+          hue-rotate(360deg)
+          brightness(90%);
+}
+
+/* Or use this simpler approach if the filter doesn't work */
+.social-icon img {
+  transition: all 0.3s ease-in-out;
+}
+
+.social-icon:hover img {
+  filter:
+          brightness(0)
+          saturate(100%)
+          invert(72%)
+          sepia(90%)
+          saturate(500%)
+          hue-rotate(360deg)
+          brightness(90%);
+}
+
+/* For SVG icons that are already white */
+.dark .social-icon img {
+  filter: brightness(0) invert(1);
+}
+
+.dark .social-icon:hover img {
+  filter:
+          brightness(0)
+          saturate(100%)
+          invert(72%)
+          sepia(90%)
+          saturate(500%)
+          hue-rotate(360deg)
+          brightness(90%);
+}
+footer p, a{
+  @apply py-1 text-sm cursor-pointer hover:text-amber-400 transition-colors duration-500;
+}
+body {
+    font-family: 'Poppins', sans-serif;
+}
+
+/* Mobile Responsive */
+
+.icon-container {
+    transition: all 0.3s ease;
+}
+.icon-container:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+@keyframes twinkle {
+    0%, 100% { opacity: 0.7; }
+    50% { opacity: 1; }
+}
+
+.animate-twinkle {
+    animation: twinkle 3s ease-in-out infinite;
+}

@@ -9,9 +9,9 @@
 ### 1. **Navigate to Your Subsystem**
 - Go to the `backend/` directory
 - Find the folder with your name or assigned subsystem:
-  - 📊 `property-management/` - Assigned to: [Your Name]
-  - 💰 `transaction-management/` - Assigned to: [Your Name] 
-  - 📈 `analysis-service/` - Assigned to: [Your Name]
+  - 📊 `property-management/` - Assigned to: Beza
+  - 💰 `transaction-management/` - Assigned to: Saron 
+  - 📈 `analysis-service/` - Assigned to: Beletu
 
 ### 2. **Read Your README.md File**
 Once you're in your assigned subsystem folder:

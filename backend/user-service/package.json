@@ -1,22 +1,26 @@
 {
   "name": "user-service",
   "version": "1.0.0",
-  "description": "Handles user registration, authentication, and RBAC for WubLand Portfolio",
+  "type": "module",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "dev": "nodemon server.js"
   },
-
   "keywords": [],
-  "author": "Yokabd Bililign",
+  "author": "",
   "license": "ISC",
+  "description": "",
   "dependencies": {
     "bcrypt": "^6.0.0",
+    "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
-    "dotenv": "^17.2.1",
+    "dotenv": "^17.2.2",
     "express": "^5.1.0",
+    "express-fileupload": "^1.5.2",
     "jsonwebtoken": "^9.0.2",
-    "mysql2": "^3.14.3"
+    "mysql2": "^3.14.4"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.10"
   }
 }

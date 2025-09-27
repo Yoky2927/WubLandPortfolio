@@ -1,76 +1,60 @@
--- Create Database
 CREATE DATABASE IF NOT EXISTS wubland_portfolio_db;
 USE wubland_portfolio_db;
 
--- Users Table (User Management)
+-- Create users table
 CREATE TABLE IF NOT EXISTS users (
-                                     id INT AUTO_INCREMENT PRIMARY KEY,
-                                     email VARCHAR(255) UNIQUE NOT NULL,
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    first_name VARCHAR(255) NOT NULL,
+    last_name VARCHAR(255) NOT NULL,
+    username VARCHAR(50) UNIQUE,
+    email VARCHAR(255) NOT NULL UNIQUE,
     password VARCHAR(255) NOT NULL,
-    role ENUM('user', 'broker', 'admin', 'support_agent') NOT NULL,
+    role ENUM('admin', 'broker', 'buyer', 'seller', 'user', 'renter', 'support_agent') NOT NULL DEFAULT 'user',
+    profile_picture VARCHAR(255),
     verified BOOLEAN DEFAULT FALSE,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    );
-
--- Properties Table (Property Management)
-CREATE TABLE IF NOT EXISTS properties (
-                                          id INT AUTO_INCREMENT PRIMARY KEY,
-                                          address VARCHAR(255) NOT NULL,
-    price DECIMAL(10, 2) NOT NULL,
-    type ENUM('rent', 'sale') NOT NULL,
-    status ENUM('pending', 'approved', 'rejected') NOT NULL,
-    description TEXT,
-    images JSON,
-    owner_id INT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (owner_id) REFERENCES users(id)
-    );
+    status ENUM('active', 'inactive', 'suspended') NOT NULL DEFAULT 'active',
+    is_premium BOOLEAN DEFAULT FALSE,
+    broker_type ENUM('internal', 'external') NULL,
+    last_message_time TIMESTAMP NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
--- Transactions Table (Transaction Management)
-CREATE TABLE IF NOT EXISTS transactions (
-                                            id INT AUTO_INCREMENT PRIMARY KEY,
-                                            property_id INT NOT NULL,
-                                            user_id INT NOT NULL,
-                                            amount DECIMAL(10, 2) NOT NULL,
-    type ENUM('rent', 'purchase') NOT NULL,
-    status ENUM('pending', 'completed', 'failed') NOT NULL,
-    broker_id INT,
+-- Create todos table
+CREATE TABLE IF NOT EXISTS todos (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    text TEXT NOT NULL,
+    completed BOOLEAN DEFAULT FALSE,
+    due_date DATE,
+    assignee VARCHAR(255),
+    created_by INT,
+    order_index INT DEFAULT 0,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (property_id) REFERENCES properties(id),
-    FOREIGN KEY (user_id) REFERENCES users(id),
-    FOREIGN KEY (broker_id) REFERENCES users(id)
-    );
+    FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
--- Notifications Table (Communication - One-way)
-CREATE TABLE IF NOT EXISTS notifications (
-                                             id INT AUTO_INCREMENT PRIMARY KEY,
-                                             user_id INT NOT NULL,
-                                             message TEXT NOT NULL,
-                                             type ENUM('payment_update', 'property_status', 'announcement') NOT NULL,
-    read BOOLEAN DEFAULT FALSE,
+-- Create chat_messages table
+CREATE TABLE IF NOT EXISTS chat_messages (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    sender_id INT,
+    receiver_id INT,
+    text TEXT,
+    image VARCHAR(255),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (user_id) REFERENCES users(id)
-    );
+    status ENUM('sent', 'delivered', 'read') DEFAULT 'sent',
+    file VARCHAR(255),
+    file_type VARCHAR(50),
+    file_name VARCHAR(255),
+    FOREIGN KEY (sender_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (receiver_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
--- Messages Table (Communication - Two-way)
-CREATE TABLE IF NOT EXISTS messages (
-                                        id INT AUTO_INCREMENT PRIMARY KEY,
-                                        sender_id INT NOT NULL,
-                                        receiver_id INT NOT NULL,
-                                        message TEXT NOT NULL,
-                                        read BOOLEAN DEFAULT FALSE,
-                                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                                        FOREIGN KEY (sender_id) REFERENCES users(id),
-    FOREIGN KEY (receiver_id) REFERENCES users(id)
-    );
-
--- Reports Table (Analysis and Reporting)
-CREATE TABLE IF NOT EXISTS reports (
-                                       id INT AUTO_INCREMENT PRIMARY KEY,
-                                       type ENUM('sales_rent', 'payment_tracking', 'broker_performance') NOT NULL,
-    data JSON,
-    generated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    );
-
--- Insert Sample Data (Optional)
-INSERT INTO users (email, password, role) VALUES ('admin@example.com', '$2b$10$...hashed...', 'admin');
+-- Create admin_activities table
+CREATE TABLE IF NOT EXISTS admin_activities (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    type VARCHAR(50) NOT NULL,
+    admin_username VARCHAR(50) NOT NULL,
+    target VARCHAR(255),
+    details TEXT,
+    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (admin_username) REFERENCES users(username) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;

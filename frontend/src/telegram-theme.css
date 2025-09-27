@@ -1,0 +1,52 @@
+/* Telegram CSS Variables and Classes */
+:root {
+    --telegram-bg-dark: #0e1621;
+    --telegram-bg-light: #f5f5f5;
+    --telegram-sidebar-dark: #17212b;
+    --telegram-sidebar-light: #ffffff;
+    --telegram-header-dark: #17212b;
+    --telegram-header-light: #ffffff;
+    --telegram-input-dark: #242f3d;
+    --telegram-input-light: #ffffff;
+    --telegram-border-dark: #2f3847;
+    --telegram-border-light: #e0e0e0;
+    --telegram-hover-dark: #2b5278;
+    --telegram-hover-light: #f0f0f0;
+    --telegram-selected-dark: #2b5278;
+    --telegram-selected-light: #e3f2fd;
+    --telegram-primary: #0088cc;
+    --telegram-primary-dark: #0077b3;
+    --telegram-own-message-dark: #2b5278;
+    --telegram-own-message-light: #e3f2fd;
+    --telegram-their-message-dark: #182533;
+    --telegram-their-message-light: #ffffff;
+}
+
+.bg-telegram-bg-dark { background-color: var(--telegram-bg-dark); }
+.bg-telegram-bg-light { background-color: var(--telegram-bg-light); }
+.bg-telegram-sidebar-dark { background-color: var(--telegram-sidebar-dark); }
+.bg-telegram-sidebar-light { background-color: var(--telegram-sidebar-light); }
+.bg-telegram-header-dark { background-color: var(--telegram-header-dark); }
+.bg-telegram-header-light { background-color: var(--telegram-header-light); }
+.bg-telegram-input-dark { background-color: var(--telegram-input-dark); }
+.bg-telegram-input-light { background-color: var(--telegram-input-light); }
+.bg-telegram-hover-dark { background-color: var(--telegram-hover-dark); }
+.bg-telegram-hover-light { background-color: var(--telegram-hover-light); }
+.bg-telegram-selected-dark { background-color: var(--telegram-selected-dark); }
+.bg-telegram-selected-light { background-color: var(--telegram-selected-light); }
+.bg-telegram-primary { background-color: var(--telegram-primary); }
+.bg-telegram-primary-dark { background-color: var(--telegram-primary-dark); }
+.bg-telegram-own-message-dark { background-color: var(--telegram-own-message-dark); }
+.bg-telegram-own-message-light { background-color: var(--telegram-own-message-light); }
+.bg-telegram-their-message-dark { background-color: var(--telegram-their-message-dark); }
+.bg-telegram-their-message-light { background-color: var(--telegram-their-message-light); }
+
+.border-telegram-border-dark { border-color: var(--telegram-border-dark); }
+.border-telegram-border-light { border-color: var(--telegram-border-light); }
+
+.text-telegram-primary { color: var(--telegram-primary); }
+
+/* Optional: Add smooth transitions for all elements */
+* {
+    transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+}

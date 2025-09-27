@@ -1,270 +1,176 @@
+/* ========== SYNFUSION UI COMPONENTS ========== */
+@import "../node_modules/@syncfusion/ej2-base/styles/material.css";
+@import "../node_modules/@syncfusion/ej2-buttons/styles/material.css";
+@import "../node_modules/@syncfusion/ej2-lists/styles/material.css";
+@import "../node_modules/@syncfusion/ej2-popups/styles/material.css";
+@import "../node_modules/@syncfusion/ej2-inputs/styles/material.css";
+
+/* ========== TAILWIND CSS ========== */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* ========== BASE STYLES ========== */
+/* ========== BASE STYLES & THEME SETUP ========== */
 @layer base {
+  /* Base body styles with theme transitions */
   body {
     @apply transition-colors duration-300 bg-black text-white font-poppins;
   }
 
+  /* Light theme variant */
   body.light {
     @apply bg-white text-black;
   }
 
+  /* Dark theme variant with gradient background */
   body.dark {
     @apply bg-gradient-to-r from-gray-900 via-black to-gray-900 text-white;
   }
 }
 
+/* ========== UTILITY CLASSES ========== */
 @layer utilities {
-    /* Custom breakpoint for extra small screens (xs) - screens smaller than 640px */
-    @media (max-width: 639px) {
-        .xs\:px-4 {
-            padding-left: 1rem;
-            padding-right: 1rem;
-        }
-        .xs\:px-3 {
-            padding-left: 0.75rem;
-            padding-right: 0.75rem;
-        }
-        .xs\:text-lg {
-            font-size: 1.125rem;
-            line-height: 1.75rem;
-        }
-        .xs\:text-base {
-            font-size: 1rem;
-            line-height: 1.5rem;
-        }
-        .xs\:pt-\[10\%\] {
-            padding-top: 10%;
-        }
-        .xs\:pt-\[15\%\] {
-            padding-top: 15%;
-        }
-        .xs\:pt-\[20\%\] {
-            padding-top: 20%;
-        }
-        .xs\:pt-\[25\%\] {
-            padding-top: 25%;
-        }
-        .xs\:px-\[5\%\] {
-            padding-left: 5%;
-            padding-right: 5%;
-        }
-        .xs\:px-\[10\%\] {
-            padding-left: 10%;
-            padding-right: 10%;
-        }
-    }
+  /* Custom breakpoint for extra small screens (xs) - screens smaller than 640px */
+  @media (max-width: 639px) {
+    .xs\:px-4 { padding-left: 1rem; padding-right: 1rem; }
+    .xs\:px-3 { padding-left: 0.75rem; padding-right: 0.75rem; }
+    .xs\:text-lg { font-size: 1.125rem; line-height: 1.75rem; }
+    .xs\:text-base { font-size: 1rem; line-height: 1.5rem; }
+    .xs\:pt-\[10\%\] { padding-top: 10%; }
+    .xs\:pt-\[15\%\] { padding-top: 15%; }
+    .xs\:pt-\[20\%\] { padding-top: 20%; }
+    .xs\:pt-\[25\%\] { padding-top: 25%; }
+    .xs\:px-\[5\%\] { padding-left: 5%; padding-right: 5%; }
+    .xs\:px-\[10\%\] { padding-left: 10%; padding-right: 10%; }
+  }
 }
 
-/* ========== COMPONENTS ========== */
+/* ========== COMPONENT STYLES ========== */
 @layer components {
-.Cards {
+  /* ========== CARD COMPONENTS ========== */
+  /* Main card component with hover effects */
+  .Cards {
     @apply shadow-xl overflow-hidden relative transition-all duration-500 hover:shadow-2xl hover:-translate-y-1;
     @apply w-full max-w-xs mx-auto h-auto min-h-[450px] md:min-h-[500px] transition-transform duration-300 hover:scale-[1.02];
     min-width: 280px;
-       }
+  }
 
-    /* For medium screens and up */
-    @media (min-width: 768px) {
-        .Cards {
-            @apply w-[calc(50%-1rem)]; /* 16px gap equivalent */
-        }
-    }
+  /* Card responsive adjustments */
+  @media (min-width: 768px) {
+    .Cards { @apply w-[calc(50%-1rem)]; } /* 16px gap equivalent */
+  }
+  @media (min-width: 1024px) {
+    .Cards { @apply w-80; } /* 320px */
+  }
+  @media (max-width: 480px) {
+    .Cards { @apply min-h-[470px] max-w-[90vw]; }
+  }
+  @media (min-width: 777px) and (max-width: 1021px) {
+    .Cards { min-width: 300px !important; width: 300px !important; }
+  }
 
-    /* For large screens and up */
-    @media (min-width: 1024px) {
-        .Cards {
-            @apply w-80; /* 320px */
-        }
-    }
+  /* Card theme variants */
+  .Cards.dark {
+    @apply bg-gradient-to-br from-[#332500]/80 to-[#1a1200] border border-amber-400/20;
+  }
+  .Cards.light {
+    @apply bg-white border border-gray-100;
+  }
 
-    /* Extra small screen adjustments */
-    @media (max-width: 480px) {
-        .Cards {
-            @apply min-h-[470px] max-w-[90vw]; /* Slightly smaller on very small screens */
-        }
-    }
+  /* ========== TESTIMONIAL COMPONENTS ========== */
+  .TestimonialsCard {
+    @apply shadow-2xl transition-all duration-500 w-full md:w-[450px] h-auto min-h-[150px] rounded-lg p-4 flex items-start relative z-10;
+  }
 
-    /* Fix for card width issues between 777px and 1021px */
-    @media (min-width: 777px) and (max-width: 1021px) {
-        .Cards {
-            min-width: 300px !important;
-            width: 300px !important;
-        }
-    }
+  /* Testimonial theme variants */
+  .TestimonialsCard-dark {
+    @apply bg-gradient-to-r from-gray-900 via-gray-800 to-gray-900 text-white;
+  }
+  .TestimonialsCard-light {
+    @apply bg-white text-black;
+  }
 
-    .Cards.dark {
-        @apply bg-gradient-to-br from-[#332500]/80 to-[#1a1200] border border-amber-400/20;
-    }
+  .TestimonialsProfile {
+    @apply w-16 h-16 sm:w-24 sm:h-24 md:w-28 md:h-28 lg:w-32 lg:h-32 rounded-full mr-4 flex-shrink-0 object-cover;
+  }
 
-    .Cards.light {
-        @apply bg-white border border-gray-100;
-    }
+  /* Testimonial hover effects */
+  .testimonial-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
+  }
+  .dark .testimonial-card:hover {
+    box-shadow: 0 20px 40px rgba(255, 255, 255, 0.1);
+  }
 
-    .TestimonialsCard {
-        @apply shadow-2xl transition-all duration-500 w-full md:w-[450px] h-auto min-h-[150px] rounded-lg p-4 flex items-start relative z-10;
-    }
+  /* Testimonial text styling */
+  .testimonial-text { @apply text-sm sm:text-base italic; }
+  .testimonial-author { @apply font-semibold text-right mt-3 text-sm sm:text-base; }
 
-    .TestimonialsCard-dark {
-        @apply bg-gradient-to-r from-gray-900 via-gray-800 to-gray-900 text-white;
-    }
-
-    .TestimonialsCard-light {
-        @apply bg-white text-black;
-    }
-
-    .TestimonialsProfile {
-        @apply w-16 h-16 sm:w-24 sm:h-24 md:w-28 md:h-28 lg:w-32 lg:h-32 rounded-full mr-4 flex-shrink-0 object-cover;
-    }
-
-    /* Hover effects for testimonial cards */
-    .testimonial-card:hover {
-        transform: translateY(-5px);
-        box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
-    }
-
-    .dark .testimonial-card:hover {
-        box-shadow: 0 20px 40px rgba(255, 255, 255, 0.1);
-    }
-
-    /* Testimonial text styling */
-    .testimonial-text {
-        @apply text-sm sm:text-base italic ;
-    }
-
-    .testimonial-author {
-        @apply font-semibold text-right mt-3 text-sm sm:text-base;
-    }
-
-
-
-    /* Responsive adjustments for testimonials */
-    @media (max-width: 768px) {
-        .TestimonialsCard {
-            @apply min-h-[130px] p-3;
-        }
-
-        .TestimonialsProfile {
-            @apply w-14 h-14 sm:w-16 sm:h-16 mr-3;
-        }
-    }
-
-    @media (max-width: 640px) {
-        .TestimonialsCard {
-            @apply min-h-[120px] p-3;
-        }
-
-        .testimonial-text {
-            @apply text-xs sm:text-sm;
-        }
-
-        .testimonial-author {
-            @apply text-xs sm:text-sm mt-2;
-        }
-    }
-
+  /* Testimonial responsive adjustments */
+  @media (max-width: 768px) {
+    .TestimonialsCard { @apply min-h-[130px] p-3; }
+    .TestimonialsProfile { @apply w-14 h-14 sm:w-16 sm:h-16 mr-3; }
+  }
+  @media (max-width: 640px) {
+    .TestimonialsCard { @apply min-h-[120px] p-3; }
+    .testimonial-text { @apply text-xs sm:text-sm; }
+    .testimonial-author { @apply text-xs sm:text-sm mt-2; }
+  }
 }
 
-/* Simple up and down floating animation for all diamonds */
+/* ========== ANIMATIONS & KEYFRAMES ========== */
+/* Floating animation for diamonds */
 @keyframes float-up-down {
-    0%, 100% {
-        transform: translate(-50%, -50%) translateY(0px);
-    }
-    50% {
-        transform: translate(-50%, -50%) translateY(-15px);
-    }
+  0%, 100% { transform: translate(-50%, -50%) translateY(0px); }
+  50% { transform: translate(-50%, -50%) translateY(-15px); }
 }
-
-
-.animate-float-up-down {
-    animation: float-up-down 3s ease-in-out infinite;
-}
-
+.animate-float-up-down { animation: float-up-down 3s ease-in-out infinite; }
 
 /* Diamond shape styling with glow */
-.diamond-shape {
-    filter: drop-shadow(0 2px 4px rgba(211, 164, 16, 0.6));
-}
+.diamond-shape { filter: drop-shadow(0 2px 4px rgba(211, 164, 16, 0.6)); }
 
 /* Backdrop blur consistency */
 .backdrop-blur-md {
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
 }
 
-/* Keep existing animations */
+/* Copy feedback animation */
+@keyframes bounceIn {
+  0% { transform: scale(0.8); opacity: 0; }
+  50% { transform: scale(1.1); }
+  100% { transform: scale(1); opacity: 1; }
+}
+.copy-feedback { animation: bounceIn 0.3s ease-out; }
+
+/* Existing custom animations */
 @keyframes bounce-custom {
-    0%, 100% {
-        transform: translateY(36px);
-    }
-    50% {
-        transform: translateY(46px);
-    }
+  0%, 100% { transform: translateY(36px); }
+  50% { transform: translateY(46px); }
 }
-
 @keyframes bounce-custom-2 {
-    0%, 100% {
-        transform: translateY(46px);
-    }
-    50% {
-        transform: translateY(56px);
-    }
+  0%, 100% { transform: translateY(46px); }
+  50% { transform: translateY(56px); }
 }
-
 @keyframes umbral {
-    0% {
-        stop-color: #d3a5102e;
-    }
-    50% {
-        stop-color: rgba(211, 165, 16, 0.519);
-    }
-    100% {
-        stop-color: #d3a5102e;
-    }
+  0% { stop-color: #d3a5102e; }
+  50% { stop-color: rgba(211, 165, 16, 0.519); }
+  100% { stop-color: #d3a5102e; }
 }
 
 .animate-bounce-custom {
-    animation: bounce-custom 4s ease-in-out infinite;
-    transform: translateY(36px);
+  animation: bounce-custom 4s ease-in-out infinite;
+  transform: translateY(36px);
 }
-
 .animate-bounce-custom-2 {
-    animation: bounce-custom-2 4s ease-in-out infinite;
-    transform: translateY(46px);
-    animation-delay: 0.5s;
+  animation: bounce-custom-2 4s ease-in-out infinite;
+  transform: translateY(46px);
+  animation-delay: 0.5s;
 }
+.animate-umbral { animation: umbral 4s infinite; }
 
-.animate-umbral {
-    animation: umbral 4s infinite;
-}
-
-/* Ensure navigation dots are visible */
-.loader-svg-container {
-    position: relative;
-    z-index: 10;
-}
-
-/* Improved visibility for dots */
-.bg-amber-200 {
-    background-color: #fde68a;
-}
-
-.bg-amber-400 {
-    background-color: #fbbf24;
-}
-
-.bg-amber-600 {
-    background-color: #d97706;
-}
-
-.bg-amber-700 {
-    background-color: #b45309;
-}
-
-/* ========== NAVIGATION ========== */
+/* ========== NAVIGATION STYLES ========== */
 .NavBar {
   @apply h-[135px] w-full sm:w-[800px] md:w-[1040px] mx-auto flex items-center justify-between px-0;
 }
@@ -272,19 +178,15 @@
 .NavBarBottom {
   @apply absolute bottom-0 left-1/2 transform -translate-x-1/2 bg-[#FFC511] h-[80px] w-[800px];
 }
+.dark .NavBarBottom { @apply bg-[#332500]/50; }
 
-
-.dark .NavBarBottom {
-  @apply bg-[#332500]/50;
-}
-
+/* Navigation link styling with hover effects */
 .NavBarBottom a {
   position: relative;
   display: inline-block;
-  padding-bottom: 4px; /* space for underline */
+  padding-bottom: 4px;
   @apply transition-all duration-300 ease-in-out text-sm sm:text-base;
 }
-
 .NavBarBottom a::after {
   content: '';
   position: absolute;
@@ -295,228 +197,429 @@
   background-color: transparent;
   transition: all 0.3s ease-in-out;
 }
-
-.NavBarBottom a:hover {
-  @apply text-white;
-}
-
+.NavBarBottom a:hover { @apply text-white; }
 .NavBarBottom a:hover::after {
   width: 100%;
   background-color: white;
 }
+
+/* Navigation responsive adjustments */
 @media (max-width: 640px) {
-    .NavBarBottom {
-        @apply py-3;
-    }
-
-    .NavBarBottom a {
-        padding-bottom: 2px;
-    }
+  .NavBarBottom { @apply py-3; }
+  .NavBarBottom a { padding-bottom: 2px; }
 }
-
-/* For very small screens, reduce gap further */
 @media (max-width: 400px) {
-    .NavBarBottom ul {
-        @apply gap-1;
-    }
-
-    .NavBarBottom a {
-        @apply text-xs;
-    }
+  .NavBarBottom ul { @apply gap-1; }
+  .NavBarBottom a { @apply text-xs; }
 }
+
+/* Scrollbar hiding utility */
 .hide-scrollbar {
-    scrollbar-width: none; /* Firefox */
-    -ms-overflow-style: none; /* IE and Edge */
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE and Edge */
+}
+.hide-scrollbar::-webkit-scrollbar { display: none; } /* Chrome, Safari, Opera */
+
+/* Logo styling */
+.logoTop {
+  @apply sm:justify-end items-center space-y-2 sm:space-y-0 space-x-0 sm:space-x-4 md:w-44 md:h-44 sm:mt-0 lg:w-52 lg:h-52 sm:w-44 mb-4 sm:mb-0;
 }
 
-.hide-scrollbar::-webkit-scrollbar {
-    display: none; /* Chrome, Safari and Opera */
-}
-
-/* Optional: Add some padding to ensure items aren't cut off at edges */
-.NavBarBottom ul {
-    padding: 0 1rem;
-}
-
-/* For very small screens, you might want to adjust spacing */
-@media (max-width: 640px) {
-    .NavBarBottom ul {
-        padding: 0 0.5rem;
-    }
-}
-
-.logoTop{
-    @apply  sm:justify-end items-center space-y-2 sm:space-y-0 space-x-0 sm:space-x-4 md:w-44 md:h-44 sm:mt-0 lg:w-52 lg:h-52 sm:w-44 mb-4 sm:mb-0;
-}
-/* Shared nav-link style */
+/* Shared navigation link styling */
 .nav-link {
   position: relative;
   transition: all 0.3s ease-in-out;
-    @apply text-sm md:text-base;
+  @apply text-sm md:text-base;
 }
-.nav-link:hover {
-  color: #f59e0b; /* amber-400 */
-}
-
+.nav-link:hover { color: #f59e0b; }
 .nav-link::after {
   content: '';
   @apply absolute bottom-0 left-1/2 w-0 h-0.5 bg-transparent transition-all duration-500 ease-in-out;
 }
-
 .nav-link:hover::after {
   @apply left-0 w-full bg-amber-400;
 }
 
 /* ========== TYPOGRAPHY ========== */
-h1 {
-  @apply text-4xl font-bold mb-6 font-poppins;
-}
-h2 {
-  @apply text-3xl font-bold mb-3 font-poppins;
-}
-h3 {
-  @apply text-2xl font-bold mb-2 font-poppins;
-}
-span {
-  @apply text-amber-400;
-}
+h1 { @apply text-4xl font-bold mb-6 font-poppins; }
+h2 { @apply text-3xl font-bold mb-3 font-poppins; }
+h3 { @apply text-2xl font-bold mb-2 font-poppins; }
+span { @apply text-amber-400; }
 
-/* ========== BUTTONS ========== */
+/* ========== BUTTON STYLES ========== */
 .Button2 {
   @apply bg-transparent border border-amber-400 transition-all duration-500 transform hover:scale-105 hover:text-black hover:bg-amber-400 shadow-lg;
 }
-
 .button {
   @apply px-3 py-1 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded
   hover:bg-gray-300 dark:hover:bg-gray-600 font-poppins transition-all duration-300;
 }
 
-button:focus,
-button:focus-visible {
-  @apply outline-blue-500 outline-2 outline-offset-2;
-}
-
-/* ========== ANIMATIONS ========== */
+/* ========== GLOBAL ANIMATIONS ========== */
 @keyframes float {
   0%, 100% { transform: translateY(0); }
   50% { transform: translateY(-20px); }
 }
-
 @keyframes float-slow {
   0%, 100% { transform: translateY(0) rotate(0deg); }
   50% { transform: translateY(-20px) rotate(5deg); }
 }
-
 @keyframes twinkle {
   0%, 100% { opacity: 0.7; }
   50% { opacity: 1; }
 }
 
-.animate-float {
-  animation: float 6s ease-in-out infinite;
-}
-.animate-float-slow {
-  animation: float-slow 8s ease-in-out infinite;
-}
-.animate-twinkle {
-  animation: twinkle 3s ease-in-out infinite;
-}
+.animate-float { animation: float 6s ease-in-out infinite; }
+.animate-float-slow { animation: float-slow 8s ease-in-out infinite; }
+.animate-twinkle { animation: twinkle 3s ease-in-out infinite; }
 
-/* ========== HEADER ========== */
+/* ========== HEADER STYLES ========== */
 header {
   @apply relative w-full h-auto min-h-[870px] mb-10 flex justify-center items-start;
 }
 
-/* ========== TESTIMONIAL HOVER EFFECTS ========== */
-
+/* ========== TESTIMONIAL EFFECTS ========== */
 /* Floating light glow effect */
 .drop-glow {
-    filter: drop-shadow(0 0 15px rgba(245, 158, 11, 0.6));
-    animation: pulse-glow 3s ease-in-out infinite;
-    @apply -bottom-[15%] left-[20%] -translate-x-1/2 z-0 animate-float-slow;
+  filter: drop-shadow(0 0 15px rgba(245, 158, 11, 0.6));
+  animation: pulse-glow 3s ease-in-out infinite;
+  @apply -bottom-[15%] left-[20%] -translate-x-1/2 z-0 animate-float-slow;
 }
-
 @keyframes pulse-glow {
-    0%, 100% { filter: drop-shadow(0 0 15px rgba(245, 158, 11, 0.6)); }
-    50% { filter: drop-shadow(0 0 25px rgba(245, 158, 11, 0.9)); }
+  0%, 100% { filter: drop-shadow(0 0 15px rgba(245, 158, 11, 0.6)); }
+  50% { filter: drop-shadow(0 0 25px rgba(245, 158, 11, 0.9)); }
 }
 
 /* White shadow for dark mode testimonials */
-.hover-white-shadow {
-    transition: all 0.3s ease-in-out;
-}
+.hover-white-shadow { transition: all 0.3s ease-in-out; }
+.dark .hover-white-shadow:hover { box-shadow: 0 10px 30px rgba(255, 255, 255, 0.15); }
 
-.dark .hover-white-shadow:hover {
-    box-shadow: 0 10px 30px rgba(255, 255, 255, 0.15);
-}
-/* Social Media Icons */
+/* ========== SOCIAL MEDIA ICONS ========== */
 .social-icon {
   @apply transition-all duration-300 transform hover:scale-110;
 }
+.social-icon img { transition: all 0.3s ease-in-out; }
 
-/* Alternative: Use SVG filters for amber color */
-.group-hover\:filter-amber-400 {
-  filter:
-          brightness(0)
-          invert(72%)
-          sepia(90%)
-          saturate(500%)
-          hue-rotate(360deg)
-          brightness(90%);
-}
-
-/* Or use this simpler approach if the filter doesn't work */
-.social-icon img {
-  transition: all 0.3s ease-in-out;
-}
-
+/* Social icon hover effects */
 .social-icon:hover img {
-  filter:
-          brightness(0)
-          saturate(100%)
-          invert(72%)
-          sepia(90%)
-          saturate(500%)
-          hue-rotate(360deg)
-          brightness(90%);
+  filter: brightness(0) saturate(100%) invert(72%) sepia(90%) saturate(500%) hue-rotate(360deg) brightness(90%);
 }
-
-/* For SVG icons that are already white */
-.dark .social-icon img {
-  filter: brightness(0) invert(1);
-}
-
+.dark .social-icon img { filter: brightness(0) invert(1); }
 .dark .social-icon:hover img {
-  filter:
-          brightness(0)
-          saturate(100%)
-          invert(72%)
-          sepia(90%)
-          saturate(500%)
-          hue-rotate(360deg)
-          brightness(90%);
+  filter: brightness(0) saturate(100%) invert(72%) sepia(90%) saturate(500%) hue-rotate(360deg) brightness(90%);
 }
-footer p, a{
+
+/* ========== FOOTER STYLES ========== */
+footer p, footer a {
   @apply py-1 text-sm cursor-pointer hover:text-amber-400 transition-colors duration-500;
 }
-body {
-    font-family: 'Poppins', sans-serif;
-}
 
-/* Mobile Responsive */
+/* ========== FONT SETUP ========== */
+body { font-family: 'Poppins', sans-serif; }
 
-.icon-container {
-    transition: all 0.3s ease;
-}
+/* ========== ICON CONTAINER EFFECTS ========== */
+.icon-container { transition: all 0.3s ease; }
 .icon-container:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-}
-@keyframes twinkle {
-    0%, 100% { opacity: 0.7; }
-    50% { opacity: 1; }
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
 }
 
-.animate-twinkle {
-    animation: twinkle 3s ease-in-out infinite;
+/* ========== BOUNCE ANIMATION ========== */
+@keyframes bounce {
+  0%, 80%, 100% { transform: translateY(0); }
+  40% { transform: translateY(-5px); }
 }
+.animate-bounce { animation: bounce 1s infinite; }
+
+/* ========== CUSTOM SCROLLBAR STYLES ========== */
+::-webkit-scrollbar { height: 8px; width: 8px; }
+::-webkit-scrollbar-thumb {
+  border-radius: 9999px;
+  background: linear-gradient(135deg, hsl(232, 10%, 43%), hsl(232, 62%, 16%));
+}
+.dark ::-webkit-scrollbar-thumb {
+  background: linear-gradient(135deg, hsl(232, 10%, 43%), hsl(232, 62%, 16%));
+}
+::-webkit-scrollbar-track { background: transparent; }
+
+/* ========== GRADIENT BORDER CLASSES ========== */
+.gradient-border-amber, .gradient-border-blue, .gradient-border-red, .gradient-border-teal {
+  border: 2px solid transparent;
+  background-origin: border-box;
+  background-clip: padding-box, border-box;
+}
+.gradient-border-amber { background: linear-gradient(45deg, #f59e0b, #d97706, #fbbf24, #f59e0b) border-box; }
+.gradient-border-blue { background: linear-gradient(45deg, #3b82f6, #1d4ed8, #60a5fa, #3b82f6) border-box; }
+.gradient-border-red { background: linear-gradient(45deg, #ef4444, #dc2626, #f87171, #ef4444) border-box; }
+.gradient-border-teal { background: linear-gradient(45deg, #14b8a6, #0d9488, #2dd4bf, #14b8a6) border-box; }
+
+/* ========== GLASSMORPHISM EFFECT ========== */
+.glass-effect {
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+/* ========== LEAFLET MAP STYLES ========== */
+/* High contrast dark mode styling for maps */
+.leaflet-container-dark { filter: contrast(1.1) brightness(0.9); }
+.leaflet-container-light { filter: contrast(1); }
+
+/* Custom marker styling */
+.custom-marker { background: transparent !important; border: none !important; }
+
+/* Enhanced popup styling for both themes */
+.leaflet-popup-content-wrapper {
+  border-radius: 12px !important;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3) !important;
+}
+
+/* Dark theme popup */
+.leaflet-popup-content-wrapper.dark-popup {
+  background: #1e293b !important;
+  color: #f1f5f9 !important;
+  border: 2px solid #475569 !important;
+}
+
+/* Light theme popup */
+.leaflet-popup-content-wrapper.light-popup {
+  background: #ffffff !important;
+  color: #1e293b !important;
+  border: 2px solid #e2e8f0 !important;
+}
+
+/* Popup tip styling */
+.leaflet-popup-tip.dark-popup {
+  background: #1e293b !important;
+  border: 1px solid #475569 !important;
+}
+.leaflet-popup-tip.light-popup {
+  background: #ffffff !important;
+  border: 1px solid #e2e8f0 !important;
+}
+
+/* Tile layer contrast adjustments */
+.tile-layer-dark { filter: contrast(1.2) brightness(0.8); }
+.tile-layer-light { filter: contrast(1); }
+
+/* Enhanced container styling */
+.leaflet-container { font-family: inherit !important; }
+.leaflet-container a { color: #3b82f6 !important; }
+.leaflet-container.dark-mode a { color: #60a5fa !important; }
+
+/* Custom scrollbar for popup content */
+.leaflet-popup-content {
+  margin: 0 !important;
+  max-height: 200px;
+  overflow-y: auto;
+}
+.leaflet-popup-content::-webkit-scrollbar { width: 6px; }
+.leaflet-popup-content::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 3px;
+}
+.leaflet-popup-content.dark-popup::-webkit-scrollbar-track { background: #374151; }
+.leaflet-popup-content::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 3px;
+}
+.leaflet-popup-content.dark-popup::-webkit-scrollbar-thumb { background: #6b7280; }
+
+/* ========== REAL ESTATE MAP SPECIFIC STYLES ========== */
+/* Enhanced popup close button visibility */
+.leaflet-popup-close-button {
+  background: #4b5563 !important;
+  color: white !important;
+  border-radius: 50% !important;
+  width: 28px !important;
+  height: 28px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  font-size: 18px !important;
+  font-weight: bold !important;
+  margin: 8px 8px 0 0 !important;
+  z-index: 1000 !important;
+  transition: background 0.3s ease !important;
+}
+
+.leaflet-popup-close-button:hover {
+  background: #ef4444 !important;
+}
+
+/* ========== LEAFLET MAP STYLES ========== */
+/* Enhanced popup styling for both themes */
+.leaflet-popup-content-wrapper {
+  border-radius: 12px !important;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3) !important;
+  max-width: 400px !important;
+  width: auto !important;
+  overflow: visible !important; /* Prevent wrapper from scrolling */
+}
+
+/* Fix popup content sizing - MAKE IT SCROLLABLE */
+.leaflet-popup-content {
+  margin: 0 !important;
+  padding: 0 !important;
+  width: auto !important;
+  max-width: 380px !important;
+  min-width: 280px !important;
+  max-height: 400px !important; /* Set max height for scrolling */
+  overflow-y: auto !important; /* Enable vertical scrolling */
+  overflow-x: hidden !important; /* Prevent horizontal scrolling */
+}
+
+/* Custom scrollbar for popup content */
+.leaflet-popup-content::-webkit-scrollbar { 
+  width: 6px !important;
+}
+
+.leaflet-popup-content::-webkit-scrollbar-track {
+  background: #f1f1f1 !important;
+  border-radius: 3px !important;
+  margin: 5px 0 !important;
+}
+
+.dark .leaflet-popup-content::-webkit-scrollbar-track {
+  background: #374151 !important;
+}
+
+.leaflet-popup-content::-webkit-scrollbar-thumb {
+  background: #cbd5e1 !important;
+  border-radius: 3px !important;
+}
+
+.dark .leaflet-popup-content::-webkit-scrollbar-thumb {
+  background: #6b7280 !important;
+}
+
+/* Custom popup styling for real estate dashboard */
+.custom-popup .leaflet-popup-content-wrapper {
+  background: transparent !important;
+  box-shadow: none !important;
+  border-radius: 12px !important;
+  max-width: 420px !important;
+}
+
+.custom-popup .leaflet-popup-content {
+  margin: 0 !important;
+  padding: 0 !important;
+  width: 100% !important;
+  max-width: 400px !important;
+  min-width: 300px !important;
+  max-height: 400px !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+}
+
+/* Remove the duplicate scrollable class */
+.popup-content-scrollable {
+  max-height: none !important; /* Remove max height */
+  overflow: visible !important; /* Remove scrolling */
+  width: 100% !important;
+}
+
+/* Ensure popup fits within viewport */
+.leaflet-popup {
+  max-width: 95vw !important;
+}
+
+/* Mobile responsive popups */
+@media (max-width: 640px) {
+  .leaflet-popup-content-wrapper {
+    max-width: 95vw !important;
+    min-width: 280px !important;
+  }
+  
+  .leaflet-popup-content {
+    max-width: 90vw !important;
+    min-width: 260px !important;
+    max-height: 300px !important; /* Smaller max height on mobile */
+  }
+  
+  .custom-popup .leaflet-popup-content-wrapper {
+    max-width: 95vw !important;
+  }
+  
+  .custom-popup .leaflet-popup-content {
+    max-width: 90vw !important;
+    max-height: 300px !important;
+  }
+}
+
+/* Dark theme close button */
+.dark .leaflet-popup-close-button {
+  background: #6b7280 !important;
+}
+.dark .leaflet-popup-close-button:hover {
+  background: #dc2626 !important;
+}
+
+/* Custom popup styling for real estate dashboard */
+.custom-popup .leaflet-popup-content-wrapper {
+  background: transparent !important;
+  box-shadow: none !important;
+  border-radius: 12px !important;
+}
+
+.custom-popup .leaflet-popup-content {
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+/* Marker hover effects */
+.marker-hover:hover {
+  transform: scale(1.1);
+  z-index: 1000;
+  transition: transform 0.3s ease;
+}
+
+/* Real estate metric badges */
+.real-estate-badge {
+  @apply px-3 py-1 rounded-full text-xs font-semibold backdrop-blur-sm;
+}
+
+.badge-sales { 
+  background: rgba(220, 38, 38, 0.15); 
+  border: 1px solid rgba(220, 38, 38, 0.3);
+  color: #dc2626;
+}
+.badge-rental { 
+  background: rgba(16, 185, 129, 0.15);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  color: #059669;
+}
+.badge-commercial { 
+  background: rgba(139, 92, 246, 0.15);
+  border: 1px solid rgba(139, 92, 246, 0.3);
+  color: #7c3aed;
+}
+
+/* Map legend styling */
+.map-legend {
+  @apply p-3 rounded-lg backdrop-blur-sm border;
+}
+.dark .map-legend {
+  @apply bg-gray-800/50 border-gray-600;
+}
+.light .map-legend {
+  @apply bg-white/80 border-gray-200;
+}
+
+/* Revenue chart styling */
+.revenue-chart {
+  @apply h-2 rounded-full overflow-hidden;
+}
+.chart-sales { background: linear-gradient(90deg, #dc2626, #ef4444); }
+.chart-rental { background: linear-gradient(90deg, #059669, #10b981); }
+.chart-commercial { background: linear-gradient(90deg, #7c3aed, #8b5cf6); }
+
+/* ========== LOADER AND ANIMATION COLORS ========== */
+.bg-amber-200 { background-color: #fde68a; }
+.bg-amber-400 { background-color: #fbbf24; }
+.bg-amber-600 { background-color: #d97706; }
+.bg-amber-700 { background-color: #b45309; }
+
+/* Ensure navigation dots are visible */
+.loader-svg-container { position: relative; z-index: 10; }

@@ -23,6 +23,7 @@ export const protectRoute = async (req, res, next) => {
     res.status(500).json({ message: "Internal server error" });
   }
 };
+
 export const verifyToken = async (req, res, next) => {
   try {
     // Extract token from cookies or Authorization header
@@ -60,4 +61,3 @@ export const verifyAdmin = async (req, res, next) => {
   }
   next();
 };
-

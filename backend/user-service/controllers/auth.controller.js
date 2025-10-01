@@ -1,4 +1,5 @@
 // backend/user-service/controllers/auth.controller.js
+
 import bcrypt from "bcrypt";
 import { User } from "../models/user.model.js";
 import { generateToken } from "../utils/token.js";
@@ -205,7 +206,6 @@ export const updateRole = async (req, res) => {
   }
 };
 
-
 export const uploadProfilePicture = async (req, res) => {
   try {
     console.log('📤 Upload profile picture request received');
@@ -263,5 +263,74 @@ export const uploadProfilePicture = async (req, res) => {
   } catch (error) {
     console.error("uploadProfilePicture error:", error.message);
     res.status(500).json({ message: "Internal Server Error", error: error.message });
+  }
+};
+
+export const adminCreateUser = async (req, res) => {
+  const { firstName, lastName, username, email, password, role, broker_type } = req.body;
+
+  console.log('Admin creating user:', { firstName, lastName, username, email, password, role, broker_type });
+
+  try {
+    if (!firstName || !lastName || !username || !email || !password || !role) {
+      return res.status(400).json({ error: 'All fields are required' });
+    }
+
+    if (password.length < 8) return res.status(400).json({ message: "Password must be 8+ chars" });
+
+    const existingUser = await User.findByEmail(email);
+    if (existingUser) return res.status(400).json({ message: "Email already exists" });
+
+    // Define client roles vs employee roles
+    const clientRoles = ['user', 'buyer', 'seller', 'renter', 'broker']; // brokers can be external (clients)
+    const employeeRoles = ['admin', 'support_agent'];
+    
+    let finalBrokerType = null;
+
+    // Handle broker type
+    if (role === 'broker') {
+      if (!broker_type || !['internal', 'external'].includes(broker_type)) {
+        return res.status(400).json({ message: "Invalid broker type. Must be 'internal' or 'external'" });
+      }
+      finalBrokerType = broker_type;
+      
+      // If creating an internal broker, it's an employee role
+      if (broker_type === 'internal') {
+        // No warning for internal brokers (employees)
+      } else {
+        // External brokers are clients - show warning
+        return res.status(200).json({ 
+          warning: true,
+          message: "You are creating a client role (External Broker). Are you sure you want to proceed?",
+          role: role,
+          userType: "client"
+        });
+      }
+    }
+
+    // Check if it's a client role and show warning
+    if (clientRoles.includes(role) && role !== 'broker') {
+      return res.status(200).json({ 
+        warning: true,
+        message: `You are creating a client role (${role}). Clients should typically register themselves. Are you sure you want to proceed?`,
+        role: role,
+        userType: "client"
+      });
+    }
+
+    // If employee role or confirmed client creation, proceed
+    const hashedPassword = await bcrypt.hash(password, 10);
+    const newUserId = await User.create(firstName, lastName, username, email, hashedPassword, role, finalBrokerType);
+    const createdUser = await User.findById(newUserId);
+
+    res.status(201).json({ 
+      success: true,
+      message: "User created successfully",
+      user: { ...createdUser, password: undefined },
+      warning: false
+    });
+  } catch (error) {
+    console.error("adminCreateUser error:", error);
+    res.status(500).json({ message: "Internal Server Error", details: error.message });
   }
 };

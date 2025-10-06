@@ -9,14 +9,14 @@ export default class Todo {
     }
 
     static async create({ text, completed, due_date, assignee, created_by }) {
-    const [result] = await db.query(
-        `INSERT INTO todos (text, completed, due_date, assignee, created_by, order_index)
-         VALUES (?, ?, ?, ?, ?, (SELECT COALESCE(MAX(t.order_index) + 1, 1) FROM (SELECT order_index FROM todos) AS t))`,
-        [text, completed, due_date || null, assignee, created_by]
-    );
-    const [newTodo] = await db.query('SELECT * FROM todos WHERE id = ?', [result.insertId]);
-    return newTodo[0];
-   }
+        const [result] = await db.query(
+            `INSERT INTO todos (text, completed, due_date, assignee, created_by, order_index)
+             VALUES (?, ?, ?, ?, ?, (SELECT COALESCE(MAX(t.order_index) + 1, 1) FROM (SELECT order_index FROM todos) AS t))`,
+            [text, completed, due_date || null, assignee, created_by]
+        );
+        const [newTodo] = await db.query('SELECT * FROM todos WHERE id = ?', [result.insertId]);
+        return newTodo[0];
+    }
 
     static async update(id, { completed }) {
         const [result] = await db.query(

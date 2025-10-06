@@ -13,17 +13,19 @@ export const getTodos = async (req, res) => {
 export const createTodo = async (req, res) => {
   try {
     const { text, completed, dueDate, assignee } = req.body;
-    const created_by = req.user.username;
+    const created_by = req.user.username; // Now using username
+
+    console.log('Creating todo with username:', created_by);
 
     const newTodo = await Todo.create({
       text,
       completed,
       due_date: dueDate,
       assignee,
-      created_by,
+      created_by, // This is now the username string
     });
 
-    // Emit WebSocket event after successful creation
+    // Emit WebSocket event
     const io = req.app.get('socketio');
     if (io) {
       io.emit('todo_created', newTodo);

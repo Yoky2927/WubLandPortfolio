@@ -21,6 +21,7 @@ import {
   Trash2,
   Bell,
   Globe,
+  CheckSquare,
 } from "lucide-react";
 import ThemeToggle from "../components/ThemeToggle";
 import StaticProfileAvatar from "../components/StaticProfileAvatar";
@@ -32,6 +33,8 @@ import { useNavigate } from "react-router-dom";
 import { useTheme } from "../contexts/ThemeContext";
 import ChatApp from "../components/ChatApp";
 import PasswordStrengthIndicator from "../components/PasswordStrengthIndicator";
+import EthiopiaMap from "../components/EthiopiaMap";
+import { io } from "socket.io-client";
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -58,6 +61,24 @@ ChartJS.register(
   RadialLinearScale,
   Filler
 );
+
+// Helper function to calculate days ago
+const getTimeAgo = (timestamp) => {
+  const now = new Date();
+  const past = new Date(timestamp);
+  const diffInMs = now - past;
+  const diffInDays = Math.floor(diffInMs / (1000 * 60 * 60 * 24));
+  
+  if (diffInDays === 0) {
+    const diffInHours = Math.floor(diffInMs / (1000 * 60 * 60));
+    if (diffInHours === 0) {
+      const diffInMinutes = Math.floor(diffInMs / (1000 * 60));
+      return `${diffInMinutes} min ago`;
+    }
+    return `${diffInHours} hour${diffInHours > 1 ? 's' : ''} ago`;
+  }
+  return `${diffInDays} day${diffInDays > 1 ? 's' : ''} ago`;
+};
 
 const UserInfoModal = ({ isOpen, onClose, selectedUser, theme }) => {
   if (!isOpen || !selectedUser) return null;
@@ -766,6 +787,7 @@ const AdminDashboard = () => {
   const [users, setUsers] = useState([]);
   const [properties, setProperties] = useState([]);
   const [transactions, setTransactions] = useState([]);
+  const [analyticsData, setAnalyticsData] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [filterStatus, setFilterStatus] = useState("all");
   const [showProfileModal, setShowProfileModal] = useState(false);
@@ -798,6 +820,7 @@ const AdminDashboard = () => {
   const [showCalendar, setShowCalendar] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isAuthorized, setIsAuthorized] = useState(false);
+  const [recentActivities, setRecentActivities] = useState([]);
   const calendarRef = useRef(null);
   const navigate = useNavigate();
   const [showNotifications, setShowNotifications] = useState(false);
@@ -844,7 +867,6 @@ const AdminDashboard = () => {
   const handleLanguageChange = (languageCode) => {
     setCurrentLanguage(languageCode);
     setShowLanguagePicker(false);
-    // Here you would integrate with your translation service
     console.log("Language changed to:", languageCode);
   };
 
@@ -852,19 +874,15 @@ const AdminDashboard = () => {
     let strength = 0;
     const feedback = [];
 
-    // Length check
     if (password.length >= 8) strength += 25;
     else feedback.push("at least 8 characters");
 
-    // Uppercase check
     if (/[A-Z]/.test(password)) strength += 25;
     else feedback.push("an uppercase letter");
 
-    // Number check
     if (/[0-9]/.test(password)) strength += 25;
     else feedback.push("a number");
 
-    // Special character check
     if (/[!@#$%^&*(),.?":{}|<>]/.test(password)) strength += 25;
     else feedback.push("a special character");
 
@@ -872,23 +890,122 @@ const AdminDashboard = () => {
     setPasswordFeedback(feedback);
   };
 
-  const chartData = [
-    { name: "Jan", users: 45, revenue: 12000 },
-    { name: "Feb", users: 52, revenue: 15000 },
-    { name: "Mar", users: 48, revenue: 13000 },
-    { name: "Apr", users: 78, revenue: 22000 },
-    { name: "May", users: 65, revenue: 18000 },
-    { name: "Jun", users: 90, revenue: 28000 },
-  ];
+  // Fetch real-time analytics data from analysis-service
+  const fetchAnalyticsData = async () => {
+    try {
+      const token = localStorage.getItem("token");
+      const response = await fetch("http://localhost:5004/api/analytics/dashboard", {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        setAnalyticsData(data);
+        return data;
+      } else {
+        console.error("Failed to fetch analytics data:", response.statusText);
+      }
+    } catch (error) {
+      console.error("Error fetching analytics:", error);
+    }
+    return null;
+  };
 
-  const roleDistribution = [
-    { name: "Buyers", value: 33, color: "#3B82F6" },
-    { name: "Sellers", value: 25, color: "#10B981" },
-    { name: "Internal Brokers", value: 45, color: "#F59E0B" },
-    { name: "External Brokers", value: 51, color: "#F97316" },
-    { name: "Admins", value: 37, color: "#8B5CF6" },
-    { name: "Support Agents", value: 30, color: "#8B5CF6" },
-  ];
+  // Real-time WebSocket setup with 7-day filter
+  useEffect(() => {
+    const socket = io("http://localhost:5001");
+
+    socket.on("todo_created", (todo) => {
+      const newActivity = {
+        id: `todo-${Date.now()}`,
+        type: "todo",
+        action: "New Todo Created",
+        detail: `"${todo.text}" assigned to ${todo.assignee}`,
+        time: new Date().toLocaleString(),
+        icon: "CheckSquare",
+        timestamp: new Date()
+      };
+
+      setRecentActivities(prev => [newActivity, ...prev.slice(0, 9)]);
+      logActivity("todo_created", user?.username, `Todo: ${todo.text}`);
+    });
+
+    socket.on("todo_updated", (todo) => {
+      const newActivity = {
+        id: `todo-${Date.now()}`,
+        type: "todo",
+        action: "Todo Updated",
+        detail: `"${todo.text}" status changed`,
+        time: new Date().toLocaleString(),
+        icon: "Edit",
+        timestamp: new Date()
+      };
+
+      setRecentActivities(prev => [newActivity, ...prev.slice(0, 9)]);
+      logActivity("todo_updated", user?.username, `Todo: ${todo.text}`);
+    });
+
+    socket.on("todo_deleted", (todo) => {
+      const newActivity = {
+        id: `todo-${Date.now()}`,
+        type: "todo",
+        action: "Todo Deleted",
+        detail: `"${todo.text}" was removed`,
+        time: new Date().toLocaleString(),
+        icon: "Trash2",
+        timestamp: new Date()
+      };
+
+      setRecentActivities(prev => [newActivity, ...prev.slice(0, 9)]);
+      logActivity("todo_deleted", user?.username, `Todo: ${todo.text}`);
+    });
+
+    // Real-time user registration updates with 7-day filter
+    socket.on('user_registered', (newUser) => {
+      const userJoinDate = new Date(newUser.created_at || new Date());
+      const sevenDaysAgo = new Date();
+      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+      
+      // Only show users who joined in the last 7 days
+      if (userJoinDate > sevenDaysAgo) {
+        const newActivity = {
+          id: `user-${Date.now()}`,
+          type: "user",
+          action: "New User Registered",
+          detail: `${newUser.first_name} ${newUser.last_name} joined as ${newUser.role}`,
+          time: userJoinDate.toLocaleString(),
+          icon: 'Users',
+          timestamp: userJoinDate
+        };
+        
+        // Update both users list and recent activities
+        setUsers(prev => [...prev, newUser]);
+        setRecentActivities(prev => [newActivity, ...prev.slice(0, 9)]); // Keep only 10 latest
+        
+        logActivity('user_registered', 'system', `User: ${newUser.first_name} ${newUser.last_name}`);
+      }
+    });
+
+    return () => socket.disconnect();
+  }, [user]);
+
+  const logActivity = async (type, adminUsername, target) => {
+    try {
+      await fetch("http://localhost:5004/api/analytics/activity", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          type,
+          admin: adminUsername,
+          target,
+        }),
+      });
+    } catch (error) {
+      console.error("Error logging activity:", error);
+    }
+  };
 
   const lineChartOptions = {
     responsive: true,
@@ -912,10 +1029,7 @@ const AdminDashboard = () => {
       y: {
         beginAtZero: true,
         grid: {
-          color:
-            theme === "dark"
-              ? "rgba(255, 255, 255, 0.1)"
-              : "rgba(0, 0, 0, 0.1)",
+          color: theme === "dark" ? "rgba(255, 255, 255, 0.1)" : "rgba(0, 0, 0, 0.1)",
         },
         ticks: {
           color: theme === "dark" ? "#fff" : "#374151",
@@ -932,20 +1046,17 @@ const AdminDashboard = () => {
         grid: { drawOnChartArea: false },
         ticks: {
           color: theme === "dark" ? "#fff" : "#374151",
-          callback: (value) => `${value}k`,
+          callback: (value) => `${value}k ETB`,
         },
         title: {
           display: true,
-          text: "Revenue ($)",
+          text: "Revenue (ETB)",
           color: theme === "dark" ? "#fff" : "#374151",
         },
       },
       x: {
         grid: {
-          color:
-            theme === "dark"
-              ? "rgba(255, 255, 255, 0.1)"
-              : "rgba(0, 0, 0, 0.1)",
+          color: theme === "dark" ? "rgba(255, 255, 255, 0.1)" : "rgba(0, 0, 0, 0.1)",
         },
         ticks: {
           color: theme === "dark" ? "#fff" : "#374151",
@@ -960,41 +1071,6 @@ const AdminDashboard = () => {
       intersect: false,
       mode: "index",
     },
-  };
-
-  const lineChartData = {
-    labels: chartData.map((item) => item.name),
-    datasets: [
-      {
-        label: "Users",
-        data: chartData.map((item) => item.users),
-        borderColor: "rgb(59, 130, 246)",
-        backgroundColor: "rgba(59, 130, 246, 0.1)",
-        tension: 0.4,
-        fill: true,
-        pointBackgroundColor: "rgb(59, 130, 246)",
-        pointBorderColor: "#fff",
-        pointHoverBackgroundColor: "#fff",
-        pointHoverBorderColor: "rgb(59, 130, 246)",
-        pointRadius: 4,
-        pointHoverRadius: 6,
-      },
-      {
-        label: "Revenue ($)",
-        data: chartData.map((item) => item.revenue / 1000),
-        borderColor: "rgb(16, 185, 129)",
-        backgroundColor: "rgba(16, 185, 129, 0.1)",
-        tension: 0.4,
-        fill: true,
-        pointBackgroundColor: "rgb(16, 185, 129)",
-        pointBorderColor: "#fff",
-        pointHoverBackgroundColor: "#fff",
-        pointHoverBorderColor: "rgb(16, 185, 129)",
-        pointRadius: 4,
-        pointHoverRadius: 6,
-        yAxisID: "y1",
-      },
-    ],
   };
 
   const radarChartOptions = {
@@ -1018,16 +1094,10 @@ const AdminDashboard = () => {
     scales: {
       r: {
         angleLines: {
-          color:
-            theme === "dark"
-              ? "rgba(255, 255, 255, 0.1)"
-              : "rgba(0, 0, 0, 0.1)",
+          color: theme === "dark" ? "rgba(255, 255, 255, 0.1)" : "rgba(0, 0, 0, 0.1)",
         },
         grid: {
-          color:
-            theme === "dark"
-              ? "rgba(255, 255, 255, 0.1)"
-              : "rgba(0, 0, 0, 0.1)",
+          color: theme === "dark" ? "rgba(255, 255, 255, 0.1)" : "rgba(0, 0, 0, 0.1)",
         },
         pointLabels: {
           color: theme === "dark" ? "#fff" : "#374151",
@@ -1045,23 +1115,115 @@ const AdminDashboard = () => {
     },
   };
 
-  const radarChartData = {
-    labels: roleDistribution.map((item) => item.name),
-    datasets: [
-      {
-        label: "User Distribution",
-        data: roleDistribution.map((item) => item.value),
-        backgroundColor: "rgba(245, 158, 11, 0.2)",
-        borderColor: "rgb(245, 158, 11)",
-        pointBackgroundColor: "rgb(245, 158, 11)",
-        pointBorderColor: "#fff",
-        pointHoverBackgroundColor: "#fff",
-        pointHoverBorderColor: "rgb(245, 158, 11)",
-        pointRadius: 4,
-        pointHoverRadius: 6,
+  const getChartData = () => {
+    if (!analyticsData) {
+      return {
+        lineChartData: {
+          labels: ['Sep', 'Oct', 'Nov', 'Dec', 'Jan', 'Feb', 'Mar'],
+          datasets: [
+            {
+              label: "Users",
+              data: [0, 0, 0, 0, 0, 0, 0],
+              borderColor: "rgb(59, 130, 246)",
+              backgroundColor: "rgba(59, 130, 246, 0.1)",
+              tension: 0.4,
+              fill: true,
+              pointBackgroundColor: "rgb(59, 130, 246)",
+              pointBorderColor: "#fff",
+              pointHoverBackgroundColor: "#fff",
+              pointHoverBorderColor: "rgb(59, 130, 246)",
+              pointRadius: 4,
+              pointHoverRadius: 6,
+            },
+            {
+              label: "Revenue (ETB)",
+              data: [0, 0, 0, 0, 0, 0, 0],
+              borderColor: "rgb(16, 185, 129)",
+              backgroundColor: "rgba(16, 185, 129, 0.1)",
+              tension: 0.4,
+              fill: true,
+              pointBackgroundColor: "rgb(16, 185, 129)",
+              pointBorderColor: "#fff",
+              pointHoverBackgroundColor: "#fff",
+              pointHoverBorderColor: "rgb(16, 185, 129)",
+              pointRadius: 4,
+              pointHoverRadius: 6,
+              yAxisID: "y1",
+            }
+          ]
+        },
+        radarChartData: {
+          labels: ["Buyers", "Sellers", "Renters", "Brokers", "Admins", "Support Agents"],
+          datasets: [{
+            label: "User Distribution",
+            data: [0, 0, 0, 0, 0, 0],
+            backgroundColor: "rgba(245, 158, 11, 0.2)",
+            borderColor: "rgb(245, 158, 11)",
+            pointBackgroundColor: "rgb(245, 158, 11)",
+            pointBorderColor: "#fff",
+            pointHoverBackgroundColor: "#fff",
+            pointHoverBorderColor: "rgb(245, 158, 11)",
+            pointRadius: 4,
+            pointHoverRadius: 6,
+          }]
+        }
+      };
+    }
+
+    return {
+      lineChartData: {
+        labels: analyticsData.revenueData?.map(item => item.month) || ['Sep', 'Oct', 'Nov', 'Dec', 'Jan', 'Feb', 'Mar'],
+        datasets: [
+          {
+            label: "Users",
+            data: analyticsData.revenueData?.map(item => item.userCount) || [0, 0, 0, 0, 0, 0, 0],
+            borderColor: "rgb(59, 130, 246)",
+            backgroundColor: "rgba(59, 130, 246, 0.1)",
+            tension: 0.4,
+            fill: true,
+            pointBackgroundColor: "rgb(59, 130, 246)",
+            pointBorderColor: "#fff",
+            pointHoverBackgroundColor: "#fff",
+            pointHoverBorderColor: "rgb(59, 130, 246)",
+            pointRadius: 4,
+            pointHoverRadius: 6,
+          },
+          {
+            label: "Revenue (ETB)",
+            data: analyticsData.revenueData?.map(item => item.revenue / 1000) || [0, 0, 0, 0, 0, 0, 0],
+            borderColor: "rgb(16, 185, 129)",
+            backgroundColor: "rgba(16, 185, 129, 0.1)",
+            tension: 0.4,
+            fill: true,
+            pointBackgroundColor: "rgb(16, 185, 129)",
+            pointBorderColor: "#fff",
+            pointHoverBackgroundColor: "#fff",
+            pointHoverBorderColor: "rgb(16, 185, 129)",
+            pointRadius: 4,
+            pointHoverRadius: 6,
+            yAxisID: "y1",
+          }
+        ]
       },
-    ],
+      radarChartData: {
+        labels: analyticsData.userDistribution?.map(item => item.role) || ["Buyers", "Sellers", "Renters", "Brokers", "Admins", "Support Agents"],
+        datasets: [{
+          label: "User Distribution",
+          data: analyticsData.userDistribution?.map(item => item.count) || [0, 0, 0, 0, 0, 0],
+          backgroundColor: "rgba(245, 158, 11, 0.2)",
+          borderColor: "rgb(245, 158, 11)",
+          pointBackgroundColor: "rgb(245, 158, 11)",
+          pointBorderColor: "#fff",
+          pointHoverBackgroundColor: "#fff",
+          pointHoverBorderColor: "rgb(245, 158, 11)",
+          pointRadius: 4,
+          pointHoverRadius: 6,
+        }]
+      }
+    };
   };
+
+  const { lineChartData, radarChartData } = getChartData();
 
   useEffect(() => {
     const abortController = new AbortController();
@@ -1106,55 +1268,99 @@ const AdminDashboard = () => {
     return () => abortController.abort();
   }, [navigate]);
 
+  // Updated fetchData function with 7-day filter
+  const fetchData = async () => {
+    try {
+      setIsLoading(true);
+      const token = localStorage.getItem("token");
+
+      // Fetch users
+      const usersResp = await fetch("http://localhost:5000/api/users", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      
+      let usersData = [];
+      if (usersResp.ok) {
+        usersData = await usersResp.json();
+        setUsers(usersData);
+      }
+
+      // Fetch todos
+      const todosResp = await fetch("http://localhost:5003/api/todos", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (todosResp.ok) {
+        const todosData = await todosResp.json();
+        setTodoItems(todosData);
+      }
+
+      // Fetch analytics data
+      const analyticsResp = await fetchAnalyticsData();
+
+      // Get users from the last 7 days
+      const sevenDaysAgo = new Date();
+      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+      
+      const recentUsers = usersData
+        .filter((u) => u.id !== user?.id) // Exclude current admin user
+        .filter((user) => new Date(user.created_at) > sevenDaysAgo)
+        .map((user) => ({
+          id: `user-${user.id}`,
+          type: "user",
+          action: "New User Registration",
+          detail: `${user.first_name} ${user.last_name} joined as ${user.role}`,
+          time: new Date(user.created_at).toLocaleString(),
+          icon: "Users",
+          timestamp: new Date(user.created_at)
+        }))
+        .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp)); // Sort by newest first
+
+      // Get recent activities from analytics service (todos, etc.)
+      const analyticsActivities = analyticsResp?.recentActivities?.map((activity) => ({
+        id: `analytics-${activity.id}`,
+        type: activity.type,
+        action: activity.type.split('_').map(word => 
+          word.charAt(0).toUpperCase() + word.slice(1)
+        ).join(' '),
+        detail: activity.target,
+        time: new Date(activity.timestamp).toLocaleString(),
+        icon: activity.icon,
+        timestamp: new Date(activity.timestamp)
+      })) || [];
+
+      // Combine and sort all activities (newest first)
+      const allActivities = [...analyticsActivities, ...recentUsers]
+        .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
+        .slice(0, 10); // Show only latest 10 activities
+
+      setRecentActivities(allActivities);
+
+    } catch (error) {
+      if (error.name === "AbortError") return;
+      console.error("Error fetching data:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   useEffect(() => {
     if (!isAuthorized || !user) return;
 
     const abortController = new AbortController();
-    const fetchData = async () => {
-      try {
-        setIsLoading(true);
-        const token = localStorage.getItem("token");
-        const usersResp = await fetch("http://localhost:5000/api/users", {
-          method: "GET",
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
-          signal: abortController.signal,
-        });
-        if (usersResp.ok) {
-          const usersData = await usersResp.json();
-          setUsers(usersData);
-        } else {
-          console.error("Failed to fetch users");
-        }
-        const todosResp = await fetch("http://localhost:5003/api/todos", {
-          method: "GET",
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
-          signal: abortController.signal,
-        });
-        if (todosResp.ok) {
-          const todosData = await todosResp.json();
-          setTodoItems(todosData);
-        } else {
-          console.error("Failed to fetch todos");
-        }
-        setProperties([]);
-        setTransactions([]);
-      } catch (error) {
-        if (error.name === "AbortError") return;
-        console.error("Error fetching data:", error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
+    
     fetchData();
 
-    return () => abortController.abort();
+    // Set up real-time data refresh every 30 seconds
+    const interval = setInterval(() => {
+      if (isAuthorized && user) {
+        fetchAnalyticsData();
+      }
+    }, 30000);
+
+    return () => {
+      abortController.abort();
+      clearInterval(interval);
+    };
   }, [isAuthorized, user]);
 
   useEffect(() => {
@@ -1179,11 +1385,10 @@ const AdminDashboard = () => {
       return;
     }
     if (passwordStrength < 50) {
-      alert(
-        "Password is too weak. Please include " + passwordFeedback.join(", ")
-      );
+      alert("Password is too weak. Please include " + passwordFeedback.join(", "));
       return;
     }
+
     try {
       const token = localStorage.getItem("token");
       const payload = {
@@ -1195,10 +1400,12 @@ const AdminDashboard = () => {
         role: newUser.role,
         phone: newUser.phone,
       };
+
       if (newUser.role === "broker") {
         payload.broker_type = newUser.broker_type;
       }
-      const response = await fetch("http://localhost:5000/api/auth/signup", {
+
+      const response = await fetch("http://localhost:5000/api/auth/admin/create-user", {
         method: "POST",
         headers: {
           Authorization: `Bearer ${token}`,
@@ -1206,41 +1413,93 @@ const AdminDashboard = () => {
         },
         body: JSON.stringify(payload),
       });
+
+      const result = await response.json();
+
       if (response.ok) {
-        const usersResp = await fetch("http://localhost:5000/api/users", {
-          method: "GET",
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
-        });
-        if (usersResp.ok) {
-          const usersData = await usersResp.json();
-          setUsers(usersData);
+        if (result.warning) {
+          const isConfirmed = window.confirm(
+            result.message + "\n\nClick OK to proceed or Cancel to go back."
+          );
+
+          if (isConfirmed) {
+            await confirmUserCreation(payload, token);
+          } else {
+            alert("User creation canceled.");
+          }
+        } else {
+          await refreshUsersList(token);
+          setShowCreateUserModal(false);
+          resetNewUserForm();
+          alert("User created successfully!");
+          logActivity("user_created", user?.username, `User: ${newUser.first_name} ${newUser.last_name}`);
         }
-        setShowCreateUserModal(false);
-        setNewUser({
-          first_name: "",
-          last_name: "",
-          username: "",
-          email: "",
-          password: "",
-          role: "buyer",
-          phone: "",
-          status: "active",
-          broker_type: "external",
-        });
-        setPasswordStrength(0);
-        setPasswordFeedback([]);
-        alert("User created successfully!");
       } else {
-        const errorData = await response.json();
-        alert(`Failed to create user: ${errorData.message || "Unknown error"}`);
+        alert(`Failed to create user: ${result.message || "Unknown error"}`);
       }
     } catch (error) {
       console.error("Error creating user:", error);
       alert("Error creating user.");
     }
+  };
+
+  const confirmUserCreation = async (payload, token) => {
+    try {
+      const confirmResponse = await fetch("http://localhost:5000/api/auth/admin/create-user", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+          "X-Confirm": "true",
+        },
+        body: JSON.stringify(payload),
+      });
+
+      const confirmResult = await confirmResponse.json();
+
+      if (confirmResponse.ok && confirmResult.success) {
+        await refreshUsersList(token);
+        setShowCreateUserModal(false);
+        resetNewUserForm();
+        alert("User created successfully!");
+        logActivity("user_created", user?.username, `User: ${payload.firstName} ${payload.lastName}`);
+      } else {
+        alert(`Failed to create user: ${confirmResult.message || "Unknown error"}`);
+      }
+    } catch (error) {
+      console.error("Error confirming user creation:", error);
+      alert("Error creating user.");
+    }
+  };
+
+  const refreshUsersList = async (token) => {
+    const usersResp = await fetch("http://localhost:5000/api/users", {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+    });
+    if (usersResp.ok) {
+      const usersData = await usersResp.json();
+      setUsers(usersData);
+    }
+  };
+
+  const resetNewUserForm = () => {
+    setNewUser({
+      first_name: "",
+      last_name: "",
+      username: "",
+      email: "",
+      password: "",
+      role: "buyer",
+      phone: "",
+      status: "active",
+      broker_type: "external",
+    });
+    setPasswordStrength(0);
+    setPasswordFeedback([]);
   };
 
   const updateUser = async (userToUpdate) => {
@@ -1267,22 +1526,17 @@ const AdminDashboard = () => {
         return;
       }
       if (userToUpdate.status && userToUpdate.status !== selectedUser.status) {
-        const statusResponse = await fetch(
-          `http://localhost:5000/api/users/${userToUpdate.id}/status`,
-          {
-            method: "PUT",
-            headers: {
-              Authorization: `Bearer ${token}`,
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({ status: userToUpdate.status }),
-          }
-        );
+        const statusResponse = await fetch(`http://localhost:5000/api/users/${userToUpdate.id}/status`, {
+          method: "PUT",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ status: userToUpdate.status }),
+        });
         if (!statusResponse.ok) {
           const errorData = await statusResponse.json();
-          alert(
-            `Failed to update status: ${errorData.message || "Unknown error"}`
-          );
+          alert(`Failed to update status: ${errorData.message || "Unknown error"}`);
           return;
         }
       }
@@ -1300,6 +1554,7 @@ const AdminDashboard = () => {
       setShowActionModal(false);
       setEditUser(null);
       alert("User updated successfully!");
+      logActivity("user_updated", user?.username, `User: ${userToUpdate.first_name} ${userToUpdate.last_name}`);
     } catch (error) {
       console.error("Error updating user:", error);
       alert("Error updating user.");
@@ -1359,11 +1614,8 @@ const AdminDashboard = () => {
           setUsers(usersData);
         }
         setShowActionModal(false);
-        alert(
-          `${
-            actionType.charAt(0).toUpperCase() + actionType.slice(1)
-          } successful!`
-        );
+        alert(`${actionType.charAt(0).toUpperCase() + actionType.slice(1)} successful!`);
+        logActivity(`user_${actionType}`, user?.username, `User: ${selectedUser.first_name} ${selectedUser.last_name}`);
       } else {
         const errorData = await response.json();
         alert(`Action failed: ${errorData.message || "Unknown error"}`);
@@ -1377,7 +1629,7 @@ const AdminDashboard = () => {
   const handleProfilePictureUpload = async (file) => {
     try {
       const formData = new FormData();
-      formData.append("profilePicture", file); // Make sure this matches the backend expectation
+      formData.append("profilePicture", file);
 
       console.log("Uploading file:", file.name, file.size, file.type);
 
@@ -1386,7 +1638,6 @@ const AdminDashboard = () => {
         method: "POST",
         headers: {
           Authorization: `Bearer ${token}`,
-          // Don't set Content-Type for FormData, let browser set it
         },
         body: formData,
       });
@@ -1395,28 +1646,24 @@ const AdminDashboard = () => {
         const data = await response.json();
         console.log("Upload successful:", data);
 
-        // Update user state
         setUser((prevUser) => ({
           ...prevUser,
           profile_picture: data.profilePictureUrl,
         }));
 
         setShowProfileModal(false);
-        toast.success("Profile picture updated successfully!");
       } else {
         const errorData = await response.json();
         console.error("Upload failed:", errorData);
-        toast.error(errorData.message || "Upload failed");
       }
     } catch (error) {
       console.error("Upload error:", error);
-      toast.error("Upload error. Please try again.");
     }
   };
 
   const filteredUsers = useMemo(() => {
     return users
-      .filter((u) => u.id !== user.id)
+      .filter((u) => u.id !== user?.id)
       .filter(
         (user) =>
           `${user.first_name || ""} ${user.last_name || ""}`
@@ -1430,20 +1677,13 @@ const AdminDashboard = () => {
       .filter((user) => filterStatus === "all" || user.status === filterStatus);
   }, [users, searchTerm, filterStatus, user]);
 
-  const recentActivities = users
-    .filter((u) => u.id !== user.id)
-    .filter(
-      (user) =>
-        new Date(user.created_at) >
-        new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
-    )
-    .map((user) => ({
-      type: "user",
-      action: "New user registration",
-      detail: `${user.first_name} ${user.last_name} joined as ${user.role}`,
-      time: new Date(user.created_at).toLocaleDateString(),
-    }))
-    .slice(0, 5);
+  // Calculate users from last 7 days
+  const usersLast7Days = users.filter(user => {
+    const userDate = new Date(user.created_at);
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+    return userDate > sevenDaysAgo;
+  }).length;
 
   const renderContent = () => {
     if (isLoading) {
@@ -1454,42 +1694,33 @@ const AdminDashboard = () => {
       case "dashboard":
         return (
           <div className="mx-0 space-y-6">
-            <div
-              className={`p-6 text-center ${
-                theme === "dark" ? "bg-gray-800" : "bg-white"
-              } border ${
-                theme === "dark" ? "border-gray-700" : "border-gray-200"
-              }`}
-            >
-              <h1
-                className={`text-2xl font-bold ${
-                  theme === "dark" ? "text-white" : "text-gray-900"
-                } mb-2`}
-              >
+            <div className={`p-6 text-center ${
+              theme === "dark" ? "bg-gray-800" : "bg-white"
+            } border ${theme === "dark" ? "border-gray-700" : "border-gray-200"}`}>
+              <h1 className={`text-2xl font-bold ${
+                theme === "dark" ? "text-white" : "text-gray-900"
+              } mb-2`}>
                 Welcome back, {user?.first_name}!
               </h1>
-              <p
-                className={`${
-                  theme === "dark" ? "text-gray-300" : "text-gray-600"
-                }`}
-              >
+              <p className={`${theme === "dark" ? "text-gray-300" : "text-gray-600"}`}>
                 Here's what's happening with your platform today.
               </p>
             </div>
+
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
               <StatCard
                 icon={Users}
                 title="Total Users"
                 value={users.length}
-                trend="+12%"
+                trend={analyticsData?.userTrend || "+0%"}
                 color="bg-blue-500"
-                subtitle="From last week"
+                subtitle="Registered users"
                 theme={theme}
               />
               <StatCard
                 icon={Home}
                 title="Properties"
-                value={properties.length || 0}
+                value={analyticsData?.totalProperties || 0}
                 trend="+8%"
                 color="bg-green-500"
                 subtitle="Active listings"
@@ -1498,7 +1729,7 @@ const AdminDashboard = () => {
               <StatCard
                 icon={DollarSign}
                 title="Revenue"
-                value={`$${(28000).toLocaleString()}`}
+                value={`ETB ${((analyticsData?.dealAnalytics?.totalRevenue || 0) / 1000).toFixed(0)}K`}
                 trend="+23%"
                 color="bg-amber-500"
                 subtitle="This month"
@@ -1507,37 +1738,31 @@ const AdminDashboard = () => {
               <StatCard
                 icon={Activity}
                 title="Active Now"
-                value="42"
+                value={analyticsData?.activeUsers || Math.floor(users.length * 0.65)}
                 trend="+5%"
                 color="bg-purple-500"
                 subtitle="Online users"
                 theme={theme}
               />
             </div>
+
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <div
-                className={`p-6 rounded-xl border ${
-                  theme === "dark"
-                    ? "bg-gray-800 border-gray-700"
-                    : "bg-white border-gray-200"
-                }`}
-              >
+              <div className={`p-6 rounded-xl border ${
+                theme === "dark" ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"
+              }`}>
                 <div className="h-80">
                   <Line options={lineChartOptions} data={lineChartData} />
                 </div>
               </div>
-              <div
-                className={`p-6 rounded-xl border ${
-                  theme === "dark"
-                    ? "bg-gray-800 border-gray-700"
-                    : "bg-white border-gray-200"
-                }`}
-              >
+              <div className={`p-6 rounded-xl border ${
+                theme === "dark" ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"
+              }`}>
                 <div className="h-80">
                   <Radar options={radarChartOptions} data={radarChartData} />
                 </div>
               </div>
             </div>
+
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               <TodoList
                 theme={theme}
@@ -1563,105 +1788,127 @@ const AdminDashboard = () => {
                 setSelectedUser={setSelectedUser}
               />
             </div>
-            <div
-              className={`p-6 rounded-xl border ${
-                theme === "dark"
-                  ? "bg-gray-800 border-gray-700"
-                  : "bg-white border-gray-200"
-              }`}
-            >
-              <h3
-                className={`text-lg font-semibold mb-4 ${
+
+            <div className="grid grid-cols-1 gap-6">
+              <EthiopiaMap data={analyticsData?.locationAnalytics || []} />
+            </div>
+
+            {/* Updated Recent Activities with 7-Day Filter */}
+            <div className={`p-6 rounded-xl border ${
+              theme === "dark" ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"
+            }`}>
+              <div className="flex justify-between items-center mb-4">
+                <h3 className={`text-lg font-semibold ${
                   theme === "dark" ? "text-white" : "text-gray-900"
-                }`}
-              >
-                Recent Activities
-              </h3>
+                }`}>
+                  Recent Activities
+                </h3>
+                <span className={`text-sm px-3 py-1 rounded-full ${
+                  theme === "dark" ? "bg-blue-900 text-blue-200" : "bg-blue-100 text-blue-800"
+                }`}>
+                  Last 7 Days
+                </span>
+              </div>
+
+              {/* 7-Day Statistics */}
+              <div className={`mb-4 p-3 rounded-lg ${
+                theme === "dark" ? "bg-gray-700" : "bg-blue-50"
+              }`}>
+                <p className={`text-sm text-center ${
+                  theme === "dark" ? "text-blue-300" : "text-blue-700"
+                }`}>
+                  📊 <strong>{usersLast7Days} users</strong> joined in the last 7 days
+                </p>
+              </div>
+              
               {recentActivities.length > 0 ? (
                 <div className="space-y-3">
-                  {recentActivities.map((activity, idx) => (
-                    <div
-                      key={idx}
-                      className={`p-4 rounded-lg border ${
-                        theme === "dark"
-                          ? "bg-gray-700 border-gray-600"
-                          : "bg-gray-50 border-gray-200"
-                      }`}
-                    >
+                  {recentActivities.map((activity) => (
+                    <div key={activity.id} className={`p-4 rounded-lg border ${
+                      theme === "dark" ? "bg-gray-700 border-gray-600" : "bg-gray-50 border-gray-200"
+                    }`}>
                       <div className="flex items-center justify-between">
                         <div className="flex items-center">
-                          <div
-                            className={`w-10 h-10 rounded-full flex items-center justify-center mr-3 ${
-                              theme === "dark" ? "bg-blue-900" : "bg-blue-100"
-                            }`}
-                          >
-                            <Users
-                              className={`w-5 h-5 ${
-                                theme === "dark"
-                                  ? "text-blue-300"
-                                  : "text-blue-600"
-                              }`}
-                            />
+                          <div className={`w-10 h-10 rounded-full flex items-center justify-center mr-3 ${
+                            theme === "dark" ? "bg-blue-900" : "bg-blue-100"
+                          }`}>
+                            {activity.type === "user" ? (
+                              <Users className={`w-5 h-5 ${
+                                theme === "dark" ? "text-blue-300" : "text-blue-600"
+                              }`} />
+                            ) : activity.type.includes("todo") ? (
+                              activity.icon === "CheckSquare" ? (
+                                <CheckSquare className={`w-5 h-5 ${
+                                  theme === "dark" ? "text-green-300" : "text-green-600"
+                                }`} />
+                              ) : activity.icon === "Edit" ? (
+                                <Edit className={`w-5 h-5 ${
+                                  theme === "dark" ? "text-yellow-300" : "text-yellow-600"
+                                }`} />
+                              ) : (
+                                <Trash2 className={`w-5 h-5 ${
+                                  theme === "dark" ? "text-red-300" : "text-red-600"
+                                }`} />
+                              )
+                            ) : (
+                              <Activity className={`w-5 h-5 ${
+                                theme === "dark" ? "text-blue-300" : "text-blue-600"
+                              }`} />
+                            )}
                           </div>
                           <div>
-                            <p
-                              className={`font-medium ${
-                                theme === "dark"
-                                  ? "text-white"
-                                  : "text-gray-900"
-                              }`}
-                            >
+                            <p className={`font-medium ${
+                              theme === "dark" ? "text-white" : "text-gray-900"
+                            }`}>
                               {activity.action}
                             </p>
-                            <p
-                              className={`text-sm ${
-                                theme === "dark"
-                                  ? "text-gray-300"
-                                  : "text-gray-600"
-                              }`}
-                            >
+                            <p className={`text-sm ${
+                              theme === "dark" ? "text-gray-300" : "text-gray-600"
+                            }`}>
                               {activity.detail}
                             </p>
                           </div>
                         </div>
-                        <span
-                          className={`text-sm ${
-                            theme === "dark" ? "text-gray-400" : "text-gray-500"
-                          }`}
-                        >
-                          {activity.time}
+                        <span className={`text-sm ${
+                          theme === "dark" ? "text-gray-400" : "text-gray-500"
+                        }`}>
+                          {getTimeAgo(activity.timestamp)}
                         </span>
                       </div>
                     </div>
                   ))}
                 </div>
               ) : (
-                <p
-                  className={`text-center py-8 ${
+                <div className="text-center py-8">
+                  <Users className={`w-16 h-16 mx-auto mb-4 ${
+                    theme === "dark" ? "text-gray-600" : "text-gray-400"
+                  }`} />
+                  <p className={`text-lg font-medium mb-2 ${
                     theme === "dark" ? "text-gray-400" : "text-gray-500"
-                  }`}
-                >
-                  No recent activities
-                </p>
+                  }`}>
+                    No recent activities
+                  </p>
+                  <p className={`text-sm ${
+                    theme === "dark" ? "text-gray-500" : "text-gray-400"
+                  }`}>
+                    No user registrations or activities in the past 7 days
+                  </p>
+                </div>
               )}
             </div>
           </div>
         );
+
+      // ... rest of the cases remain the same
       case "users":
         return (
-          <div
-            className={`p-4 lg:p-6 rounded-xl border transition-all duration-300 max-w-full lg:max-w-6xl mx-auto ${
-              theme === "dark"
-                ? "bg-gray-800 border-gray-700 shadow-lg"
-                : "bg-white border-gray-200 shadow-md"
-            }`}
-          >
+          <div className={`p-4 lg:p-6 rounded-xl border transition-all duration-300 max-w-full lg:max-w-6xl mx-auto ${
+            theme === "dark" ? "bg-gray-800 border-gray-700 shadow-lg" : "bg-white border-gray-200 shadow-md"
+          }`}>
             <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-6 gap-4">
-              <h2
-                className={`text-2xl lg:text-3xl font-bold ${
-                  theme === "dark" ? "text-white" : "text-gray-900"
-                }`}
-              >
+              <h2 className={`text-2xl lg:text-3xl font-bold ${
+                theme === "dark" ? "text-white" : "text-gray-900"
+              }`}>
                 User Management
               </h2>
               <div className="flex flex-col sm:flex-row gap-3 w-full lg:w-auto">
@@ -1670,37 +1917,28 @@ const AdminDashboard = () => {
                   className="flex items-center gap-2 px-6 py-3 rounded-xl border-2 transition-all duration-300 transform hover:scale-[1.02] group"
                   style={{
                     background: "transparent",
-                    borderImage:
-                      theme === "dark"
-                        ? "linear-gradient(135deg, #f59e0b, #d97706) 1"
-                        : "linear-gradient(135deg, #f59e0b, #fbbf24) 1",
+                    borderImage: theme === "dark" 
+                      ? "linear-gradient(135deg, #f59e0b, #d97706) 1" 
+                      : "linear-gradient(135deg, #f59e0b, #fbbf24) 1",
                   }}
                 >
-                  <div
-                    className={`w-6 h-6 rounded-full flex items-center justify-center transition-all duration-300 ${
-                      theme === "dark"
-                        ? "bg-gradient-to-r from-amber-400 to-orange-500 group-hover:from-amber-300 group-hover:to-orange-400"
-                        : "bg-gradient-to-r from-amber-400 to-amber-500 group-hover:from-amber-300 group-hover:to-amber-400"
-                    }`}
-                  >
+                  <div className={`w-6 h-6 rounded-full flex items-center justify-center transition-all duration-300 ${
+                    theme === "dark"
+                      ? "bg-gradient-to-r from-amber-400 to-orange-500 group-hover:from-amber-300 group-hover:to-orange-400"
+                      : "bg-gradient-to-r from-amber-400 to-amber-500 group-hover:from-amber-300 group-hover:to-amber-400"
+                  }`}>
                     <UserPlus className="w-4 h-4 text-white" />
                   </div>
-                  <span
-                    className={`font-semibold ${
-                      theme === "dark"
-                        ? "text-amber-200 group-hover:text-amber-100"
-                        : "text-amber-700 group-hover:text-amber-600"
-                    }`}
-                  >
+                  <span className={`font-semibold ${
+                    theme === "dark" ? "text-amber-200 group-hover:text-amber-100" : "text-amber-700 group-hover:text-amber-600"
+                  }`}>
                     Create User
                   </span>
                 </button>
                 <div className="relative flex-1 lg:flex-none min-w-[250px]">
-                  <Search
-                    className={`absolute left-3 top-1/2 transform -translate-y-1/2 ${
-                      theme === "dark" ? "text-gray-400" : "text-gray-600"
-                    } w-5 h-5`}
-                  />
+                  <Search className={`absolute left-3 top-1/2 transform -translate-y-1/2 ${
+                    theme === "dark" ? "text-gray-400" : "text-gray-600"
+                  } w-5 h-5`} />
                   <input
                     type="text"
                     placeholder="Search users..."
@@ -1729,31 +1967,16 @@ const AdminDashboard = () => {
                 </select>
               </div>
             </div>
+
             {users.length > 0 ? (
               <div className="overflow-x-auto rounded-xl border scrollbar-thin scrollbar-thumb-rounded-full scrollbar-track-transparent scrollbar-thumb-amber-500/70 dark:scrollbar-thumb-amber-400/60">
                 <table className="min-w-[900px] w-full table-auto">
                   <thead>
-                    <tr
-                      className={`${
-                        theme === "dark" ? "bg-gray-700" : "bg-gray-50"
-                      } transition-colors duration-300`}
-                    >
-                      {[
-                        "User",
-                        "Username",
-                        "Email",
-                        "Role",
-                        "Broker Type",
-                        "Status",
-                        "Joined",
-                        "Actions",
-                      ].map((header) => (
-                        <th
-                          key={header}
-                          className={`px-6 py-4 text-left font-semibold transition-colors duration-300 ${
-                            theme === "dark" ? "text-white" : "text-gray-600"
-                          }`}
-                        >
+                    <tr className={`${theme === "dark" ? "bg-gray-700" : "bg-gray-50"} transition-colors duration-300`}>
+                      {["User", "Username", "Email", "Role", "Broker Type", "Status", "Joined", "Actions"].map((header) => (
+                        <th key={header} className={`px-6 py-4 text-left font-semibold transition-colors duration-300 ${
+                          theme === "dark" ? "text-white" : "text-gray-600"
+                        }`}>
                           {header}
                         </th>
                       ))}
@@ -1761,186 +1984,91 @@ const AdminDashboard = () => {
                   </thead>
                   <tbody>
                     {filteredUsers.map((user) => {
-                      const initials = `${user.first_name?.[0] || ""}${
-                        user.last_name?.[0] || ""
-                      }`.toUpperCase();
+                      const initials = `${user.first_name?.[0] || ""}${user.last_name?.[0] || ""}`.toUpperCase();
                       const roleColors = {
-                        admin: "bg-red-500",
-                        broker: "bg-purple-500",
-                        buyer: "bg-green-500",
-                        seller: "bg-yellow-500",
-                        support_agent: "bg-blue-500",
-                        renter: "bg-pink-500",
-                        user: "bg-gray-500",
+                        admin: "bg-red-500", broker: "bg-purple-500", buyer: "bg-green-500", 
+                        seller: "bg-yellow-500", support_agent: "bg-blue-500", renter: "bg-pink-500", user: "bg-gray-500"
                       };
                       const colorClass = roleColors[user.role] || "bg-gray-500";
 
                       return (
-                        <tr
-                          key={user.id}
-                          className={`border-b transition-all duration-300 hover:transform hover:scale-[1.01] ${
-                            theme === "dark"
-                              ? "border-gray-700 hover:bg-gray-750"
-                              : "border-gray-200 hover:bg-gray-50"
-                          }`}
-                        >
-                          <td
-                            className={`px-6 py-4 ${
-                              theme === "dark" ? "text-white" : "text-black"
-                            }`}
-                          >
+                        <tr key={user.id} className={`border-b transition-all duration-300 hover:transform hover:scale-[1.01] ${
+                          theme === "dark" ? "border-gray-700 hover:bg-gray-750" : "border-gray-200 hover:bg-gray-50"
+                        }`}>
+                          <td className={`px-6 py-4 ${theme === "dark" ? "text-white" : "text-black"}`}>
                             <div className="flex items-center gap-3">
                               <div className="relative">
                                 {user.profile_picture ? (
-                                  <img
-                                    src={user.profile_picture}
-                                    alt={`${user.first_name} ${user.last_name}`}
-                                    className="w-12 h-12 rounded-full object-cover shadow-md"
-                                  />
+                                  <img src={user.profile_picture} alt={`${user.first_name} ${user.last_name}`} 
+                                    className="w-12 h-12 rounded-full object-cover shadow-md" />
                                 ) : (
-                                  <div
-                                    className={`w-12 h-12 rounded-full flex items-center justify-center text-white font-bold shadow-md ${colorClass}`}
-                                  >
+                                  <div className={`w-12 h-12 rounded-full flex items-center justify-center text-white font-bold shadow-md ${colorClass}`}>
                                     {initials}
                                   </div>
                                 )}
-                                <span
-                                  className={`absolute bottom-0 right-0 w-3 h-3 rounded-full ring-2 transition-all duration-300 ${
-                                    theme === "dark"
-                                      ? "ring-gray-800"
-                                      : "ring-white"
-                                  } ${
-                                    user.status === "active"
-                                      ? "bg-green-500"
-                                      : "bg-red-500"
-                                  }`}
-                                />
+                                <span className={`absolute bottom-0 right-0 w-3 h-3 rounded-full ring-2 transition-all duration-300 ${
+                                  theme === "dark" ? "ring-gray-800" : "ring-white"
+                                } ${user.status === "active" ? "bg-green-500" : "bg-red-500"}`} />
                               </div>
                               <div>
-                                <div
-                                  className={`font-medium transition-colors duration-300 ${
-                                    theme === "dark"
-                                      ? "text-white"
-                                      : "text-black"
-                                  }`}
-                                >
+                                <div className={`font-medium transition-colors duration-300 ${
+                                  theme === "dark" ? "text-white" : "text-black"
+                                }`}>
                                   {user.first_name} {user.last_name}
                                 </div>
-                                <div
-                                  className={`text-sm transition-colors duration-300 ${
-                                    theme === "dark"
-                                      ? "text-gray-400"
-                                      : "text-gray-600"
-                                  }`}
-                                >
+                                <div className={`text-sm transition-colors duration-300 ${
+                                  theme === "dark" ? "text-gray-400" : "text-gray-600"
+                                }`}>
                                   {user.status} • {user.role}
                                 </div>
                               </div>
                             </div>
                           </td>
-                          <td
-                            className={`px-6 py-4 ${
-                              theme === "dark" ? "text-white" : "text-black"
-                            }`}
-                          >
+                          <td className={`px-6 py-4 ${theme === "dark" ? "text-white" : "text-black"}`}>
                             {user.username || "N/A"}
                           </td>
-                          <td
-                            className={`px-6 py-4 ${
-                              theme === "dark" ? "text-white" : "text-black"
-                            }`}
-                          >
+                          <td className={`px-6 py-4 ${theme === "dark" ? "text-white" : "text-black"}`}>
                             {user.email}
                           </td>
-                          <td
-                            className={`px-6 py-4 ${
-                              theme === "dark" ? "text-white" : "text-black"
-                            }`}
-                          >
-                            <span
-                              className={`px-3 py-1 rounded-full text-xs font-medium capitalize transition-all duration-300 ${colorClass} text-white`}
-                            >
+                          <td className={`px-6 py-4 ${theme === "dark" ? "text-white" : "text-black"}`}>
+                            <span className={`px-3 py-1 rounded-full text-xs font-medium capitalize transition-all duration-300 ${colorClass} text-white`}>
                               {user.role}
                             </span>
                           </td>
-                          <td
-                            className={`px-6 py-4 ${
-                              theme === "dark" ? "text-white" : "text-black"
-                            }`}
-                          >
-                            {user.role === "broker"
-                              ? user.broker_type || "N/A"
-                              : "N/A"}
+                          <td className={`px-6 py-4 ${theme === "dark" ? "text-white" : "text-black"}`}>
+                            {user.role === "broker" ? user.broker_type || "N/A" : "N/A"}
                           </td>
-                          <td
-                            className={`px-6 py-4 ${
-                              theme === "dark" ? "text-white" : "text-black"
-                            }`}
-                          >
-                            <span
-                              className={`px-3 py-1 rounded-full text-xs font-medium transition-all duration-300 ${
-                                user.status === "active"
-                                  ? "bg-green-100 text-green-800 hover:bg-green-200"
-                                  : user.status === "inactive"
-                                  ? "bg-red-100 text-red-800 hover:bg-red-200"
-                                  : "bg-yellow-100 text-yellow-800 hover:bg-yellow-200"
-                              }`}
-                            >
+                          <td className={`px-6 py-4 ${theme === "dark" ? "text-white" : "text-black"}`}>
+                            <span className={`px-3 py-1 rounded-full text-xs font-medium transition-all duration-300 ${
+                              user.status === "active"
+                                ? "bg-green-100 text-green-800 hover:bg-green-200"
+                                : user.status === "inactive"
+                                ? "bg-red-100 text-red-800 hover:bg-red-200"
+                                : "bg-yellow-100 text-yellow-800 hover:bg-yellow-200"
+                            }`}>
                               {user.status}
                             </span>
                           </td>
-                          <td
-                            className={`px-6 py-4 ${
-                              theme === "dark" ? "text-white" : "text-black"
-                            }`}
-                          >
+                          <td className={`px-6 py-4 ${theme === "dark" ? "text-white" : "text-black"}`}>
                             {new Date(user.created_at).toLocaleDateString()}
                           </td>
-                          <td
-                            className={`px-6 py-4 ${
-                              theme === "dark" ? "text-white" : "text-black"
-                            }`}
-                          >
+                          <td className={`px-6 py-4 ${theme === "dark" ? "text-white" : "text-black"}`}>
                             <div className="flex gap-2">
                               <button
-                                onClick={() =>
-                                  handleUserAction(
-                                    user,
-                                    user.status === "active"
-                                      ? "deactivate"
-                                      : "activate"
-                                  )
-                                }
+                                onClick={() => handleUserAction(user, user.status === "active" ? "deactivate" : "activate")}
                                 className={`p-2 rounded-lg transition-all duration-300 transform hover:scale-110 ${
                                   user.status === "active"
                                     ? "bg-red-100 text-red-600 hover:bg-red-200"
                                     : "bg-green-100 text-green-600 hover:bg-green-200"
                                 }`}
-                                title={
-                                  user.status === "active"
-                                    ? "Deactivate"
-                                    : "Activate"
-                                }
-                                aria-label={
-                                  user.status === "active"
-                                    ? "Deactivate user"
-                                    : "Activate user"
-                                }
+                                title={user.status === "active" ? "Deactivate" : "Activate"}
                               >
-                                {user.status === "active" ? (
-                                  <UserX size={16} />
-                                ) : (
-                                  <UserCheck size={16} />
-                                )}
+                                {user.status === "active" ? <UserX size={16} /> : <UserCheck size={16} />}
                               </button>
                               <button
                                 className="p-2 rounded-lg bg-blue-100 text-blue-600 hover:bg-blue-200 transition-all duration-300 transform hover:scale-110"
                                 title="View Info"
-                                onClick={() => {
-                                  setSelectedUser(user);
-                                  setShowUserInfoModal(true);
-                                }}
-                                aria-label="View user info"
+                                onClick={() => { setSelectedUser(user); setShowUserInfoModal(true); }}
                               >
                                 <Eye size={16} />
                               </button>
@@ -1948,7 +2076,6 @@ const AdminDashboard = () => {
                                 className="p-2 rounded-lg bg-green-100 text-green-600 hover:bg-green-200 transition-all duration-300 transform hover:scale-110"
                                 title="Edit"
                                 onClick={() => handleUserAction(user, "edit")}
-                                aria-label="Edit user"
                               >
                                 <Edit size={16} />
                               </button>
@@ -1956,7 +2083,6 @@ const AdminDashboard = () => {
                                 className="p-2 rounded-lg bg-red-100 text-red-600 hover:bg-red-200 transition-all duration-300 transform hover:scale-110"
                                 title="Delete"
                                 onClick={() => handleUserAction(user, "delete")}
-                                aria-label="Delete user"
                               >
                                 <Trash2 size={16} />
                               </button>
@@ -1969,18 +2095,14 @@ const AdminDashboard = () => {
                 </table>
               </div>
             ) : (
-              <div
-                className={`text-center py-16 rounded-xl border-2 border-dashed transition-all duration-300 ${
-                  theme === "dark"
-                    ? "border-gray-600 text-gray-400 bg-gray-700"
-                    : "border-gray-300 text-gray-500 bg-gray-50"
-                }`}
-              >
+              <div className={`text-center py-16 rounded-xl border-2 border-dashed transition-all duration-300 ${
+                theme === "dark" ? "border-gray-600 text-gray-400 bg-gray-700" : "border-gray-300 text-gray-500 bg-gray-50"
+              }`}>
                 <Users className="w-20 h-20 mx-auto mb-4 opacity-50" />
                 <p className="text-lg font-medium mb-2">No users found</p>
                 <p className="text-sm opacity-75">
-                  {searchTerm || filterStatus !== "all"
-                    ? "Try adjusting your search or filter criteria"
+                  {searchTerm || filterStatus !== "all" 
+                    ? "Try adjusting your search or filter criteria" 
                     : "Get started by creating your first user"}
                 </p>
               </div>
@@ -2003,40 +2125,16 @@ const AdminDashboard = () => {
         );
 
       case "properties":
-        return (
-          <ComingSoonSection
-            title="Properties Management"
-            description="This feature is currently in development."
-            theme={theme}
-          />
-        );
+        return <ComingSoonSection title="Properties Management" description="This feature is currently in development." theme={theme} />;
 
       case "transactions":
-        return (
-          <ComingSoonSection
-            title="Transaction Monitoring"
-            description="Transaction monitoring is coming soon."
-            theme={theme}
-          />
-        );
+        return <ComingSoonSection title="Transaction Monitoring" description="Transaction monitoring is coming soon." theme={theme} />;
 
       case "support":
-        return (
-          <ComingSoonSection
-            title="Support Center"
-            description="Our support system is under construction."
-            theme={theme}
-          />
-        );
+        return <ComingSoonSection title="Support Center" description="Our support system is under construction." theme={theme} />;
 
       case "system":
-        return (
-          <ComingSoonSection
-            title="System Settings"
-            description="System configuration panel is being developed."
-            theme={theme}
-          />
-        );
+        return <ComingSoonSection title="System Settings" description="System configuration panel is being developed." theme={theme} />;
 
       default:
         return null;
@@ -2048,40 +2146,32 @@ const AdminDashboard = () => {
   }
 
   return (
-     <div className={`min-h-screen ${
-      theme === "dark"
-        ? "bg-gradient-to-r from-gray-900 via-black to-gray-900 text-white"
+    <div className={`min-h-screen ${
+      theme === "dark" 
+        ? "bg-gradient-to-r from-gray-900 via-black to-gray-900 text-white" 
         : "bg-gray-100 text-gray-900"
-    } flex transition-colors duration-300`}
-    >
-      {/* Sidebar - Always on left */}
-      <div className={`w-64 flex-shrink-0 shadow-lg ${
-        theme === "dark"
-          ? "bg-gray-900/40 backdrop-blur-lg border-r border-gray-700/30"
+    } flex transition-colors duration-300`}>
+      
+      {/* Sidebar - Responsive */}
+      <div className={`fixed lg:static w-64 min-h-screen flex-shrink-0 shadow-lg transform transition-transform duration-300 ${
+        isMobileMenuOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
+      } ${
+        theme === "dark" 
+          ? "bg-gray-900/40 backdrop-blur-lg border-r border-gray-700/30" 
           : "bg-white border-r border-gray-200"
-      } flex flex-col overflow-y-auto z-30`}>
+      } flex flex-col z-30`}>
         
-        {/* Logo - Always visible */}
-            <div className={`flex items-center gap-4 px-8 py-3
-           border-b ${
-          theme === "dark"
-            ? "border-gray-700/40 bg-gray-900/30"
-            : "border-gray-200"
+        {/* Logo */}
+        <div className={`flex items-center gap-4 px-8 py-3 border-b ${
+          theme === "dark" ? "border-gray-700/40 bg-gray-900/30" : "border-gray-200"
         }`}>
-              <img
-                src="/vectors/smallLogo.svg"
-                alt="WubLand Logo"
-                className="w-16 h-16 md:w-22 md:h-22"
-              />
-              <span className={`font-medium text-lg md:text-2xl text-amber-500`}>
-                WubLand
-              </span>
-            </div>
-        {/* Static Profile in Sidebar */}
+          <img src="/vectors/smallLogo.svg" alt="WubLand Logo" className="w-16 h-16 md:w-22 md:h-22" />
+          <span className="font-medium text-lg md:text-2xl text-amber-500">WubLand</span>
+        </div>
+
+        {/* Static Profile */}
         <div className={`p-4 md:p-6 border-b ${
-          theme === "dark"
-            ? "border-gray-700/40 bg-gray-900/30"
-            : "border-gray-200"
+          theme === "dark" ? "border-gray-700/40 bg-gray-900/30" : "border-gray-200"
         } flex flex-col items-center`}>
           <div className="flex justify-center mb-4">
             <StaticProfileAvatar
@@ -2111,48 +2201,27 @@ const AdminDashboard = () => {
             ].map((item) => (
               <button
                 key={item.id}
-                onClick={() => {
-                  setActiveTab(item.id);
-                  setIsMobileMenuOpen(false);
-                }}
-                className={`w-full flex items-center rounded-xl px-4 py-3 transition-all text-left
-                    ${
-                      activeTab === item.id
-                        ? `${
-                            theme === "dark"
-                              ? "bg-amber-600/80 text-white backdrop-blur-sm"
-                              : "bg-amber-100 text-amber-600"
-                          } shadow-lg`
-                        : `${
-                            theme === "dark"
-                              ? "text-amber-200 hover:bg-gray-700/50 backdrop-blur-sm"
-                              : "text-gray-700 hover:bg-gray-100"
-                          }`
-                    }`}
-                aria-current={activeTab === item.id ? "page" : undefined}
+                onClick={() => { setActiveTab(item.id); setIsMobileMenuOpen(false); }}
+                className={`w-full flex items-center rounded-xl px-4 py-3 transition-all text-left ${
+                  activeTab === item.id
+                    ? theme === "dark"
+                      ? "bg-amber-600/80 text-white backdrop-blur-sm shadow-lg"
+                      : "bg-amber-100 text-amber-600 shadow-lg"
+                    : theme === "dark"
+                    ? "text-amber-200 hover:bg-gray-700/50 backdrop-blur-sm"
+                    : "text-gray-700 hover:bg-gray-100"
+                }`}
               >
-                <item.icon
-                  className={`w-5 h-5 mr-3 ${
-                    activeTab === item.id
-                      ? theme === "dark"
-                        ? "text-white"
-                        : "text-amber-600"
-                      : theme === "dark"
-                      ? "text-amber-400"
-                      : "text-gray-600"
-                  }`}
-                />
-                <span
-                  className={`truncate ${
-                    activeTab === item.id
-                      ? theme === "dark"
-                        ? "text-white"
-                        : "text-amber-600"
-                      : theme === "dark"
-                      ? "text-amber-400"
-                      : "text-gray-700"
-                  }`}
-                >
+                <item.icon className={`w-5 h-5 mr-3 ${
+                  activeTab === item.id
+                    ? theme === "dark" ? "text-white" : "text-amber-600"
+                    : theme === "dark" ? "text-amber-400" : "text-gray-600"
+                }`} />
+                <span className={`truncate ${
+                  activeTab === item.id
+                    ? theme === "dark" ? "text-white" : "text-amber-600"
+                    : theme === "dark" ? "text-amber-400" : "text-gray-700"
+                }`}>
                   {item.label}
                 </span>
               </button>
@@ -2162,21 +2231,15 @@ const AdminDashboard = () => {
 
         {/* Logout */}
         <div className={`p-4 border-t ${
-          theme === "dark"
-            ? "border-gray-700/40 bg-gray-900/30"
-            : "border-gray-200"
+          theme === "dark" ? "border-gray-700/40 bg-gray-900/30" : "border-gray-200"
         }`}>
           <button
             className={`w-full flex items-center justify-center px-4 py-2 rounded-lg transition-colors ${
-              theme === "dark"
-                ? "text-gray-300 hover:bg-gray-700/50 backdrop-blur-sm"
+              theme === "dark" 
+                ? "text-gray-300 hover:bg-gray-700/50 backdrop-blur-sm" 
                 : "text-gray-600 hover:bg-gray-100"
             }`}
-            onClick={() => {
-              localStorage.removeItem("token");
-              window.location.href = "/";
-            }}
-            aria-label="Logout"
+            onClick={() => { localStorage.removeItem("token"); window.location.href = "/"; }}
           >
             <LogOut className="w-4 h-4 mr-2" />
             Logout
@@ -2186,171 +2249,154 @@ const AdminDashboard = () => {
 
       {/* Right Section - Top Bar + Main Content */}
       <div className="flex-1 flex flex-col min-w-0">
-        {/* Top Bar - Only on the right side */}
-        <div className={`flex-shrink-0 ${
-          theme === "dark"
-            ? "bg-gray-900/40 border-b border-gray-700/30"
-            : "bg-white border-b border-gray-200"
-        } border-b`}>
-          <div className="flex items-center justify-between p-4">
-            {/* Left side - Menu Button (mobile only) */}
-            <button
-              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-              className={`p-2 rounded md:hidden ${
-                theme === "dark"
-                  ? "hover:bg-gray-700 text-white"
-                  : "hover:bg-gray-200 text-gray-900"
-              } transition-colors`}
-              aria-label="Toggle menu"
-            >
-              {isMobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
-            </button>
+        {/* Top Bar */}
+        <div className={`flex-shrink-0 border-b ${
+          theme === "dark" ? "border-gray-700/30" : "border-gray-200"
+        }`} style={{
+          backgroundImage: `url(${theme === "dark" ? "/vectors/TiletDark.svg" : "/vectors/TiletLight.svg"})`,
+          backgroundSize: "cover", backgroundPosition: "bottom", backgroundRepeat: "no-repeat",
+        }}>
+          <div className="">
+            <div className="flex items-center justify-between p-4">
+              {/* Menu Button (mobile only) */}
+              <button
+                onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+                className={`p-2 rounded md:hidden ${
+                  theme === "dark" 
+                    ? "hover:bg-gray-700/50 text-white" 
+                    : "hover:bg-white/30 text-gray-900"
+                } transition-colors backdrop-blur-sm`}
+              >
+                {isMobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
+              </button>
 
-            {/* Center - Page Title */}
-            <h1 className={`text-xl font-bold flex-1 mt-2 ml-10 text-center md:text-left ${
-              theme === "dark" ? "text-white" : "text-gray-900"
-            }`}>
-              {activeTab === "dashboard"
-                ? "Admin Dashboard"
-                : activeTab.charAt(0).toUpperCase() + activeTab.slice(1)}
-            </h1>
+              {/* Page Title */}
+              <h1 className={`text-xl font-bold flex-1 mt-2 ml-10 text-center md:text-left ${
+                theme === "dark" ? "text-white" : "text-gray-900"
+              }`}>
+                {activeTab === "dashboard" ? "Admin Dashboard" : activeTab.charAt(0).toUpperCase() + activeTab.slice(1)}
+              </h1>
 
-            {/* Right side - Icons */}
-            <div className="flex items-center gap-3">
-              {/* Language Picker */}
-              <div className="relative">
-                <button
-                  onClick={() => setShowLanguagePicker(!showLanguagePicker)}
-                  className={`p-2 rounded-lg transition-colors ${
-                    theme === 'dark' 
-                      ? 'hover:bg-gray-700 text-gray-300' 
-                      : 'hover:bg-gray-200 text-gray-600'
-                  }`}
-                  title="Change Language"
-                >
-                  <Globe className="w-5 h-5" />
-                </button>
-
-                {showLanguagePicker && (
-                  <div className={`absolute right-0 top-12 w-48 rounded-lg shadow-lg z-50 ${
-                    theme === 'dark' 
-                      ? 'bg-gray-800 border border-gray-700' 
-                      : 'bg-white border border-gray-200'
-                  }`}>
-                    {languages.map((language) => (
-                      <button
-                        key={language.code}
-                        onClick={() => handleLanguageChange(language.code)}
-                        className={`w-full text-left px-4 py-2 flex items-center gap-3 ${
-                          currentLanguage === language.code
-                            ? theme === 'dark' ? 'bg-gray-700 text-amber-400' : 'bg-amber-100 text-amber-700'
-                            : theme === 'dark' ? 'hover:bg-gray-700 text-gray-300' : 'hover:bg-gray-100 text-gray-700'
-                        } transition-colors`}
-                      >
-                        <span className="text-lg">{language.flag}</span>
-                        <span>{language.name}</span>
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              {/* Notifications Bell */}
-              <div className="relative">
-                <button
-                  onClick={() => setShowNotifications(!showNotifications)}
-                  className={`p-2 rounded-lg transition-colors relative ${
-                    theme === 'dark' 
-                      ? 'hover:bg-gray-700 text-gray-300' 
-                      : 'hover:bg-gray-200 text-gray-600'
-                  }`}
-                  title="Notifications"
-                >
-                  <Bell className="w-5 h-5" />
-                  {unreadCount > 0 && (
-                    <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
-                      {unreadCount}
-                    </span>
-                  )}
-                </button>
-
-                {showNotifications && (
-                  <div className={`absolute right-0 top-12 w-80 rounded-lg shadow-lg z-50 ${
-                    theme === 'dark' 
-                      ? 'bg-gray-800 border border-gray-700' 
-                      : 'bg-white border border-gray-200'
-                  }`}>
-                    <div className={`p-3 border-b ${
-                      theme === 'dark' ? 'border-gray-700' : 'border-gray-200'
+              {/* Right side - Icons */}
+              <div className="flex items-center gap-3">
+                {/* Language Picker */}
+                <div className="relative">
+                  <button
+                    onClick={() => setShowLanguagePicker(!showLanguagePicker)}
+                    className={`p-2 rounded-lg transition-colors backdrop-blur-sm ${
+                      theme === "dark" 
+                        ? "hover:bg-gray-700/50 text-gray-300" 
+                        : "hover:bg-white/30 text-gray-600"
+                    }`}
+                  >
+                    <Globe className="w-5 h-5" />
+                  </button>
+                  {showLanguagePicker && (
+                    <div className={`absolute right-0 top-12 w-48 rounded-lg shadow-lg z-50 backdrop-blur-md ${
+                      theme === "dark" ? "bg-gray-800/90 border border-gray-700" : "bg-white/90 border border-gray-200"
                     }`}>
-                      <h3 className={`font-semibold ${
-                        theme === 'dark' ? 'text-white' : 'text-gray-900'
-                      }`}>
-                        Notifications
-                      </h3>
+                      {languages.map((language) => (
+                        <button
+                          key={language.code}
+                          onClick={() => handleLanguageChange(language.code)}
+                          className={`w-full text-left px-4 py-2 flex items-center gap-3 ${
+                            currentLanguage === language.code
+                              ? theme === "dark" ? "bg-gray-700/50 text-amber-400" : "bg-amber-100/80 text-amber-700"
+                              : theme === "dark" ? "hover:bg-gray-700/50 text-gray-300" : "hover:bg-gray-100/80 text-gray-700"
+                          } transition-colors`}
+                        >
+                          <span className="text-lg">{language.flag}</span>
+                          <span>{language.name}</span>
+                        </button>
+                      ))}
                     </div>
-                    <div className="max-h-96 overflow-y-auto">
-                      {notifications.length > 0 ? (
-                        notifications.map((notification) => (
-                          <div
-                            key={notification.id}
-                            className={`p-3 border-b ${
-                              theme === 'dark' 
-                                ? 'border-gray-700 hover:bg-gray-750' 
-                                : 'border-gray-200 hover:bg-gray-50'
-                            } transition-colors ${!notification.read ? 'bg-amber-500/10' : ''}`}
-                          >
-                            <p className={`text-sm ${
-                              theme === 'dark' ? 'text-gray-300' : 'text-gray-700'
-                            }`}>
-                              {notification.message}
-                            </p>
-                            <p className={`text-xs ${
-                              theme === 'dark' ? 'text-gray-500' : 'text-gray-400'
-                            } mt-1`}>
-                              {notification.time}
-                            </p>
-                          </div>
-                        ))
-                      ) : (
-                        <p className={`p-4 text-center ${
-                          theme === 'dark' ? 'text-gray-400' : 'text-gray-500'
-                        }`}>
-                          No notifications
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                )}
-              </div>
+                  )}
+                </div>
 
-              {/* Profile Avatar */}
-              <div className="relative">
-                <ProfileAvatar
-                  userProfilePicture={user?.profile_picture}
-                  firstName={user?.first_name}
-                  lastName={user?.last_name}
-                  username={user?.username}
-                  email={user?.email}
-                  role={user?.role}
-                  size="sm"
-                  onLogout={() => {
-                    localStorage.removeItem('token');
-                    window.location.href = '/';
-                  }}
-                  onUploadImage={() => setShowProfileModal(true)}
-                  onNavigateToSection={(section) => {
-                    setActiveTab(section);
-                    setIsMobileMenuOpen(false);
-                  }}
-                  theme={theme}
-                />
+                {/* Notifications Bell */}
+                <div className="relative">
+                  <button
+                    onClick={() => setShowNotifications(!showNotifications)}
+                    className={`p-2 rounded-lg transition-colors backdrop-blur-sm relative ${
+                      theme === "dark" 
+                        ? "hover:bg-gray-700/50 text-gray-300" 
+                        : "hover:bg-white/30 text-gray-600"
+                    }`}
+                  >
+                    <Bell className="w-5 h-5" />
+                    {unreadCount > 0 && (
+                      <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center backdrop-blur-sm">
+                        {unreadCount}
+                      </span>
+                    )}
+                  </button>
+                  {showNotifications && (
+                    <div className={`absolute right-0 top-12 w-80 rounded-lg shadow-lg z-50 backdrop-blur-md ${
+                      theme === "dark" ? "bg-gray-800/90 border border-gray-700" : "bg-white/90 border border-gray-200"
+                    }`}>
+                      <div className={`p-3 border-b ${
+                        theme === "dark" ? "border-gray-700" : "border-gray-200"
+                      }`}>
+                        <h3 className={`font-semibold ${
+                          theme === "dark" ? "text-white" : "text-gray-900"
+                        }`}>
+                          Notifications
+                        </h3>
+                      </div>
+                      <div className="max-h-96 overflow-y-auto">
+                        {notifications.length > 0 ? (
+                          notifications.map((notification) => (
+                            <div key={notification.id} className={`p-3 border-b ${
+                              theme === "dark" 
+                                ? "border-gray-700 hover:bg-gray-700/50" 
+                                : "border-gray-200 hover:bg-gray-100/80"
+                            } transition-colors ${!notification.read ? "bg-amber-500/10" : ""}`}>
+                              <p className={`text-sm ${
+                                theme === "dark" ? "text-gray-300" : "text-gray-700"
+                              }`}>
+                                {notification.message}
+                              </p>
+                              <p className={`text-xs ${
+                                theme === "dark" ? "text-gray-500" : "text-gray-400"
+                              } mt-1`}>
+                                {notification.time}
+                              </p>
+                            </div>
+                          ))
+                        ) : (
+                          <p className={`p-4 text-center ${
+                            theme === "dark" ? "text-gray-400" : "text-gray-500"
+                          }`}>
+                            No notifications
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Profile Avatar */}
+                <div className="relative">
+                  <ProfileAvatar
+                    userProfilePicture={user?.profile_picture}
+                    firstName={user?.first_name}
+                    lastName={user?.last_name}
+                    username={user?.username}
+                    email={user?.email}
+                    role={user?.role}
+                    size="sm"
+                    onLogout={() => { localStorage.removeItem("token"); window.location.href = "/"; }}
+                    onUploadImage={() => setShowProfileModal(true)}
+                    onNavigateToSection={(section) => { setActiveTab(section); setIsMobileMenuOpen(false); }}
+                    theme={theme}
+                  />
+                </div>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Main Content - Below Top Bar on right side */}
+        {/* Main Content */}
         <div className="flex-1 overflow-auto p-4 md:p-6">
           <main>{renderContent()}</main>
         </div>
@@ -2358,71 +2404,36 @@ const AdminDashboard = () => {
 
       {/* Mobile Sidebar Overlay */}
       {isMobileMenuOpen && (
-        <>
-          <div className="fixed inset-0 bg-black bg-opacity-50 md:hidden z-40"
-               onClick={() => setIsMobileMenuOpen(false)} />
-          <div className={`fixed inset-y-0 left-0 w-64 z-50 md:hidden ${
-            theme === "dark"
-              ? "bg-gray-900/95 backdrop-blur-lg"
-              : "bg-white"
-          } transform ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'} transition-transform duration-300`}>
-            {/* Mobile sidebar content would go here */}
-          </div>
-        </>
+        <div className="fixed inset-0 bg-black h-full bg-opacity-50 md:hidden z-20" onClick={() => setIsMobileMenuOpen(false)} />
       )}
 
       <ThemeToggle theme={theme} onToggle={toggleTheme} />
+      
       {/* Modals */}
-      <UserInfoModal
-        isOpen={showUserInfoModal}
-        onClose={() => setShowUserInfoModal(false)}
-        selectedUser={selectedUser}
-        theme={theme}
-      />
+      <UserInfoModal isOpen={showUserInfoModal} onClose={() => setShowUserInfoModal(false)} selectedUser={selectedUser} theme={theme} />
       <CreateUserModal
-        isOpen={showCreateUserModal}
-        onClose={() => setShowCreateUserModal(false)}
-        theme={theme}
-        newUser={newUser}
-        setNewUser={setNewUser}
-        passwordStrength={passwordStrength}
-        passwordFeedback={passwordFeedback}
-        createUser={createUser}
-        checkPasswordStrength={checkPasswordStrength}
+        isOpen={showCreateUserModal} onClose={() => setShowCreateUserModal(false)} theme={theme}
+        newUser={newUser} setNewUser={setNewUser} passwordStrength={passwordStrength} passwordFeedback={passwordFeedback}
+        createUser={createUser} checkPasswordStrength={checkPasswordStrength}
       />
       <EditUserModal
-        isOpen={showActionModal && actionType === "edit"}
-        onClose={() => setShowActionModal(false)}
-        editUser={editUser}
-        setEditUser={setEditUser}
-        theme={theme}
-        updateUser={updateUser}
+        isOpen={showActionModal && actionType === "edit"} onClose={() => setShowActionModal(false)}
+        editUser={editUser} setEditUser={setEditUser} theme={theme} updateUser={updateUser}
       />
       <ConfirmationModal
-        isOpen={showActionModal && actionType !== "edit"}
-        onClose={() => setShowActionModal(false)}
+        isOpen={showActionModal && actionType !== "edit"} onClose={() => setShowActionModal(false)}
         title={`Confirm ${actionType}`}
-        message={`Are you sure you want to ${actionType} user ${
-          selectedUser?.first_name
-        } ${selectedUser?.last_name}?${
+        message={`Are you sure you want to ${actionType} user ${selectedUser?.first_name} ${selectedUser?.last_name}?${
           actionType === "delete" ? " This action cannot be undone." : ""
         }`}
-        onConfirm={confirmUserAction}
-        confirmText={`Confirm ${actionType}`}
-        confirmColor={
-          actionType === "delete"
-            ? "bg-red-600 hover:opacity-90"
-            : "bg-blue-600 hover:opacity-90"
-        }
+        onConfirm={confirmUserAction} confirmText={`Confirm ${actionType}`}
+        confirmColor={actionType === "delete" ? "bg-red-600 hover:opacity-90" : "bg-blue-600 hover:opacity-90"}
         theme={theme}
       />
       {user && (
         <ProfilePictureModal
-          isOpen={showProfileModal}
-          onClose={() => setShowProfileModal(false)}
-          onUpload={handleProfilePictureUpload}
-          user={user}
-          theme={theme}
+          isOpen={showProfileModal} onClose={() => setShowProfileModal(false)}
+          onUpload={handleProfilePictureUpload} user={user} theme={theme}
         />
       )}
     </div>

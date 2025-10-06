@@ -10,6 +10,7 @@ import ProfileAvatar from "../components/ProfileAvatar";
 import ProfilePictureModal from "../components/ProfilePictureModal.jsx";
 import { useTheme } from "../contexts/ThemeContext";
 import AdminDashboard from "./AdminDashboard.jsx"; // Import AdminDashboard
+import SupportAgentsDashboard from "./SupportAgentsDashboard.jsx";
 
 function Home() {
   const { theme, toggleTheme } = useTheme();
@@ -750,6 +751,8 @@ function Home() {
       );
     } else if (user.role === "admin") {
       return <AdminDashboard />;
+    } else if (user.role === "support_agent") {
+      return <SupportAgentsDashboard />;
     } else {
       const handleLogout = () => {
         localStorage.removeItem("token"); // Clear token from localStorage

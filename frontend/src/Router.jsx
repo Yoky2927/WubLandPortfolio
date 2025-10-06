@@ -4,8 +4,9 @@ import App from "./App.jsx";
 import DocumentValidator from "./pages/DocumentValidator.jsx";
 import LoginRegister from "./pages/LoginRegister.jsx";
 import AdminDashboard from './pages/AdminDashboard.jsx';
+import SupportAgentsDashboard from './pages/SupportAgentsDashboard.jsx'; // ADD THIS IMPORT
 import Home from "./pages/Home.jsx";
-import { ThemeProvider } from "./contexts/ThemeContext"; // ADD THIS IMPORT
+import { ThemeProvider } from "./contexts/ThemeContext";
 
 // Protected Route Component
 const ProtectedRoute = ({ children, requiredRole = null }) => {
@@ -25,7 +26,7 @@ const ProtectedRoute = ({ children, requiredRole = null }) => {
 
 function Router() {
    return (
-    <ThemeProvider>  {/* Wrap ALL routes */}
+    <ThemeProvider>
       <Routes>
         <Route path="/" element={<App />}>
           <Route index element={<Home />} />
@@ -33,12 +34,23 @@ function Router() {
         </Route>
 
         <Route path="/document-validator" element={<DocumentValidator />} />
-        <Route path="/admin" element={
+        
+        {/* Admin Dashboard Route */}
+        <Route path="/admin-dashboard" element={
           <ProtectedRoute requiredRole="admin">
             <AdminDashboard />
           </ProtectedRoute>
         } />
         
+        {/* Support Agent Dashboard Route */}
+        <Route path="/support-dashboard" element={
+          <ProtectedRoute requiredRole="support_agent">
+            <SupportAgentsDashboard />
+          </ProtectedRoute>
+        } />
+        
+        {/* Catch all route - redirect to home */}
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </ThemeProvider>
   );

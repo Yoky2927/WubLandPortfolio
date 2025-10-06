@@ -19,17 +19,17 @@ CREATE TABLE IF NOT EXISTS users (
     last_message_time TIMESTAMP NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
--- Create todos table
+-- Create todos table (updated with username foreign key)
 CREATE TABLE IF NOT EXISTS todos (
     id INT AUTO_INCREMENT PRIMARY KEY,
     text TEXT NOT NULL,
     completed BOOLEAN DEFAULT FALSE,
     due_date DATE,
     assignee VARCHAR(255),
-    created_by INT,
+    created_by VARCHAR(50), -- Changed to VARCHAR to reference username
     order_index INT DEFAULT 0,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL
+    FOREIGN KEY (created_by) REFERENCES users(username) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- Create chat_messages table
@@ -58,3 +58,104 @@ CREATE TABLE IF NOT EXISTS admin_activities (
     timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (admin_username) REFERENCES users(username) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- Create support_tickets table
+CREATE TABLE IF NOT EXISTS support_tickets (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NOT NULL,
+    subject VARCHAR(255) NOT NULL,
+    description TEXT NOT NULL,
+    category ENUM('account', 'payment', 'technical', 'property', 'safety', 'general') NOT NULL,
+    priority ENUM('low', 'medium', 'high', 'urgent') DEFAULT 'medium',
+    status ENUM('open', 'in_progress', 'resolved', 'closed') DEFAULT 'open',
+    assigned_to VARCHAR(50), -- Support agent username
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    resolved_at TIMESTAMP NULL,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (assigned_to) REFERENCES users(username) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- Create ticket_responses table
+CREATE TABLE IF NOT EXISTS ticket_responses (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    ticket_id INT NOT NULL,
+    responder_username VARCHAR(50) NOT NULL,
+    response_text TEXT NOT NULL,
+    internal_note BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (ticket_id) REFERENCES support_tickets(id) ON DELETE CASCADE,
+    FOREIGN KEY (responder_username) REFERENCES users(username) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- Create knowledge_base_articles table
+CREATE TABLE IF NOT EXISTS knowledge_base_articles (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    title VARCHAR(255) NOT NULL,
+    content TEXT NOT NULL,
+    category ENUM('general', 'account', 'payment', 'technical', 'property', 'safety') NOT NULL,
+    author_username VARCHAR(50) NOT NULL,
+    views INT DEFAULT 0,
+    helpful_votes INT DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    is_published BOOLEAN DEFAULT TRUE,
+    FOREIGN KEY (author_username) REFERENCES users(username) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- Create flagged_content table
+CREATE TABLE IF NOT EXISTS flagged_content (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    content_type ENUM('property_listing', 'user_message', 'user_profile', 'review', 'other') NOT NULL,
+    content_id VARCHAR(255), -- Can reference different types of content
+    reported_by_user_id INT NOT NULL,
+    reason TEXT NOT NULL,
+    severity ENUM('low', 'medium', 'high') DEFAULT 'medium',
+    status ENUM('pending', 'under_review', 'approved', 'rejected', 'action_taken') DEFAULT 'pending',
+    assigned_to VARCHAR(50), -- Support agent username
+    resolved_by VARCHAR(50), -- Support agent who resolved it
+    resolved_at TIMESTAMP NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (reported_by_user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (assigned_to) REFERENCES users(username) ON DELETE SET NULL,
+    FOREIGN KEY (resolved_by) REFERENCES users(username) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- Create support_agent_activities table
+CREATE TABLE IF NOT EXISTS support_agent_activities (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    agent_username VARCHAR(50) NOT NULL,
+    activity_type ENUM('ticket_created', 'ticket_updated', 'ticket_resolved', 'article_created', 
+                      'article_updated', 'flag_resolved', 'response_sent', 'user_assisted') NOT NULL,
+    target_id INT, -- Reference to ticket_id, article_id, etc.
+    target_type ENUM('ticket', 'article', 'flag', 'user') NOT NULL,
+    details TEXT,
+    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (agent_username) REFERENCES users(username) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- Create user_feedback table
+CREATE TABLE IF NOT EXISTS user_feedback (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NOT NULL,
+    ticket_id INT,
+    rating INT CHECK (rating >= 1 AND rating <= 5),
+    feedback_text TEXT,
+    responded_to_by VARCHAR(50), -- Support agent username
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (ticket_id) REFERENCES support_tickets(id) ON DELETE SET NULL,
+    FOREIGN KEY (responded_to_by) REFERENCES users(username) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- Insert sample support agents
+INSERT INTO users (first_name, last_name, username, email, password, role, status) VALUES
+('Support', 'Agent1', 'support_agent1', 'support1@wubland.com', '$2b$10$examplehashedpassword', 'support_agent', 'active'),
+('Support', 'Agent2', 'support_agent2', 'support2@wubland.com', '$2b$10$examplehashedpassword', 'support_agent', 'active'),
+('Support', 'Agent3', 'support_agent3', 'support3@wubland.com', '$2b$10$examplehashedpassword', 'support_agent', 'active');
+
+-- Insert sample knowledge base articles
+INSERT INTO knowledge_base_articles (title, content, category, author_username, views, helpful_votes) VALUES
+('How to Reset Your Password', 'Step-by-step guide to reset your password if you''ve forgotten it...', 'account', 'support_agent1', 1245, 89),
+('Understanding Payment Processing', 'Learn how payments are processed on our platform and typical timelines...', 'payment', 'support_agent2', 876, 67),
+('Property Listing Guidelines', 'Complete guide to creating and managing property listings...', 'property', 'support_agent1', 1543, 112);

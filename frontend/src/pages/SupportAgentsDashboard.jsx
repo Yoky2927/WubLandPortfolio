@@ -29,6 +29,11 @@ import {
   ThumbsDown,
   Star,
   User,
+  Video,
+  Play,
+  Shield,
+  Send,
+  TrendingUp,
 } from "lucide-react";
 import ThemeToggle from "../components/ThemeToggle";
 import StaticProfileAvatar from "../components/StaticProfileAvatar";
@@ -39,37 +44,76 @@ import { useNavigate } from "react-router-dom";
 import { useTheme } from "../contexts/ThemeContext";
 import ChatApp from "../components/ChatApp";
 import { io } from "socket.io-client";
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  Title,
+  Tooltip,
+  Legend,
+  RadialLinearScale,
+  Filler,
+  ArcElement,
+} from "chart.js";
+import { Line, Radar, Doughnut } from "react-chartjs-2";
+
+// Register Chart.js components
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  Title,
+  Tooltip,
+  Legend,
+  RadialLinearScale,
+  Filler,
+  ArcElement
+);
 
 // Helper function to calculate days ago
 const getTimeAgo = (timestamp) => {
+  if (!timestamp) return "Just now";
+
   const now = new Date();
   const past = new Date(timestamp);
   const diffInMs = now - past;
   const diffInDays = Math.floor(diffInMs / (1000 * 60 * 60 * 24));
-  
+
   if (diffInDays === 0) {
     const diffInHours = Math.floor(diffInMs / (1000 * 60 * 60));
     if (diffInHours === 0) {
       const diffInMinutes = Math.floor(diffInMs / (1000 * 60));
       return `${diffInMinutes} min ago`;
     }
-    return `${diffInHours} hour${diffInHours > 1 ? 's' : ''} ago`;
+    return `${diffInHours} hour${diffInHours > 1 ? "s" : ""} ago`;
   }
-  return `${diffInDays} day${diffInDays > 1 ? 's' : ''} ago`;
+  return `${diffInDays} day${diffInDays > 1 ? "s" : ""} ago`;
 };
 
-const TicketModal = ({ isOpen, onClose, ticket, theme, onUpdateTicket, currentUser }) => {
+const TicketModal = ({
+  isOpen,
+  onClose,
+  ticket,
+  theme,
+  onUpdateTicket,
+  currentUser,
+}) => {
   if (!isOpen || !ticket) return null;
 
   const [response, setResponse] = useState("");
   const [status, setStatus] = useState(ticket.status);
+  const [priority, setPriority] = useState(ticket.priority);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     await onUpdateTicket(ticket.id, {
       response,
       status,
-      respondedAt: new Date().toISOString()
+      priority,
+      respondedAt: new Date().toISOString(),
     });
     setResponse("");
     onClose();
@@ -106,53 +150,77 @@ const TicketModal = ({ isOpen, onClose, ticket, theme, onUpdateTicket, currentUs
 
         <div className="space-y-4">
           {/* Ticket Info */}
-          <div className={`p-4 rounded-lg ${
-            theme === "dark" ? "bg-gray-700" : "bg-gray-100"
-          }`}>
+          <div
+            className={`p-4 rounded-lg ${
+              theme === "dark" ? "bg-gray-700" : "bg-gray-100"
+            }`}
+          >
             <div className="grid grid-cols-2 gap-4 text-sm">
               <div>
-                <span className="font-medium">User:</span> {ticket.user_name}
+                <span className="font-medium">User:</span>{" "}
+                {ticket.user_first_name} {ticket.user_last_name}
               </div>
               <div>
-                <span className="font-medium">Priority:</span>
-                <span className={`ml-2 px-2 py-1 rounded-full text-xs ${
-                  ticket.priority === 'high' 
-                    ? 'bg-red-100 text-red-800'
-                    : ticket.priority === 'medium'
-                    ? 'bg-yellow-100 text-yellow-800'
-                    : 'bg-green-100 text-green-800'
-                }`}>
-                  {ticket.priority}
-                </span>
+                <span className="font-medium">Email:</span> {ticket.user_email}
               </div>
               <div>
                 <span className="font-medium">Category:</span> {ticket.category}
               </div>
               <div>
-                <span className="font-medium">Status:</span>
-                <span className={`ml-2 px-2 py-1 rounded-full text-xs ${
-                  ticket.status === 'open' 
-                    ? 'bg-blue-100 text-blue-800'
-                    : ticket.status === 'in_progress'
-                    ? 'bg-yellow-100 text-yellow-800'
-                    : 'bg-green-100 text-green-800'
-                }`}>
-                  {ticket.status}
-                </span>
+                <span className="font-medium">Created:</span>{" "}
+                {getTimeAgo(ticket.created_at)}
               </div>
+            </div>
+          </div>
+
+          {/* Priority Selection */}
+          <div>
+            <label
+              className={`block text-sm font-medium mb-2 ${
+                theme === "dark" ? "text-white" : "text-gray-900"
+              }`}
+            >
+              Priority Level
+            </label>
+            <div className="grid grid-cols-4 gap-2">
+              {[
+                { value: "low", label: "Low", color: "bg-green-500" },
+                { value: "medium", label: "Medium", color: "bg-yellow-500" },
+                { value: "high", label: "High", color: "bg-orange-500" },
+                { value: "urgent", label: "Urgent", color: "bg-red-500" },
+              ].map((level) => (
+                <button
+                  key={level.value}
+                  type="button"
+                  onClick={() => setPriority(level.value)}
+                  className={`p-2 rounded-lg text-white text-sm font-medium transition-all ${
+                    priority === level.value
+                      ? `${level.color} ring-2 ring-offset-2 ${
+                          theme === "dark" ? "ring-white" : "ring-gray-900"
+                        }`
+                      : `${level.color} opacity-70 hover:opacity-90`
+                  }`}
+                >
+                  {level.label}
+                </button>
+              ))}
             </div>
           </div>
 
           {/* Issue Description */}
           <div>
-            <h4 className={`font-medium mb-2 ${
-              theme === "dark" ? "text-white" : "text-gray-900"
-            }`}>
+            <h4
+              className={`font-medium mb-2 ${
+                theme === "dark" ? "text-white" : "text-gray-900"
+              }`}
+            >
               Issue Description
             </h4>
-            <p className={`text-sm ${
-              theme === "dark" ? "text-gray-300" : "text-gray-600"
-            }`}>
+            <p
+              className={`text-sm ${
+                theme === "dark" ? "text-gray-300" : "text-gray-600"
+              }`}
+            >
               {ticket.description}
             </p>
           </div>
@@ -160,18 +228,25 @@ const TicketModal = ({ isOpen, onClose, ticket, theme, onUpdateTicket, currentUs
           {/* Previous Responses */}
           {ticket.responses && ticket.responses.length > 0 && (
             <div>
-              <h4 className={`font-medium mb-2 ${
-                theme === "dark" ? "text-white" : "text-gray-900"
-              }`}>
+              <h4
+                className={`font-medium mb-2 ${
+                  theme === "dark" ? "text-white" : "text-gray-900"
+                }`}
+              >
                 Previous Responses
               </h4>
               <div className="space-y-2 max-h-40 overflow-y-auto">
                 {ticket.responses.map((response, index) => (
-                  <div key={index} className={`p-3 rounded ${
-                    theme === "dark" ? "bg-gray-600" : "bg-gray-200"
-                  }`}>
+                  <div
+                    key={index}
+                    className={`p-3 rounded ${
+                      theme === "dark" ? "bg-gray-600" : "bg-gray-200"
+                    }`}
+                  >
                     <div className="flex justify-between text-sm">
-                      <span className="font-medium">{response.responder_username}</span>
+                      <span className="font-medium">
+                        {response.responder_username}
+                      </span>
                       <span>{getTimeAgo(response.created_at)}</span>
                     </div>
                     <p className="text-sm mt-1">{response.response_text}</p>
@@ -184,9 +259,11 @@ const TicketModal = ({ isOpen, onClose, ticket, theme, onUpdateTicket, currentUs
           {/* Response Form */}
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className={`block text-sm font-medium mb-2 ${
-                theme === "dark" ? "text-white" : "text-gray-900"
-              }`}>
+              <label
+                className={`block text-sm font-medium mb-2 ${
+                  theme === "dark" ? "text-white" : "text-gray-900"
+                }`}
+              >
                 Your Response
               </label>
               <textarea
@@ -204,9 +281,11 @@ const TicketModal = ({ isOpen, onClose, ticket, theme, onUpdateTicket, currentUs
             </div>
 
             <div>
-              <label className={`block text-sm font-medium mb-2 ${
-                theme === "dark" ? "text-white" : "text-gray-900"
-              }`}>
+              <label
+                className={`block text-sm font-medium mb-2 ${
+                  theme === "dark" ? "text-white" : "text-gray-900"
+                }`}
+              >
                 Update Status
               </label>
               <select
@@ -251,11 +330,19 @@ const TicketModal = ({ isOpen, onClose, ticket, theme, onUpdateTicket, currentUs
   );
 };
 
-const ArticleModal = ({ isOpen, onClose, article, theme, onSaveArticle }) => {
+const FAQModal = ({
+  isOpen,
+  onClose,
+  article,
+  theme,
+  onSaveArticle,
+  currentUser,
+}) => {
   const [formData, setFormData] = useState({
     title: article?.title || "",
     content: article?.content || "",
-    category: article?.category || "general"
+    category: article?.category || "general",
+    video_url: article?.video_url || "",
   });
 
   useEffect(() => {
@@ -263,7 +350,8 @@ const ArticleModal = ({ isOpen, onClose, article, theme, onSaveArticle }) => {
       setFormData({
         title: article.title,
         content: article.content,
-        category: article.category
+        category: article.category,
+        video_url: article.video_url || "",
       });
     }
   }, [article]);
@@ -272,6 +360,13 @@ const ArticleModal = ({ isOpen, onClose, article, theme, onSaveArticle }) => {
     e.preventDefault();
     await onSaveArticle(article?.id, formData);
     onClose();
+  };
+
+  const extractYouTubeId = (url) => {
+    const match = url.match(
+      /(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/
+    );
+    return match ? match[1] : null;
   };
 
   if (!isOpen) return null;
@@ -283,7 +378,7 @@ const ArticleModal = ({ isOpen, onClose, article, theme, onSaveArticle }) => {
           theme === "dark"
             ? "bg-gray-800 border-gray-700"
             : "bg-white border-gray-200"
-        } border max-w-2xl w-full max-h-[90vh] overflow-y-auto`}
+        } border max-w-4xl w-full max-h-[90vh] overflow-y-auto`}
       >
         <div className="flex justify-between items-center mb-4">
           <h3
@@ -291,7 +386,7 @@ const ArticleModal = ({ isOpen, onClose, article, theme, onSaveArticle }) => {
               theme === "dark" ? "text-white" : "text-gray-900"
             }`}
           >
-            {article ? 'Edit Article' : 'Create New Article'}
+            {article ? "Edit FAQ" : "Create New FAQ"}
           </h3>
           <button
             onClick={onClose}
@@ -305,17 +400,21 @@ const ArticleModal = ({ isOpen, onClose, article, theme, onSaveArticle }) => {
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-6">
           <div>
-            <label className={`block text-sm font-medium mb-2 ${
-              theme === "dark" ? "text-white" : "text-gray-900"
-            }`}>
+            <label
+              className={`block text-sm font-medium mb-2 ${
+                theme === "dark" ? "text-white" : "text-gray-900"
+              }`}
+            >
               Title
             </label>
             <input
               type="text"
               value={formData.title}
-              onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
+              onChange={(e) =>
+                setFormData((prev) => ({ ...prev, title: e.target.value }))
+              }
               className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-400 ${
                 theme === "dark"
                   ? "bg-gray-700 border-gray-600 text-white"
@@ -326,14 +425,18 @@ const ArticleModal = ({ isOpen, onClose, article, theme, onSaveArticle }) => {
           </div>
 
           <div>
-            <label className={`block text-sm font-medium mb-2 ${
-              theme === "dark" ? "text-white" : "text-gray-900"
-            }`}>
+            <label
+              className={`block text-sm font-medium mb-2 ${
+                theme === "dark" ? "text-white" : "text-gray-900"
+              }`}
+            >
               Category
             </label>
             <select
               value={formData.category}
-              onChange={(e) => setFormData(prev => ({ ...prev, category: e.target.value }))}
+              onChange={(e) =>
+                setFormData((prev) => ({ ...prev, category: e.target.value }))
+              }
               className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-400 ${
                 theme === "dark"
                   ? "bg-gray-700 border-gray-600 text-white"
@@ -349,15 +452,84 @@ const ArticleModal = ({ isOpen, onClose, article, theme, onSaveArticle }) => {
             </select>
           </div>
 
+          {/* Video URL Section */}
           <div>
-            <label className={`block text-sm font-medium mb-2 ${
-              theme === "dark" ? "text-white" : "text-gray-900"
-            }`}>
+            <label
+              className={`block text-sm font-medium mb-2 ${
+                theme === "dark" ? "text-white" : "text-gray-900"
+              }`}
+            >
+              YouTube Video URL (Optional)
+            </label>
+            <div
+              className={`p-6 border-2 border-dashed rounded-lg text-center ${
+                theme === "dark"
+                  ? "border-gray-600 bg-gray-700"
+                  : "border-gray-300 bg-gray-50"
+              }`}
+            >
+              <Video className="w-12 h-12 mx-auto mb-4 text-gray-400" />
+              <p
+                className={`text-lg font-medium mb-2 ${
+                  theme === "dark" ? "text-gray-300" : "text-gray-600"
+                }`}
+              >
+                Add Videos Here
+              </p>
+              <p
+                className={`text-sm mb-4 ${
+                  theme === "dark" ? "text-gray-400" : "text-gray-500"
+                }`}
+              >
+                Paste YouTube URL to embed tutorial videos
+              </p>
+              <input
+                type="url"
+                value={formData.video_url}
+                onChange={(e) =>
+                  setFormData((prev) => ({
+                    ...prev,
+                    video_url: e.target.value,
+                  }))
+                }
+                placeholder="https://www.youtube.com/watch?v=..."
+                className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-400 ${
+                  theme === "dark"
+                    ? "bg-gray-600 border-gray-500 text-white"
+                    : "bg-white border-gray-300 text-gray-900"
+                }`}
+              />
+              {formData.video_url && extractYouTubeId(formData.video_url) && (
+                <div className="mt-4">
+                  <div className="relative aspect-video bg-black rounded-lg overflow-hidden">
+                    <iframe
+                      src={`https://www.youtube.com/embed/${extractYouTubeId(
+                        formData.video_url
+                      )}`}
+                      className="w-full h-full"
+                      frameBorder="0"
+                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                      allowFullScreen
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div>
+            <label
+              className={`block text-sm font-medium mb-2 ${
+                theme === "dark" ? "text-white" : "text-gray-900"
+              }`}
+            >
               Content
             </label>
             <textarea
               value={formData.content}
-              onChange={(e) => setFormData(prev => ({ ...prev, content: e.target.value }))}
+              onChange={(e) =>
+                setFormData((prev) => ({ ...prev, content: e.target.value }))
+              }
               rows="8"
               className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-400 ${
                 theme === "dark"
@@ -384,7 +556,7 @@ const ArticleModal = ({ isOpen, onClose, article, theme, onSaveArticle }) => {
               type="submit"
               className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
             >
-              {article ? 'Update Article' : 'Create Article'}
+              {article ? "Update FAQ" : "Create FAQ"}
             </button>
           </div>
         </form>
@@ -393,7 +565,380 @@ const ArticleModal = ({ isOpen, onClose, article, theme, onSaveArticle }) => {
   );
 };
 
-const StatCard = ({ icon: Icon, title, value, trend, color, subtitle, theme }) => (
+const FlaggedContentModal = ({
+  isOpen,
+  onClose,
+  flag,
+  theme,
+  onResolveFlag,
+  currentUser,
+}) => {
+  const [action, setAction] = useState("");
+  const [adminMessage, setAdminMessage] = useState("");
+
+  if (!isOpen || !flag) return null;
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    await onResolveFlag(flag.id, action, adminMessage);
+    setAdminMessage("");
+    onClose();
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div
+        className={`p-6 rounded-xl shadow-xl ${
+          theme === "dark"
+            ? "bg-gray-800 border-gray-700"
+            : "bg-white border-gray-200"
+        } border max-w-2xl w-full max-h-[90vh] overflow-y-auto`}
+      >
+        <div className="flex justify-between items-center mb-4">
+          <h3
+            className={`text-lg font-semibold ${
+              theme === "dark" ? "text-white" : "text-gray-900"
+            }`}
+          >
+            Review Flagged Content
+          </h3>
+          <button
+            onClick={onClose}
+            className={`p-1 rounded ${
+              theme === "dark"
+                ? "hover:bg-gray-700 text-white"
+                : "hover:bg-gray-200 text-gray-900"
+            }`}
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        <div className="space-y-4">
+          {/* Content Preview */}
+          <div
+            className={`p-4 rounded-lg border ${
+              theme === "dark"
+                ? "bg-gray-700 border-gray-600"
+                : "bg-gray-50 border-gray-200"
+            }`}
+          >
+            <h4
+              className={`font-medium mb-2 ${
+                theme === "dark" ? "text-white" : "text-gray-900"
+              }`}
+            >
+              {flag.content_type} Report
+            </h4>
+            <p
+              className={`text-sm mb-3 ${
+                theme === "dark" ? "text-gray-300" : "text-gray-600"
+              }`}
+            >
+              {flag.reason}
+            </p>
+            <div className="flex items-center gap-2 text-sm">
+              <span className="font-medium">Content ID:</span>
+              <span
+                className={`px-2 py-1 rounded ${
+                  theme === "dark"
+                    ? "bg-gray-600 text-gray-300"
+                    : "bg-gray-200 text-gray-700"
+                }`}
+              >
+                {flag.content_id}
+              </span>
+            </div>
+          </div>
+
+          {/* Flag Details */}
+          <div
+            className={`p-4 rounded-lg ${
+              theme === "dark" ? "bg-gray-700" : "bg-gray-100"
+            }`}
+          >
+            <div className="grid grid-cols-2 gap-4 text-sm">
+              <div>
+                <span className="font-medium">Reported By:</span>{" "}
+                {flag.reported_by_username}
+              </div>
+              <div>
+                <span className="font-medium">Reason:</span> {flag.reason}
+              </div>
+              <div>
+                <span className="font-medium">Severity:</span>
+                <span
+                  className={`ml-2 px-2 py-1 rounded-full text-xs ${
+                    flag.severity === "high"
+                      ? "bg-red-100 text-red-800"
+                      : flag.severity === "medium"
+                      ? "bg-yellow-100 text-yellow-800"
+                      : "bg-green-100 text-green-800"
+                  }`}
+                >
+                  {flag.severity}
+                </span>
+              </div>
+              <div>
+                <span className="font-medium">Reported:</span>{" "}
+                {getTimeAgo(flag.created_at)}
+              </div>
+            </div>
+          </div>
+
+          {/* Resolution Form */}
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <label
+                className={`block text-sm font-medium mb-2 ${
+                  theme === "dark" ? "text-white" : "text-gray-900"
+                }`}
+              >
+                Action to Take
+              </label>
+              <select
+                value={action}
+                onChange={(e) => setAction(e.target.value)}
+                className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-400 ${
+                  theme === "dark"
+                    ? "bg-gray-700 border-gray-600 text-white"
+                    : "bg-white border-gray-300 text-gray-900"
+                }`}
+                required
+              >
+                <option value="">Select Action</option>
+                <option value="approve">Approve Content</option>
+                <option value="reject">Reject Content</option>
+                <option value="suspend_user">Suspend User</option>
+                <option value="warn_user">Send Warning</option>
+              </select>
+            </div>
+
+            {action && (
+              <div>
+                <label
+                  className={`block text-sm font-medium mb-2 ${
+                    theme === "dark" ? "text-white" : "text-gray-900"
+                  }`}
+                >
+                  Message to Admin
+                </label>
+                <textarea
+                  value={adminMessage}
+                  onChange={(e) => setAdminMessage(e.target.value)}
+                  rows="3"
+                  className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-400 ${
+                    theme === "dark"
+                      ? "bg-gray-700 border-gray-600 text-white"
+                      : "bg-white border-gray-300 text-gray-900"
+                  }`}
+                  placeholder="Add notes for admin review..."
+                />
+              </div>
+            )}
+
+            <div className="flex gap-3 justify-end">
+              <button
+                type="button"
+                onClick={onClose}
+                className={`px-4 py-2 rounded-lg ${
+                  theme === "dark"
+                    ? "bg-gray-700 text-white hover:bg-gray-600"
+                    : "bg-gray-200 text-gray-800 hover:bg-gray-300"
+                }`}
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+              >
+                Submit Action
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const ReviewsModal = ({
+  isOpen,
+  onClose,
+  reviews,
+  theme,
+  currentUser,
+  stats,
+}) => {
+  if (!isOpen) return null;
+
+  const renderStars = (rating) => {
+    return Array.from({ length: 5 }, (_, i) => (
+      <Star
+        key={i}
+        className={`w-4 h-4 ${
+          i < rating
+            ? "text-yellow-400 fill-yellow-400"
+            : theme === "dark"
+            ? "text-gray-600"
+            : "text-gray-300"
+        }`}
+      />
+    ));
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div
+        className={`p-6 rounded-xl shadow-xl ${
+          theme === "dark"
+            ? "bg-gray-800 border-gray-700"
+            : "bg-white border-gray-200"
+        } border max-w-4xl w-full max-h-[90vh] overflow-y-auto`}
+      >
+        <div className="flex justify-between items-center mb-6">
+          <div>
+            <h3
+              className={`text-lg font-semibold ${
+                theme === "dark" ? "text-white" : "text-gray-900"
+              }`}
+            >
+              Customer Reviews & Feedback
+            </h3>
+            {stats && (
+              <div className="flex items-center gap-4 mt-2">
+                <div className="flex items-center gap-2">
+                  <div className="flex">
+                    {renderStars(Math.round(stats.averageRating || 0))}
+                  </div>
+                  <span
+                    className={`text-sm ${
+                      theme === "dark" ? "text-gray-300" : "text-gray-600"
+                    }`}
+                  >
+                    {stats.averageRating || "0.0"} / 5.0
+                  </span>
+                </div>
+                <span
+                  className={`text-sm ${
+                    theme === "dark" ? "text-gray-400" : "text-gray-500"
+                  }`}
+                >
+                  {stats.totalFeedback || 0} total reviews
+                </span>
+              </div>
+            )}
+          </div>
+          <button
+            onClick={onClose}
+            className={`p-1 rounded ${
+              theme === "dark"
+                ? "hover:bg-gray-700 text-white"
+                : "hover:bg-gray-200 text-gray-900"
+            }`}
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        <div className="space-y-4">
+          {reviews.length > 0 ? (
+            reviews.map((review) => (
+              <div
+                key={review.id}
+                className={`p-4 rounded-lg border ${
+                  theme === "dark"
+                    ? "bg-gray-700 border-gray-600"
+                    : "bg-gray-50 border-gray-200"
+                }`}
+              >
+                <div className="flex justify-between items-start mb-2">
+                  <div>
+                    <p
+                      className={`font-medium ${
+                        theme === "dark" ? "text-white" : "text-gray-900"
+                      }`}
+                    >
+                      {review.user_first_name} {review.user_last_name}
+                    </p>
+                    <p
+                      className={`text-sm ${
+                        theme === "dark" ? "text-gray-300" : "text-gray-600"
+                      }`}
+                    >
+                      {review.ticket_subject || "General Feedback"}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="flex">{renderStars(review.rating)}</div>
+                    <span
+                      className={`text-xs ${
+                        theme === "dark" ? "text-gray-400" : "text-gray-500"
+                      }`}
+                    >
+                      {getTimeAgo(review.created_at)}
+                    </span>
+                  </div>
+                </div>
+                {review.feedback_text && (
+                  <p
+                    className={`text-sm ${
+                      theme === "dark" ? "text-gray-300" : "text-gray-600"
+                    } mt-2`}
+                  >
+                    "{review.feedback_text}"
+                  </p>
+                )}
+                <div className="flex justify-between items-center mt-3">
+                  <span
+                    className={`text-xs ${
+                      theme === "dark" ? "text-gray-400" : "text-gray-500"
+                    }`}
+                  >
+                    Responded by: {review.responded_to_by}
+                  </span>
+                  {review.rating >= 4 && (
+                    <span className="flex items-center gap-1 text-green-600 text-xs">
+                      <ThumbsUp className="w-3 h-3" />
+                      Positive
+                    </span>
+                  )}
+                  {review.rating <= 2 && (
+                    <span className="flex items-center gap-1 text-red-600 text-xs">
+                      <ThumbsDown className="w-3 h-3" />
+                      Needs Improvement
+                    </span>
+                  )}
+                </div>
+              </div>
+            ))
+          ) : (
+            <div
+              className={`text-center py-8 ${
+                theme === "dark" ? "text-gray-400" : "text-gray-500"
+              }`}
+            >
+              <Star className="w-12 h-12 mx-auto mb-4 opacity-50" />
+              <p>No reviews yet</p>
+              <p className="text-sm mt-2">Customer feedback will appear here</p>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const StatCard = ({
+  icon: Icon,
+  title,
+  value,
+  trend,
+  color,
+  subtitle,
+  theme,
+}) => (
   <div
     className={`p-6 rounded-xl border ${
       theme === "dark"
@@ -407,7 +952,11 @@ const StatCard = ({ icon: Icon, title, value, trend, color, subtitle, theme }) =
       </div>
       <span
         className={`text-sm font-medium ${
-          trend?.includes("+") ? "text-green-500" : trend?.includes("-") ? "text-red-500" : "text-gray-500"
+          trend?.includes("+")
+            ? "text-green-500"
+            : trend?.includes("-")
+            ? "text-red-500"
+            : "text-gray-500"
         }`}
       >
         {trend}
@@ -451,21 +1000,26 @@ const SupportAgentsDashboard = () => {
 
   // Support-specific state
   const [tickets, setTickets] = useState([]);
-  const [articles, setArticles] = useState([]);
+  const [faqs, setFaqs] = useState([]);
   const [flaggedContent, setFlaggedContent] = useState([]);
   const [supportAgents, setSupportAgents] = useState([]);
   const [userFeedback, setUserFeedback] = useState([]);
+  const [reviews, setReviews] = useState([]);
   const [selectedTicket, setSelectedTicket] = useState(null);
   const [showTicketModal, setShowTicketModal] = useState(false);
-  const [showArticleModal, setShowArticleModal] = useState(false);
-  const [selectedArticle, setSelectedArticle] = useState(null);
+  const [showFAQModal, setShowFAQModal] = useState(false);
+  const [selectedFAQ, setSelectedFAQ] = useState(null);
+  const [showFlagModal, setShowFlagModal] = useState(false);
+  const [selectedFlag, setSelectedFlag] = useState(null);
+  const [showReviewsModal, setShowReviewsModal] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [filterStatus, setFilterStatus] = useState("all");
   const [recentActivities, setRecentActivities] = useState([]);
+  const [reviewStats, setReviewStats] = useState(null);
 
   const navigate = useNavigate();
 
-  // API Base URLs
+  // API Base URLs - UPDATED FOR BACKEND CONNECTION
   const API_BASE = "http://localhost:5000"; // User service
   const SUPPORT_API_BASE = "http://localhost:5005"; // Support service
 
@@ -492,7 +1046,7 @@ const SupportAgentsDashboard = () => {
     },
     {
       id: 3,
-      message: "Article 'Payment Issues' needs update",
+      message: "FAQ 'Payment Issues' needs update",
       time: "3 hours ago",
       read: true,
     },
@@ -500,100 +1054,163 @@ const SupportAgentsDashboard = () => {
 
   const unreadCount = notifications.filter((n) => !n.read).length;
 
-  // Mock data for fallback
-  const mockTickets = [
-    {
-      id: 1,
-      userName: "John Smith",
-      userEmail: "john@example.com",
-      subject: "Cannot access my account",
-      description: "I'm unable to login to my account. It says invalid credentials but I'm sure my password is correct.",
-      priority: "high",
-      category: "account",
-      status: "open",
-      createdAt: new Date(Date.now() - 1000 * 60 * 30).toISOString(),
-      respondedAt: null
+  // Chart options
+  const lineChartOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: {
+        position: "top",
+        labels: {
+          color: theme === "dark" ? "#fff" : "#374151",
+          font: { size: 12 },
+        },
+      },
+      title: {
+        display: true,
+        text: "Customer Satisfaction Trend",
+        color: theme === "dark" ? "#fff" : "#374151",
+        font: { size: 16, weight: "bold" },
+      },
     },
-    {
-      id: 2,
-      userName: "Sarah Johnson",
-      userEmail: "sarah@example.com",
-      subject: "Payment not processed",
-      description: "I made a payment 3 days ago but it's still showing as pending. Can you check what's wrong?",
-      priority: "medium",
-      category: "payment",
-      status: "in_progress",
-      createdAt: new Date(Date.now() - 1000 * 60 * 60 * 2).toISOString(),
-      respondedAt: new Date(Date.now() - 1000 * 60 * 60).toISOString()
+    scales: {
+      y: {
+        beginAtZero: true,
+        min: 0,
+        max: 5,
+        grid: {
+          color:
+            theme === "dark"
+              ? "rgba(255, 255, 255, 0.1)"
+              : "rgba(0, 0, 0, 0.1)",
+        },
+        ticks: {
+          color: theme === "dark" ? "#fff" : "#374151",
+          stepSize: 1,
+        },
+        title: {
+          display: true,
+          text: "Rating",
+          color: theme === "dark" ? "#fff" : "#374151",
+        },
+      },
+      x: {
+        grid: {
+          color:
+            theme === "dark"
+              ? "rgba(255, 255, 255, 0.1)"
+              : "rgba(0, 0, 0, 0.1)",
+        },
+        ticks: {
+          color: theme === "dark" ? "#fff" : "#374151",
+        },
+      },
     },
-    {
-      id: 3,
-      userName: "Mike Brown",
-      userEmail: "mike@example.com",
-      subject: "Property listing issue",
-      description: "My property listing is not showing up in search results even though it's approved.",
-      priority: "medium",
-      category: "property",
-      status: "open",
-      createdAt: new Date(Date.now() - 1000 * 60 * 60 * 5).toISOString(),
-      respondedAt: null
-    }
-  ];
+    animation: {
+      duration: 2000,
+      easing: "easeOutQuart",
+    },
+  };
 
-  const mockArticles = [
-    {
-      id: 1,
-      title: "How to Reset Your Password",
-      content: "Step-by-step guide to reset your password if you've forgotten it...",
-      category: "account",
-      views: 1245,
-      helpful: 89,
-      lastUpdated: new Date(Date.now() - 1000 * 60 * 60 * 24 * 7).toISOString()
+  const radarChartOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: {
+        position: "top",
+        labels: {
+          color: theme === "dark" ? "#fff" : "#374151",
+          font: { size: 12 },
+        },
+      },
+      title: {
+        display: true,
+        text: "Ticket Distribution by Category",
+        color: theme === "dark" ? "#fff" : "#374151",
+        font: { size: 16, weight: "bold" },
+      },
     },
-    {
-      id: 2,
-      title: "Understanding Payment Processing",
-      content: "Learn how payments are processed on our platform and typical timelines...",
-      category: "payment",
-      views: 876,
-      helpful: 67,
-      lastUpdated: new Date(Date.now() - 1000 * 60 * 60 * 24 * 3).toISOString()
+    scales: {
+      r: {
+        angleLines: {
+          color:
+            theme === "dark"
+              ? "rgba(255, 255, 255, 0.1)"
+              : "rgba(0, 0, 0, 0.1)",
+        },
+        grid: {
+          color:
+            theme === "dark"
+              ? "rgba(255, 255, 255, 0.1)"
+              : "rgba(0, 0, 0, 0.1)",
+        },
+        pointLabels: {
+          color: theme === "dark" ? "#fff" : "#374151",
+          font: { size: 11 },
+        },
+        ticks: {
+          backdropColor: "transparent",
+          color: theme === "dark" ? "#fff" : "#374151",
+          stepSize: 1,
+        },
+        beginAtZero: true,
+      },
     },
-    {
-      id: 3,
-      title: "Property Listing Guidelines",
-      content: "Complete guide to creating and managing property listings...",
-      category: "property",
-      views: 1543,
-      helpful: 112,
-      lastUpdated: new Date(Date.now() - 1000 * 60 * 60 * 24).toISOString()
-    }
-  ];
+    animation: {
+      duration: 2000,
+      easing: "easeOutQuart",
+    },
+  };
 
-  const mockFlaggedContent = [
-    {
-      id: 1,
-      type: "property_listing",
-      title: "Suspicious Property in Bole Area",
-      reportedBy: "user123",
-      reason: "Possible scam listing",
-      severity: "high",
-      status: "pending",
-      reportedAt: new Date(Date.now() - 1000 * 60 * 60 * 2).toISOString()
-    },
-    {
-      id: 2,
-      type: "user_message",
-      title: "Inappropriate language in chat",
-      reportedBy: "user456",
-      reason: "Harassment",
-      severity: "medium",
-      status: "under_review",
-      reportedAt: new Date(Date.now() - 1000 * 60 * 60 * 12).toISOString()
-    }
-  ];
+  const canAssignTickets = () => {
+    return ["support_lead", "support_admin", "admin", "super_admin"].includes(
+      user?.role
+    );
+  };
 
-  // Fetch user data from user-service (similar to AdminDashboard)
+  const canManageTeam = () => {
+    return ["support_admin", "admin", "super_admin"].includes(user?.role);
+  };
+
+  const canDeleteContent = () => {
+    return ["support_lead", "support_admin", "admin", "super_admin"].includes(
+      user?.role
+    );
+  };
+
+  const canViewAnalytics = () => {
+    return ["support_lead", "support_admin", "admin", "super_admin"].includes(
+      user?.role
+    );
+  };
+
+  const canCreateFAQ = () => {
+    return [
+      "support_agent",
+      "support_lead",
+      "support_admin",
+      "admin",
+      "super_admin",
+    ].includes(user?.role);
+  };
+
+  const canResolveFlags = () => {
+    return [
+      "support_agent",
+      "support_lead",
+      "support_admin",
+      "admin",
+      "super_admin",
+    ].includes(user?.role);
+  };
+
+  const canViewAllTickets = () => {
+    return ["support_lead", "support_admin", "admin", "super_admin"].includes(
+      user?.role
+    );
+  };
+
+  // Fetch user data from user-service
   useEffect(() => {
     const abortController = new AbortController();
     const fetchUserData = async () => {
@@ -615,14 +1232,21 @@ const SupportAgentsDashboard = () => {
 
         if (response.ok) {
           const userData = await response.json();
-          
+
           // Check if user has support agent role
-          if (userData.role !== "support_agent" && userData.role !== "admin") {
+          const supportRoles = [
+            "support_agent",
+            "support_lead",
+            "support_admin",
+            "super_admin",
+            "admin",
+          ];
+          if (!supportRoles.includes(userData.role)) {
             localStorage.removeItem("token");
             navigate("/forbidden");
             return;
           }
-          
+
           setUser(userData);
           setIsAuthorized(true);
           setIsLoading(false);
@@ -647,74 +1271,142 @@ const SupportAgentsDashboard = () => {
   const fetchSupportData = async () => {
     try {
       const token = localStorage.getItem("token");
-      
-      // Fetch support tickets
-      const ticketsResponse = await fetch(`${API_BASE}/api/support/tickets`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      if (ticketsResponse.ok) {
-        const ticketsData = await ticketsResponse.json();
-        setTickets(ticketsData);
-      } else {
-        // Fallback to mock data if API fails
-        setTickets(mockTickets);
+      if (!token) {
+        console.error("No token found");
+        return;
       }
 
-      // Fetch knowledge base articles
-      const articlesResponse = await fetch(`${API_BASE}/api/support/articles`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      if (articlesResponse.ok) {
-        const articlesData = await articlesResponse.json();
-        setArticles(articlesData);
+      console.log("Fetching real data from backend...");
+
+      // Fetch support tickets
+      const ticketsResponse = await fetch(
+        `${SUPPORT_API_BASE}/api/support/tickets`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+
+      if (ticketsResponse.ok) {
+        const ticketsData = await ticketsResponse.json();
+        console.log("Tickets data:", ticketsData);
+        setTickets(ticketsData);
       } else {
-        setArticles(mockArticles);
+        console.error("Failed to fetch tickets:", ticketsResponse.status);
+        setTickets([]);
+      }
+
+      // Fetch FAQs
+      const faqsResponse = await fetch(`${SUPPORT_API_BASE}/api/support/faqs`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (faqsResponse.ok) {
+        const faqsData = await faqsResponse.json();
+        console.log("FAQs data:", faqsData);
+        setFaqs(faqsData);
+      } else {
+        console.error("Failed to fetch FAQs:", faqsResponse.status);
+        setFaqs([]);
       }
 
       // Fetch flagged content
-      const flagsResponse = await fetch(`${API_BASE}/api/support/flagged-content`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const flagsResponse = await fetch(
+        `${SUPPORT_API_BASE}/api/support/flagged-content`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+
       if (flagsResponse.ok) {
         const flagsData = await flagsResponse.json();
+        console.log("Flagged content data:", flagsData);
         setFlaggedContent(flagsData);
       } else {
-        setFlaggedContent(mockFlaggedContent);
+        console.error("Failed to fetch flagged content:", flagsResponse.status);
+        setFlaggedContent([]);
       }
 
-      // Fetch support agents from user-service
-      const agentsResponse = await fetch(`${API_BASE}/api/users?role=support_agent`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      if (agentsResponse.ok) {
-        const agentsData = await agentsResponse.json();
-        setSupportAgents(agentsData);
-      }
+      // FIXED: Use /api/support/reviews instead of /api/support/feedback
+      const feedbackResponse = await fetch(
+        `${SUPPORT_API_BASE}/api/support/reviews`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
 
-      // Fetch user feedback
-      const feedbackResponse = await fetch(`${API_BASE}/api/support/feedback`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
       if (feedbackResponse.ok) {
         const feedbackData = await feedbackResponse.json();
+        console.log("Feedback data:", feedbackData);
         setUserFeedback(feedbackData);
+        setReviews(feedbackData);
+
+        // Calculate review stats
+        if (feedbackData.length > 0) {
+          const averageRating =
+            feedbackData.reduce((sum, review) => sum + review.rating, 0) /
+            feedbackData.length;
+          setReviewStats({
+            averageRating: averageRating.toFixed(1),
+            totalFeedback: feedbackData.length,
+          });
+        } else {
+          setReviewStats({
+            averageRating: "0.0",
+            totalFeedback: 0,
+          });
+        }
+      } else {
+        console.error("Failed to fetch feedback:", feedbackResponse.status);
+        setReviews([]);
+        setReviewStats(null);
       }
 
-      // Fetch recent activities
-      const activitiesResponse = await fetch(`${API_BASE}/api/support/activities`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      // FIXED: Get support agents from support service instead of user service
+      // Or create a public endpoint in user service for support agents
+      try {
+        // Try to get from user service with admin access
+        const agentsResponse = await fetch(
+          `${API_BASE}/api/users/support/agents`,
+          {
+            headers: { Authorization: `Bearer ${token}` },
+          }
+        );
+
+        if (agentsResponse.ok) {
+          const agentsData = await agentsResponse.json();
+          setSupportAgents(agentsData);
+        } else {
+          console.log("Cannot fetch support agents, using fallback");
+          setSupportAgents([user]);
+        }
+      } catch (error) {
+        console.error("Error fetching support agents:", error);
+        setSupportAgents([user]); // Use current user as fallback
+      }
+
+      // Fetch recent activities - FIXED URL
+      const activitiesResponse = await fetch(
+        `${SUPPORT_API_BASE}/api/support/activity/activities`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+
       if (activitiesResponse.ok) {
         const activitiesData = await activitiesResponse.json();
-        setRecentActivities(activitiesData);
+        setRecentActivities(activitiesData.slice(0, 10));
+      } else {
+        console.error("Failed to fetch activities:", activitiesResponse.status);
+        setRecentActivities([]);
       }
-
     } catch (error) {
       console.error("Error fetching support data:", error);
-      // Fallback to mock data
-      setTickets(mockTickets);
-      setArticles(mockArticles);
-      setFlaggedContent(mockFlaggedContent);
+      setTickets([]);
+      setFaqs([]);
+      setFlaggedContent([]);
+      setReviews([]);
+      setRecentActivities([]);
+      setSupportAgents([]);
     }
   };
 
@@ -722,23 +1414,57 @@ const SupportAgentsDashboard = () => {
     if (!isAuthorized || !user) return;
 
     const abortController = new AbortController();
-    
+
     fetchSupportData();
 
     // Set up WebSocket for real-time updates
-    const socket = io("http://localhost:5001");
-    
+    const socket = io("http://localhost:5005");
+
     socket.on("new_ticket", (ticket) => {
-      setTickets(prev => [ticket, ...prev]);
-      setRecentActivities(prev => [{
-        id: Date.now(),
-        type: "ticket",
-        action: "New Support Ticket",
-        detail: `New ticket from ${ticket.userName}: ${ticket.subject}`,
-        time: new Date().toLocaleString(),
-        icon: "MessageSquare",
-        timestamp: new Date()
-      }, ...prev.slice(0, 9)]);
+      setTickets((prev) => [ticket, ...prev]);
+      setRecentActivities((prev) => [
+        {
+          id: Date.now(),
+          type: "ticket",
+          action: "New Support Ticket",
+          detail: `New ${ticket.priority} priority ticket from ${ticket.user_name}`,
+          time: new Date().toLocaleString(),
+          icon: "MessageSquare",
+          timestamp: new Date(),
+        },
+        ...prev.slice(0, 9),
+      ]);
+    });
+
+    socket.on("faq_updated", (faq) => {
+      setRecentActivities((prev) => [
+        {
+          id: Date.now(),
+          type: "faq",
+          action: "FAQ Updated",
+          detail: `Updated FAQ: ${faq.title}`,
+          time: new Date().toLocaleString(),
+          icon: "FileText",
+          timestamp: new Date(),
+        },
+        ...prev.slice(0, 9),
+      ]);
+    });
+
+    socket.on("new_feedback", (feedback) => {
+      setReviews((prev) => [feedback, ...prev]);
+      setRecentActivities((prev) => [
+        {
+          id: Date.now(),
+          type: "feedback",
+          action: "New Customer Review",
+          detail: `Received ${feedback.rating}-star review from ${feedback.user_name}`,
+          time: new Date().toLocaleString(),
+          icon: "Star",
+          timestamp: new Date(),
+        },
+        ...prev.slice(0, 9),
+      ]);
     });
 
     return () => {
@@ -751,69 +1477,68 @@ const SupportAgentsDashboard = () => {
   const handleUpdateTicket = async (ticketId, updates) => {
     try {
       const token = localStorage.getItem("token");
-      const response = await fetch(`${API_BASE}/api/support/tickets/${ticketId}/respond`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          response: updates.response,
-          status: updates.status,
-          responder_username: user.username
-        }),
-      });
+      const response = await fetch(
+        `${SUPPORT_API_BASE}/api/support/tickets/${ticketId}/respond`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            response: updates.response,
+            status: updates.status,
+            priority: updates.priority,
+            responder_username: user.username,
+          }),
+        }
+      );
 
       if (response.ok) {
-        // Refresh tickets data
         await fetchSupportData();
-        
-        // Add to recent activities
-        setRecentActivities(prev => [{
-          id: Date.now(),
-          type: "ticket",
-          action: "Ticket Response Sent",
-          detail: `Responded to ticket #${ticketId}`,
-          time: new Date().toLocaleString(),
-          icon: "MessageSquare",
-          timestamp: new Date(),
-          agent: user.username
-        }, ...prev.slice(0, 9)]);
+
+        setRecentActivities((prev) => [
+          {
+            id: Date.now(),
+            type: "ticket",
+            action: "Ticket Response Sent",
+            detail: `Responded to ${updates.priority} priority ticket #${ticketId}`,
+            time: new Date().toLocaleString(),
+            icon: "MessageSquare",
+            timestamp: new Date(),
+            agent: user.username,
+          },
+          ...prev.slice(0, 9),
+        ]);
       } else {
-        // Fallback to local update if API fails
-        setTickets(prev => prev.map(ticket => 
-          ticket.id === ticketId ? { ...ticket, ...updates } : ticket
-        ));
-        
-        setRecentActivities(prev => [{
-          id: Date.now(),
-          type: "ticket",
-          action: "Ticket Updated",
-          detail: `Updated ticket #${ticketId}`,
-          time: new Date().toLocaleString(),
-          icon: "Edit",
-          timestamp: new Date()
-        }, ...prev.slice(0, 9)]);
+        // Fallback: update local state
+        setTickets((prev) =>
+          prev.map((ticket) =>
+            ticket.id === ticketId ? { ...ticket, ...updates } : ticket
+          )
+        );
       }
     } catch (error) {
       console.error("Error updating ticket:", error);
-      // Fallback to local update
-      setTickets(prev => prev.map(ticket => 
-        ticket.id === ticketId ? { ...ticket, ...updates } : ticket
-      ));
+      // Fallback: update local state
+      setTickets((prev) =>
+        prev.map((ticket) =>
+          ticket.id === ticketId ? { ...ticket, ...updates } : ticket
+        )
+      );
     }
   };
 
-  // Create or update knowledge base article
-  const handleSaveArticle = async (articleId, data) => {
+  // Create or update FAQ
+  const handleSaveFAQ = async (faqId, data) => {
     try {
       const token = localStorage.getItem("token");
-      const url = articleId 
-        ? `${API_BASE}/api/support/articles/${articleId}`
-        : `${API_BASE}/api/support/articles`;
-      
-      const method = articleId ? "PUT" : "POST";
-      
+      const url = faqId
+        ? `${SUPPORT_API_BASE}/api/support/faqs/${faqId}`
+        : `${SUPPORT_API_BASE}/api/support/faqs`;
+
+      const method = faqId ? "PUT" : "POST";
+
       const response = await fetch(url, {
         method,
         headers: {
@@ -822,101 +1547,150 @@ const SupportAgentsDashboard = () => {
         },
         body: JSON.stringify({
           ...data,
-          author_username: user.username
+          author_username: user.username,
         }),
       });
 
       if (response.ok) {
         await fetchSupportData();
-        
-        setRecentActivities(prev => [{
-          id: Date.now(),
-          type: "article",
-          action: articleId ? "Article Updated" : "New Article Created",
-          detail: `${articleId ? 'Updated' : 'Created'} article: ${data.title}`,
-          time: new Date().toLocaleString(),
-          icon: "FileText",
-          timestamp: new Date(),
-          agent: user.username
-        }, ...prev.slice(0, 9)]);
+
+        setRecentActivities((prev) => [
+          {
+            id: Date.now(),
+            type: "faq",
+            action: faqId ? "FAQ Updated" : "New FAQ Created",
+            detail: `${faqId ? "Updated" : "Created"} FAQ: ${data.title}`,
+            time: new Date().toLocaleString(),
+            icon: "FileText",
+            timestamp: new Date(),
+            agent: user.username,
+          },
+          ...prev.slice(0, 9),
+        ]);
       } else {
-        // Fallback to local update
-        if (articleId) {
-          setArticles(prev => prev.map(article => 
-            article.id === articleId ? { ...article, ...data, lastUpdated: new Date().toISOString() } : article
-          ));
+        // Fallback: update local state
+        if (faqId) {
+          setFaqs((prev) =>
+            prev.map((faq) =>
+              faq.id === faqId
+                ? { ...faq, ...data, lastUpdated: new Date().toISOString() }
+                : faq
+            )
+          );
         } else {
-          const newArticle = {
-            id: Math.max(...articles.map(a => a.id)) + 1,
+          const newFAQ = {
+            id: Math.max(...faqs.map((f) => f.id || 0), 0) + 1,
             ...data,
             views: 0,
-            helpful: 0,
-            lastUpdated: new Date().toISOString()
+            helpful_votes: 0,
+            lastUpdated: new Date().toISOString(),
           };
-          setArticles(prev => [newArticle, ...prev]);
+          setFaqs((prev) => [newFAQ, ...prev]);
         }
       }
     } catch (error) {
-      console.error("Error saving article:", error);
-      // Fallback to local update
-      if (articleId) {
-        setArticles(prev => prev.map(article => 
-          article.id === articleId ? { ...article, ...data, lastUpdated: new Date().toISOString() } : article
-        ));
+      console.error("Error saving FAQ:", error);
+      // Fallback: update local state
+      if (faqId) {
+        setFaqs((prev) =>
+          prev.map((faq) =>
+            faq.id === faqId
+              ? { ...faq, ...data, lastUpdated: new Date().toISOString() }
+              : faq
+          )
+        );
       } else {
-        const newArticle = {
-          id: Math.max(...articles.map(a => a.id)) + 1,
+        const newFAQ = {
+          id: Math.max(...faqs.map((f) => f.id || 0), 0) + 1,
           ...data,
           views: 0,
-          helpful: 0,
-          lastUpdated: new Date().toISOString()
+          helpful_votes: 0,
+          lastUpdated: new Date().toISOString(),
         };
-        setArticles(prev => [newArticle, ...prev]);
+        setFaqs((prev) => [newFAQ, ...prev]);
       }
     }
   };
 
-  // Resolve flagged content
-  const handleResolveFlaggedContent = async (flagId, action) => {
+  // Delete FAQ
+  const handleDeleteFAQ = async (faqId) => {
     try {
       const token = localStorage.getItem("token");
-      const response = await fetch(`${API_BASE}/api/support/flagged-content/${flagId}/resolve`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          action,
-          resolved_by: user.username
-        }),
-      });
+      const response = await fetch(
+        `${SUPPORT_API_BASE}/api/support/faqs/${faqId}`,
+        {
+          method: "DELETE",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
 
       if (response.ok) {
         await fetchSupportData();
-        
-        setRecentActivities(prev => [{
-          id: Date.now(),
-          type: "flag",
-          action: "Flagged Content Resolved",
-          detail: `Resolved flagged content #${flagId} (${action})`,
-          time: new Date().toLocaleString(),
-          icon: "Flag",
-          timestamp: new Date(),
-          agent: user.username
-        }, ...prev.slice(0, 9)]);
       } else {
-        // Fallback to local update
-        setFlaggedContent(prev => prev.map(flag => 
-          flag.id === flagId ? { ...flag, status: action === 'approve' ? 'approved' : 'rejected' } : flag
-        ));
+        // Fallback: update local state
+        setFaqs((prev) => prev.filter((faq) => faq.id !== faqId));
+      }
+    } catch (error) {
+      console.error("Error deleting FAQ:", error);
+      // Fallback: update local state
+      setFaqs((prev) => prev.filter((faq) => faq.id !== faqId));
+    }
+  };
+
+  // Resolve flagged content
+  const handleResolveFlaggedContent = async (flagId, action, adminMessage) => {
+    try {
+      const token = localStorage.getItem("token");
+      const response = await fetch(
+        `${SUPPORT_API_BASE}/api/support/flagged-content/${flagId}/resolve`,
+        {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            action,
+            admin_message: adminMessage,
+            resolved_by: user.username,
+          }),
+        }
+      );
+
+      if (response.ok) {
+        await fetchSupportData();
+
+        setRecentActivities((prev) => [
+          {
+            id: Date.now(),
+            type: "flag",
+            action: "Flagged Content Resolved",
+            detail: `Resolved flagged content #${flagId} (${action})`,
+            time: new Date().toLocaleString(),
+            icon: "Flag",
+            timestamp: new Date(),
+            agent: user.username,
+          },
+          ...prev.slice(0, 9),
+        ]);
+      } else {
+        // Fallback: update local state
+        setFlaggedContent((prev) =>
+          prev.map((flag) =>
+            flag.id === flagId ? { ...flag, status: "resolved" } : flag
+          )
+        );
       }
     } catch (error) {
       console.error("Error resolving flagged content:", error);
-      // Fallback to local update
-      setFlaggedContent(prev => prev.map(flag => 
-        flag.id === flagId ? { ...flag, status: action === 'approve' ? 'approved' : 'rejected' } : flag
-      ));
+      // Fallback: update local state
+      setFlaggedContent((prev) =>
+        prev.map((flag) =>
+          flag.id === flagId ? { ...flag, status: "resolved" } : flag
+        )
+      );
     }
   };
 
@@ -925,13 +1699,11 @@ const SupportAgentsDashboard = () => {
     setShowLanguagePicker(false);
   };
 
-  // Profile picture upload function (similar to AdminDashboard)
+  // Profile picture upload function
   const handleProfilePictureUpload = async (file) => {
     try {
       const formData = new FormData();
       formData.append("profilePicture", file);
-
-      console.log("Uploading file:", file.name, file.size, file.type);
 
       const token = localStorage.getItem("token");
       const response = await fetch(`${API_BASE}/api/auth/upload`, {
@@ -944,13 +1716,10 @@ const SupportAgentsDashboard = () => {
 
       if (response.ok) {
         const data = await response.json();
-        console.log("Upload successful:", data);
-
         setUser((prevUser) => ({
           ...prevUser,
           profile_picture: data.profilePictureUrl,
         }));
-
         setShowProfileModal(false);
       } else {
         const errorData = await response.json();
@@ -962,29 +1731,51 @@ const SupportAgentsDashboard = () => {
   };
 
   const filteredTickets = useMemo(() => {
-    return tickets.filter(ticket => 
-      (filterStatus === "all" || ticket.status === filterStatus) &&
-      (ticket.userName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-       ticket.subject?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-       ticket.user_name?.toLowerCase().includes(searchTerm.toLowerCase()))
+    return tickets.filter(
+      (ticket) =>
+        (filterStatus === "all" || ticket.status === filterStatus) &&
+        (ticket.user_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          ticket.subject?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          ticket.user_first_name
+            ?.toLowerCase()
+            .includes(searchTerm.toLowerCase()) ||
+          ticket.user_last_name
+            ?.toLowerCase()
+            .includes(searchTerm.toLowerCase()))
     );
   }, [tickets, searchTerm, filterStatus]);
 
   // Calculate statistics from real data
   const stats = useMemo(() => {
     const totalTickets = tickets.length;
-    const openTickets = tickets.filter(t => t.status === 'open').length;
-    const resolvedToday = tickets.filter(t => 
-      t.status === 'resolved' && 
-      new Date(t.resolved_at || t.respondedAt).toDateString() === new Date().toDateString()
+    const openTickets = tickets.filter((t) => t.status === "open").length;
+    const resolvedToday = tickets.filter(
+      (t) =>
+        t.status === "resolved" &&
+        new Date(t.resolved_at || t.respondedAt).toDateString() ===
+          new Date().toDateString()
     ).length;
-    
-    // Calculate average rating from feedback
-    const averageRating = userFeedback.length > 0 
-      ? (userFeedback.reduce((sum, feedback) => sum + (feedback.rating || 0), 0) / userFeedback.length).toFixed(1)
-      : "0.0";
 
-    const helpfulArticles = articles.reduce((sum, article) => sum + (article.helpful_votes || article.helpful || 0), 0);
+    // Calculate average rating from feedback
+    const averageRating =
+      reviews.length > 0
+        ? (
+            reviews.reduce((sum, review) => sum + (review.rating || 0), 0) /
+            reviews.length
+          ).toFixed(1)
+        : "0.0";
+
+    const helpfulFaqs = faqs.reduce(
+      (sum, faq) => sum + (faq.helpful_votes || faq.helpful || 0),
+      0
+    );
+    const positiveReviews = reviews.filter((r) => r.rating >= 4).length;
+    const satisfactionRate =
+      reviews.length > 0
+        ? Math.round(
+            (reviews.filter((r) => r.rating >= 3).length / reviews.length) * 100
+          )
+        : 0;
 
     return {
       totalTickets,
@@ -992,10 +1783,94 @@ const SupportAgentsDashboard = () => {
       resolvedToday,
       averageRating,
       supportAgentsCount: supportAgents.length,
-      helpfulArticles,
-      avgResponseTime: "2.5h"
+      helpfulFaqs,
+      avgResponseTime: "2.5h",
+      positiveReviews,
+      satisfactionRate: `${satisfactionRate}%`,
+      totalReviews: reviews.length,
     };
-  }, [tickets, userFeedback, supportAgents, articles]);
+  }, [tickets, reviews, supportAgents, faqs]);
+
+  // Chart data
+  const chartData = useMemo(() => {
+    // Line chart for customer satisfaction
+    const satisfactionData = {
+      labels: ["Jan", "Feb", "Mar", "Apr", "May", "Jun"],
+      datasets: [
+        {
+          label: "Customer Rating",
+          data: [
+            3.2,
+            3.8,
+            4.2,
+            4.5,
+            4.3,
+            parseFloat(stats.averageRating) || 4.6,
+          ],
+          borderColor: "rgb(245, 158, 11)",
+          backgroundColor: "rgba(245, 158, 11, 0.1)",
+          tension: 0.4,
+          fill: true,
+          pointBackgroundColor: "rgb(245, 158, 11)",
+          pointBorderColor: "#fff",
+          pointHoverBackgroundColor: "#fff",
+          pointHoverBorderColor: "rgb(245, 158, 11)",
+          pointRadius: 4,
+          pointHoverRadius: 6,
+        },
+      ],
+    };
+
+    // Radar chart for ticket distribution
+    const ticketDistribution = {
+      labels: [
+        "Account",
+        "Payment",
+        "Technical",
+        "Property",
+        "Safety",
+        "General",
+      ],
+      datasets: [
+        {
+          label: "Tickets by Category",
+          data: [
+            tickets.filter((t) => t.category === "account").length,
+            tickets.filter((t) => t.category === "payment").length,
+            tickets.filter((t) => t.category === "technical").length,
+            tickets.filter((t) => t.category === "property").length,
+            tickets.filter((t) => t.category === "safety").length,
+            tickets.filter((t) => t.category === "general").length,
+          ],
+          backgroundColor: "rgba(59, 130, 246, 0.2)",
+          borderColor: "rgb(59, 130, 246)",
+          pointBackgroundColor: "rgb(59, 130, 246)",
+          pointBorderColor: "#fff",
+          pointHoverBackgroundColor: "#fff",
+          pointHoverBorderColor: "rgb(59, 130, 246)",
+          pointRadius: 4,
+          pointHoverRadius: 6,
+        },
+      ],
+    };
+
+    return { satisfactionData, ticketDistribution };
+  }, [tickets, stats.averageRating]);
+
+  const renderStars = (rating) => {
+    return Array.from({ length: 5 }, (_, i) => (
+      <Star
+        key={i}
+        className={`w-4 h-4 ${
+          i < rating
+            ? "text-yellow-400 fill-yellow-400"
+            : theme === "dark"
+            ? "text-gray-600"
+            : "text-gray-300"
+        }`}
+      />
+    ));
+  };
 
   const renderContent = () => {
     if (isLoading) {
@@ -1006,101 +1881,166 @@ const SupportAgentsDashboard = () => {
       case "dashboard":
         return (
           <div className="mx-0 space-y-6">
-            <div className={`p-6 text-center ${
-              theme === "dark" ? "bg-gray-800" : "bg-white"
-            } border ${theme === "dark" ? "border-gray-700" : "border-gray-200"}`}>
-              <h1 className={`text-2xl font-bold ${
-                theme === "dark" ? "text-white" : "text-gray-900"
-              } mb-2`}>
+            <div
+              className={`p-6 text-center ${
+                theme === "dark" ? "bg-gray-800" : "bg-white"
+              } border ${
+                theme === "dark" ? "border-gray-700" : "border-gray-200"
+              }`}
+            >
+              <h1
+                className={`text-2xl font-bold ${
+                  theme === "dark" ? "text-white" : "text-gray-900"
+                } mb-2`}
+              >
                 Welcome back, {user?.first_name}!
               </h1>
-              <p className={`${theme === "dark" ? "text-gray-300" : "text-gray-600"}`}>
+              <p
+                className={`${
+                  theme === "dark" ? "text-gray-300" : "text-gray-600"
+                }`}
+              >
                 Here's your support dashboard overview.
               </p>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              <StatCard
-                icon={MessageSquare}
-                title="Total Tickets"
-                value={stats.totalTickets}
-                trend="+12%"
-                color="bg-blue-500"
-                subtitle="All support requests"
-                theme={theme}
-              />
-              <StatCard
-                icon={AlertCircle}
-                title="Open Tickets"
-                value={stats.openTickets}
-                trend="+5%"
-                color="bg-amber-500"
-                subtitle="Needing attention"
-                theme={theme}
-              />
-              <StatCard
-                icon={CheckCircle}
-                title="Resolved Today"
-                value={stats.resolvedToday}
-                trend="+8%"
-                color="bg-green-500"
-                subtitle="Successful resolutions"
-                theme={theme}
-              />
-              <StatCard
-                icon={Clock}
-                title="Avg Response Time"
-                value={stats.avgResponseTime}
-                trend="-15%"
-                color="bg-purple-500"
-                subtitle="Faster responses"
-                theme={theme}
-              />
-              {/* Additional stat cards from first code */}
-              <StatCard
-                icon={Star}
-                title="Average Rating"
-                value={stats.averageRating}
-                trend="+0.2"
-                color="bg-yellow-500"
-                subtitle="User satisfaction"
-                theme={theme}
-              />
-              <StatCard
-                icon={Users}
-                title="Support Team"
-                value={stats.supportAgentsCount}
-                trend="+1"
-                color="bg-purple-500"
-                subtitle="Active agents"
-                theme={theme}
-              />
-              <StatCard
-                icon={ThumbsUp}
-                title="Helpful Articles"
-                value={stats.helpfulArticles}
-                trend="+15%"
-                color="bg-green-500"
-                subtitle="Positive feedback"
-                theme={theme}
-              />
+            {/* Enhanced Stats Grid with Charts */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Left Column - Stats Cards */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <StatCard
+                  icon={MessageSquare}
+                  title="Total Tickets"
+                  value={stats.totalTickets}
+                  trend="+12%"
+                  color="bg-blue-500"
+                  subtitle="All support requests"
+                  theme={theme}
+                />
+                <StatCard
+                  icon={AlertCircle}
+                  title="Open Tickets"
+                  value={stats.openTickets}
+                  trend="+5%"
+                  color="bg-amber-500"
+                  subtitle="Needing attention"
+                  theme={theme}
+                />
+                <StatCard
+                  icon={CheckCircle}
+                  title="Resolved Today"
+                  value={stats.resolvedToday}
+                  trend="+8%"
+                  color="bg-green-500"
+                  subtitle="Successful resolutions"
+                  theme={theme}
+                />
+                <StatCard
+                  icon={Star}
+                  title="Customer Rating"
+                  value={stats.averageRating}
+                  trend="+0.3"
+                  color="bg-yellow-500"
+                  subtitle="out of 5 stars"
+                  theme={theme}
+                />
+                <StatCard
+                  icon={Users}
+                  title="Support Team"
+                  value={stats.supportAgentsCount}
+                  trend="+1"
+                  color="bg-indigo-500"
+                  subtitle="Active agents"
+                  theme={theme}
+                />
+                <StatCard
+                  icon={ThumbsUp}
+                  title="Helpful FAQs"
+                  value={stats.helpfulFaqs}
+                  trend="+15%"
+                  color="bg-green-500"
+                  subtitle="Positive feedback"
+                  theme={theme}
+                />
+                <StatCard
+                  icon={TrendingUp}
+                  title="Satisfaction Rate"
+                  value={stats.satisfactionRate}
+                  trend="+5%"
+                  color="bg-purple-500"
+                  subtitle="happy customers"
+                  theme={theme}
+                />
+                <StatCard
+                  icon={Clock}
+                  title="Avg Response Time"
+                  value={stats.avgResponseTime}
+                  trend="-15%"
+                  color="bg-blue-500"
+                  subtitle="Faster responses"
+                  theme={theme}
+                />
+              </div>
+
+              {/* Right Column - Charts */}
+              <div className="space-y-6">
+                {/* Customer Satisfaction Line Chart */}
+                <div
+                  className={`p-6 rounded-xl border ${
+                    theme === "dark"
+                      ? "bg-gray-800 border-gray-700"
+                      : "bg-white border-gray-200"
+                  }`}
+                >
+                  <div className="h-64">
+                    <Line
+                      options={lineChartOptions}
+                      data={chartData.satisfactionData}
+                    />
+                  </div>
+                </div>
+
+                {/* Ticket Distribution Radar Chart */}
+                <div
+                  className={`p-6 rounded-xl border ${
+                    theme === "dark"
+                      ? "bg-gray-800 border-gray-700"
+                      : "bg-white border-gray-200"
+                  }`}
+                >
+                  <div className="h-64">
+                    <Radar
+                      options={radarChartOptions}
+                      data={chartData.ticketDistribution}
+                    />
+                  </div>
+                </div>
+              </div>
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {/* Recent Tickets */}
-              <div className={`p-6 rounded-xl border ${
-                theme === "dark" ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"
-              }`}>
+              <div
+                className={`p-6 rounded-xl border ${
+                  theme === "dark"
+                    ? "bg-gray-800 border-gray-700"
+                    : "bg-white border-gray-200"
+                }`}
+              >
                 <div className="flex justify-between items-center mb-4">
-                  <h3 className={`text-lg font-semibold ${
-                    theme === "dark" ? "text-white" : "text-gray-900"
-                  }`}>
+                  <h3
+                    className={`text-lg font-semibold ${
+                      theme === "dark" ? "text-white" : "text-gray-900"
+                    }`}
+                  >
                     Recent Tickets
                   </h3>
-                  <button 
+                  <button
                     onClick={() => setActiveTab("tickets")}
                     className={`text-sm ${
-                      theme === "dark" ? "text-blue-400 hover:text-blue-300" : "text-blue-600 hover:text-blue-700"
+                      theme === "dark"
+                        ? "text-blue-400 hover:text-blue-300"
+                        : "text-blue-600 hover:text-blue-700"
                     }`}
                   >
                     View All
@@ -1108,29 +2048,45 @@ const SupportAgentsDashboard = () => {
                 </div>
                 <div className="space-y-3">
                   {tickets.slice(0, 5).map((ticket) => (
-                    <div key={ticket.id} className={`p-3 rounded-lg border ${
-                      theme === "dark" ? "bg-gray-700 border-gray-600" : "bg-gray-50 border-gray-200"
-                    }`}>
+                    <div
+                      key={ticket.id}
+                      className={`p-3 rounded-lg border ${
+                        theme === "dark"
+                          ? "bg-gray-700 border-gray-600"
+                          : "bg-gray-50 border-gray-200"
+                      }`}
+                    >
                       <div className="flex justify-between items-start">
                         <div>
-                          <p className={`font-medium ${
-                            theme === "dark" ? "text-white" : "text-gray-900"
-                          }`}>
+                          <p
+                            className={`font-medium ${
+                              theme === "dark" ? "text-white" : "text-gray-900"
+                            }`}
+                          >
                             {ticket.subject}
                           </p>
-                          <p className={`text-sm ${
-                            theme === "dark" ? "text-gray-300" : "text-gray-600"
-                          }`}>
-                            {ticket.userName || ticket.user_name} • {getTimeAgo(ticket.createdAt || ticket.created_at)}
+                          <p
+                            className={`text-sm ${
+                              theme === "dark"
+                                ? "text-gray-300"
+                                : "text-gray-600"
+                            }`}
+                          >
+                            {ticket.user_first_name} {ticket.user_last_name} •{" "}
+                            {getTimeAgo(ticket.created_at)}
                           </p>
                         </div>
-                        <span className={`px-2 py-1 rounded-full text-xs ${
-                          ticket.priority === 'high' 
-                            ? 'bg-red-100 text-red-800'
-                            : ticket.priority === 'medium'
-                            ? 'bg-yellow-100 text-yellow-800'
-                            : 'bg-green-100 text-green-800'
-                        }`}>
+                        <span
+                          className={`px-2 py-1 rounded-full text-xs ${
+                            ticket.priority === "urgent"
+                              ? "bg-red-100 text-red-800"
+                              : ticket.priority === "high"
+                              ? "bg-orange-100 text-orange-800"
+                              : ticket.priority === "medium"
+                              ? "bg-yellow-100 text-yellow-800"
+                              : "bg-green-100 text-green-800"
+                          }`}
+                        >
                           {ticket.priority}
                         </span>
                       </div>
@@ -1140,86 +2096,204 @@ const SupportAgentsDashboard = () => {
               </div>
 
               {/* Recent Activities */}
-              <div className={`p-6 rounded-xl border ${
-                theme === "dark" ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"
-              }`}>
+              <div
+                className={`p-6 rounded-xl border ${
+                  theme === "dark"
+                    ? "bg-gray-800 border-gray-700"
+                    : "bg-white border-gray-200"
+                }`}
+              >
                 <div className="flex justify-between items-center mb-4">
-                  <h3 className={`text-lg font-semibold ${
-                    theme === "dark" ? "text-white" : "text-gray-900"
-                  }`}>
+                  <h3
+                    className={`text-lg font-semibold ${
+                      theme === "dark" ? "text-white" : "text-gray-900"
+                    }`}
+                  >
                     Recent Activities
                   </h3>
-                  <span className={`text-sm px-3 py-1 rounded-full ${
-                    theme === "dark" ? "bg-blue-900 text-blue-200" : "bg-blue-100 text-blue-800"
-                  }`}>
+                  <span
+                    className={`text-sm px-3 py-1 rounded-full ${
+                      theme === "dark"
+                        ? "bg-blue-900 text-blue-200"
+                        : "bg-blue-100 text-blue-800"
+                    }`}
+                  >
                     Last 7 Days
                   </span>
                 </div>
                 {recentActivities.length > 0 ? (
                   <div className="space-y-3">
                     {recentActivities.map((activity) => (
-                      <div key={activity.id} className={`p-3 rounded-lg border ${
-                        theme === "dark" ? "bg-gray-700 border-gray-600" : "bg-gray-50 border-gray-200"
-                      }`}>
+                      <div
+                        key={activity.id}
+                        className={`p-3 rounded-lg border ${
+                          theme === "dark"
+                            ? "bg-gray-700 border-gray-600"
+                            : "bg-gray-50 border-gray-200"
+                        }`}
+                      >
                         <div className="flex items-center justify-between">
                           <div className="flex items-center">
-                            <div className={`w-8 h-8 rounded-full flex items-center justify-center mr-3 ${
-                              theme === "dark" ? "bg-blue-900" : "bg-blue-100"
-                            }`}>
-                              <MessageSquare className={`w-4 h-4 ${
-                                theme === "dark" ? "text-blue-300" : "text-blue-600"
-                              }`} />
+                            <div
+                              className={`w-8 h-8 rounded-full flex items-center justify-center mr-3 ${
+                                theme === "dark" ? "bg-blue-900" : "bg-blue-100"
+                              }`}
+                            >
+                              {activity.activity_type?.includes("ticket") ? (
+                                <MessageSquare
+                                  className={`w-4 h-4 ${
+                                    theme === "dark"
+                                      ? "text-blue-300"
+                                      : "text-blue-600"
+                                  }`}
+                                />
+                              ) : activity.activity_type?.includes(
+                                  "article"
+                                ) ? (
+                                <FileText
+                                  className={`w-4 h-4 ${
+                                    theme === "dark"
+                                      ? "text-green-300"
+                                      : "text-green-600"
+                                  }`}
+                                />
+                              ) : activity.activity_type?.includes("flag") ? (
+                                <Flag
+                                  className={`w-4 h-4 ${
+                                    theme === "dark"
+                                      ? "text-red-300"
+                                      : "text-red-600"
+                                  }`}
+                                />
+                              ) : (
+                                <Star
+                                  className={`w-4 h-4 ${
+                                    theme === "dark"
+                                      ? "text-yellow-300"
+                                      : "text-yellow-600"
+                                  }`}
+                                />
+                              )}
                             </div>
                             <div>
-                              <p className={`font-medium text-sm ${
-                                theme === "dark" ? "text-white" : "text-gray-900"
-                              }`}>
-                                {activity.action}
+                              <p
+                                className={`font-medium text-sm ${
+                                  theme === "dark"
+                                    ? "text-white"
+                                    : "text-gray-900"
+                                }`}
+                              >
+                                {activity.activity_type?.replace("_", " ") ||
+                                  activity.action}
                               </p>
-                              <p className={`text-xs ${
-                                theme === "dark" ? "text-gray-300" : "text-gray-600"
-                              }`}>
-                                {activity.detail}
+                              <p
+                                className={`text-xs ${
+                                  theme === "dark"
+                                    ? "text-gray-300"
+                                    : "text-gray-600"
+                                }`}
+                              >
+                                {activity.details || activity.detail}
                               </p>
                             </div>
                           </div>
-                          <span className={`text-xs ${
-                            theme === "dark" ? "text-gray-400" : "text-gray-500"
-                          }`}>
-                            {getTimeAgo(activity.timestamp)}
+                          <span
+                            className={`text-xs ${
+                              theme === "dark"
+                                ? "text-gray-400"
+                                : "text-gray-500"
+                            }`}
+                          >
+                            {getTimeAgo(activity.timestamp || activity.time)}
                           </span>
                         </div>
                       </div>
                     ))}
                   </div>
                 ) : (
-                  <p className={`text-center py-8 ${
-                    theme === "dark" ? "text-gray-400" : "text-gray-500"
-                  }`}>
+                  <p
+                    className={`text-center py-8 ${
+                      theme === "dark" ? "text-gray-400" : "text-gray-500"
+                    }`}
+                  >
                     No recent activities
                   </p>
                 )}
               </div>
             </div>
+            {canViewAnalytics() && (
+              <div
+                className={`p-6 rounded-xl border ${
+                  theme === "dark"
+                    ? "bg-gray-800 border-gray-700"
+                    : "bg-white border-gray-200"
+                }`}
+              >
+                <h3
+                  className={`text-xl font-bold mb-4 ${
+                    theme === "dark" ? "text-white" : "text-gray-900"
+                  }`}
+                >
+                  Team Analytics
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <StatCard
+                    icon={Users}
+                    title="Team Members"
+                    value={supportAgents.length}
+                    trend="+2"
+                    color="bg-blue-500"
+                    subtitle="Active support staff"
+                    theme={theme}
+                  />
+                  <StatCard
+                    icon={TrendingUp}
+                    title="Team Performance"
+                    value="94%"
+                    trend="+3%"
+                    color="bg-green-500"
+                    subtitle="Satisfaction rate"
+                    theme={theme}
+                  />
+                  <StatCard
+                    icon={Clock}
+                    title="Avg Team Response"
+                    value="1.8h"
+                    trend="-0.5h"
+                    color="bg-purple-500"
+                    subtitle="Faster responses"
+                    theme={theme}
+                  />
+                </div>
+              </div>
+            )}
           </div>
         );
 
       case "tickets":
         return (
-          <div className={`p-6 rounded-xl border ${
-            theme === "dark" ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"
-          }`}>
+          <div
+            className={`p-6 rounded-xl border ${
+              theme === "dark"
+                ? "bg-gray-800 border-gray-700"
+                : "bg-white border-gray-200"
+            }`}
+          >
             <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-6 gap-4">
-              <h2 className={`text-2xl font-bold ${
-                theme === "dark" ? "text-white" : "text-gray-900"
-              }`}>
+              <h2
+                className={`text-2xl font-bold ${
+                  theme === "dark" ? "text-white" : "text-gray-900"
+                }`}
+              >
                 Support Tickets
               </h2>
               <div className="flex flex-col sm:flex-row gap-3 w-full lg:w-auto">
                 <div className="relative flex-1 lg:flex-none min-w-[250px]">
-                  <Search className={`absolute left-3 top-1/2 transform -translate-y-1/2 ${
-                    theme === "dark" ? "text-gray-400" : "text-gray-600"
-                  } w-5 h-5`} />
+                  <Search
+                    className={`absolute left-3 top-1/2 transform -translate-y-1/2 ${
+                      theme === "dark" ? "text-gray-400" : "text-gray-600"
+                    } w-5 h-5`}
+                  />
                   <input
                     type="text"
                     placeholder="Search tickets..."
@@ -1253,7 +2327,11 @@ const SupportAgentsDashboard = () => {
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead>
-                  <tr className={`${theme === "dark" ? "bg-gray-700" : "bg-gray-50"}`}>
+                  <tr
+                    className={`${
+                      theme === "dark" ? "bg-gray-700" : "bg-gray-50"
+                    }`}
+                  >
                     <th className="px-4 py-3 text-left">Ticket</th>
                     <th className="px-4 py-3 text-left">User</th>
                     <th className="px-4 py-3 text-left">Priority</th>
@@ -1264,54 +2342,75 @@ const SupportAgentsDashboard = () => {
                 </thead>
                 <tbody>
                   {filteredTickets.map((ticket) => (
-                    <tr key={ticket.id} className={`border-b ${
-                      theme === "dark" ? "border-gray-700 hover:bg-gray-750" : "border-gray-200 hover:bg-gray-50"
-                    }`}>
+                    <tr
+                      key={ticket.id}
+                      className={`border-b ${
+                        theme === "dark"
+                          ? "border-gray-700 hover:bg-gray-750"
+                          : "border-gray-200 hover:bg-gray-50"
+                      }`}
+                    >
                       <td className="px-4 py-3">
                         <div>
-                          <p className={`font-medium ${
-                            theme === "dark" ? "text-white" : "text-gray-900"
-                          }`}>
+                          <p
+                            className={`font-medium ${
+                              theme === "dark" ? "text-white" : "text-gray-900"
+                            }`}
+                          >
                             {ticket.subject}
                           </p>
-                          <p className={`text-sm ${
-                            theme === "dark" ? "text-gray-300" : "text-gray-600"
-                          }`}>
+                          <p
+                            className={`text-sm ${
+                              theme === "dark"
+                                ? "text-gray-300"
+                                : "text-gray-600"
+                            }`}
+                          >
                             {ticket.category}
                           </p>
                         </div>
                       </td>
-                      <td className={`px-4 py-3 ${
-                        theme === "dark" ? "text-white" : "text-gray-900"
-                      }`}>
-                        {ticket.userName || ticket.user_name}
+                      <td
+                        className={`px-4 py-3 ${
+                          theme === "dark" ? "text-white" : "text-gray-900"
+                        }`}
+                      >
+                        {ticket.user_first_name} {ticket.user_last_name}
                       </td>
                       <td className="px-4 py-3">
-                        <span className={`px-2 py-1 rounded-full text-xs ${
-                          ticket.priority === 'high' 
-                            ? 'bg-red-100 text-red-800'
-                            : ticket.priority === 'medium'
-                            ? 'bg-yellow-100 text-yellow-800'
-                            : 'bg-green-100 text-green-800'
-                        }`}>
+                        <span
+                          className={`px-2 py-1 rounded-full text-xs ${
+                            ticket.priority === "urgent"
+                              ? "bg-red-100 text-red-800"
+                              : ticket.priority === "high"
+                              ? "bg-orange-100 text-orange-800"
+                              : ticket.priority === "medium"
+                              ? "bg-yellow-100 text-yellow-800"
+                              : "bg-green-100 text-green-800"
+                          }`}
+                        >
                           {ticket.priority}
                         </span>
                       </td>
                       <td className="px-4 py-3">
-                        <span className={`px-2 py-1 rounded-full text-xs ${
-                          ticket.status === 'open' 
-                            ? 'bg-blue-100 text-blue-800'
-                            : ticket.status === 'in_progress'
-                            ? 'bg-yellow-100 text-yellow-800'
-                            : 'bg-green-100 text-green-800'
-                        }`}>
+                        <span
+                          className={`px-2 py-1 rounded-full text-xs ${
+                            ticket.status === "open"
+                              ? "bg-blue-100 text-blue-800"
+                              : ticket.status === "in_progress"
+                              ? "bg-yellow-100 text-yellow-800"
+                              : "bg-green-100 text-green-800"
+                          }`}
+                        >
                           {ticket.status}
                         </span>
                       </td>
-                      <td className={`px-4 py-3 ${
-                        theme === "dark" ? "text-gray-300" : "text-gray-600"
-                      }`}>
-                        {getTimeAgo(ticket.createdAt || ticket.created_at)}
+                      <td
+                        className={`px-4 py-3 ${
+                          theme === "dark" ? "text-gray-300" : "text-gray-600"
+                        }`}
+                      >
+                        {getTimeAgo(ticket.created_at)}
                       </td>
                       <td className="px-4 py-3">
                         <button
@@ -1336,60 +2435,92 @@ const SupportAgentsDashboard = () => {
           </div>
         );
 
-      case "knowledge":
+      case "faqs":
         return (
-          <div className={`p-6 rounded-xl border ${
-            theme === "dark" ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"
-          }`}>
+          <div
+            className={`p-6 rounded-xl border ${
+              theme === "dark"
+                ? "bg-gray-800 border-gray-700"
+                : "bg-white border-gray-200"
+            }`}
+          >
             <div className="flex justify-between items-center mb-6">
-              <h2 className={`text-2xl font-bold ${
-                theme === "dark" ? "text-white" : "text-gray-900"
-              }`}>
-                Knowledge Base
-              </h2>
-              <button
-                onClick={() => {
-                  setSelectedArticle(null);
-                  setShowArticleModal(true);
-                }}
-                className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
+              <h2
+                className={`text-2xl font-bold ${
+                  theme === "dark" ? "text-white" : "text-gray-900"
+                }`}
               >
-                <Plus className="w-4 h-4" />
-                New Article
-              </button>
+                FAQ Section
+              </h2>
+              {/* ONLY SHOW CREATE BUTTON FOR AUTHORIZED ROLES */}
+              {canCreateFAQ() && (
+                <button
+                  onClick={() => {
+                    setSelectedFAQ(null);
+                    setShowFAQModal(true);
+                  }}
+                  className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
+                >
+                  <Plus className="w-4 h-4" />
+                  New FAQ
+                </button>
+              )}
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {articles.map((article) => (
-                <div key={article.id} className={`p-4 rounded-lg border ${
-                  theme === "dark" ? "bg-gray-700 border-gray-600" : "bg-gray-50 border-gray-200"
-                }`}>
-                  <h3 className={`font-semibold mb-2 ${
-                    theme === "dark" ? "text-white" : "text-gray-900"
-                  }`}>
-                    {article.title}
+              {faqs.map((faq) => (
+                <div
+                  key={faq.id}
+                  className={`p-4 rounded-lg border ${
+                    theme === "dark"
+                      ? "bg-gray-700 border-gray-600"
+                      : "bg-gray-50 border-gray-200"
+                  }`}
+                >
+                  <h3
+                    className={`font-semibold mb-2 ${
+                      theme === "dark" ? "text-white" : "text-gray-900"
+                    }`}
+                  >
+                    {faq.title}
                   </h3>
-                  <p className={`text-sm mb-3 ${
-                    theme === "dark" ? "text-gray-300" : "text-gray-600"
-                  }`}>
-                    {article.content.substring(0, 100)}...
+                  <p
+                    className={`text-sm mb-3 ${
+                      theme === "dark" ? "text-gray-300" : "text-gray-600"
+                    }`}
+                  >
+                    {faq.content?.substring(0, 100)}...
                   </p>
+
+                  {faq.video_url && (
+                    <div className="mb-3">
+                      <div className="flex items-center gap-2 text-xs text-blue-500">
+                        <Video className="w-4 h-4" />
+                        Video Tutorial Available
+                      </div>
+                    </div>
+                  )}
+
                   <div className="flex justify-between items-center text-xs">
-                    <span className={`px-2 py-1 rounded ${
-                      theme === "dark" ? "bg-gray-600 text-gray-300" : "bg-gray-200 text-gray-700"
-                    }`}>
-                      {article.category}
+                    <span
+                      className={`px-2 py-1 rounded ${
+                        theme === "dark"
+                          ? "bg-gray-600 text-gray-300"
+                          : "bg-gray-200 text-gray-700"
+                      }`}
+                    >
+                      {faq.category}
                     </span>
                     <div className="flex items-center gap-4">
-                      <span>{article.views} views</span>
-                      <span>{article.helpful_votes || article.helpful} helpful</span>
+                      <span>{faq.views || 0} views</span>
+                      <span>{faq.helpful_votes || 0} helpful</span>
                     </div>
                   </div>
                   <div className="flex gap-2 mt-3">
                     <button
                       onClick={() => {
-                        setSelectedArticle(article);
-                        setShowArticleModal(true);
+                        setSelectedFAQ(faq);
+                        setShowFAQModal(true);
                       }}
                       className={`px-2 py-1 rounded text-xs ${
                         theme === "dark"
@@ -1399,15 +2530,19 @@ const SupportAgentsDashboard = () => {
                     >
                       Edit
                     </button>
-                    <button
-                      className={`px-2 py-1 rounded text-xs ${
-                        theme === "dark"
-                          ? "bg-red-600 text-white hover:bg-red-700"
-                          : "bg-red-100 text-red-800 hover:bg-red-200"
-                      }`}
-                    >
-                      Delete
-                    </button>
+                    {/* ONLY SHOW DELETE BUTTON FOR LEADS+ */}
+                    {canDeleteContent() && (
+                      <button
+                        onClick={() => handleDeleteFAQ(faq.id)}
+                        className={`px-2 py-1 rounded text-xs ${
+                          theme === "dark"
+                            ? "bg-red-600 text-white hover:bg-red-700"
+                            : "bg-red-100 text-red-800 hover:bg-red-200"
+                        }`}
+                      >
+                        Delete
+                      </button>
+                    )}
                   </div>
                 </div>
               ))}
@@ -1417,59 +2552,77 @@ const SupportAgentsDashboard = () => {
 
       case "flags":
         return (
-          <div className={`p-6 rounded-xl border ${
-            theme === "dark" ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"
-          }`}>
-            <h2 className={`text-2xl font-bold mb-6 ${
-              theme === "dark" ? "text-white" : "text-gray-900"
-            }`}>
+          <div
+            className={`p-6 rounded-xl border ${
+              theme === "dark"
+                ? "bg-gray-800 border-gray-700"
+                : "bg-white border-gray-200"
+            }`}
+          >
+            <h2
+              className={`text-2xl font-bold mb-6 ${
+                theme === "dark" ? "text-white" : "text-gray-900"
+              }`}
+            >
               Flagged Content
             </h2>
 
             <div className="space-y-4">
               {flaggedContent.map((flag) => (
-                <div key={flag.id} className={`p-4 rounded-lg border ${
-                  theme === "dark" ? "bg-gray-700 border-gray-600" : "bg-gray-50 border-gray-200"
-                }`}>
+                <div
+                  key={flag.id}
+                  className={`p-4 rounded-lg border ${
+                    theme === "dark"
+                      ? "bg-gray-700 border-gray-600"
+                      : "bg-gray-50 border-gray-200"
+                  }`}
+                >
                   <div className="flex justify-between items-start mb-3">
                     <div>
-                      <h3 className={`font-semibold ${
-                        theme === "dark" ? "text-white" : "text-gray-900"
-                      }`}>
-                        {flag.title}
+                      <h3
+                        className={`font-semibold ${
+                          theme === "dark" ? "text-white" : "text-gray-900"
+                        }`}
+                      >
+                        {flag.content_type} Report
                       </h3>
-                      <p className={`text-sm ${
-                        theme === "dark" ? "text-gray-300" : "text-gray-600"
-                      }`}>
-                        Reported by {flag.reportedBy} • {flag.reason}
+                      <p
+                        className={`text-sm ${
+                          theme === "dark" ? "text-gray-300" : "text-gray-600"
+                        }`}
+                      >
+                        Reported by {flag.reported_by_username} • {flag.reason}
                       </p>
                     </div>
-                    <span className={`px-2 py-1 rounded-full text-xs ${
-                      flag.severity === 'high' 
-                        ? 'bg-red-100 text-red-800'
-                        : 'bg-yellow-100 text-yellow-800'
-                    }`}>
+                    <span
+                      className={`px-2 py-1 rounded-full text-xs ${
+                        flag.severity === "high"
+                          ? "bg-red-100 text-red-800"
+                          : flag.severity === "medium"
+                          ? "bg-yellow-100 text-yellow-800"
+                          : "bg-green-100 text-green-800"
+                      }`}
+                    >
                       {flag.severity}
                     </span>
                   </div>
                   <div className="flex justify-between items-center">
-                    <span className={`text-sm ${
-                      theme === "dark" ? "text-gray-400" : "text-gray-500"
-                    }`}>
-                      {getTimeAgo(flag.reportedAt)}
+                    <span
+                      className={`text-sm ${
+                        theme === "dark" ? "text-gray-400" : "text-gray-500"
+                      }`}
+                    >
+                      {getTimeAgo(flag.created_at)}
                     </span>
                     <div className="flex gap-2">
                       <button
-                        onClick={() => handleResolveFlaggedContent(flag.id, 'approve')}
-                        className="px-3 py-1 bg-green-600 text-white rounded text-sm hover:bg-green-700"
+                        onClick={() => {
+                          setSelectedFlag(flag);
+                          setShowFlagModal(true);
+                        }}
+                        className="px-3 py-1 bg-blue-600 text-white rounded text-sm hover:bg-blue-700"
                       >
-                        Approve
-                      </button>
-                      <button
-                        onClick={() => handleResolveFlaggedContent(flag.id, 'reject')}
-                        className="px-3 py-1 bg-red-600 text-white rounded text-sm hover:bg-red-700"
-                      >
-                        Reject
+                        Review
                       </button>
                     </div>
                   </div>
@@ -1479,18 +2632,200 @@ const SupportAgentsDashboard = () => {
           </div>
         );
 
+      case "reviews":
+        return (
+          <div
+            className={`p-6 rounded-xl border ${
+              theme === "dark"
+                ? "bg-gray-800 border-gray-700"
+                : "bg-white border-gray-200"
+            }`}
+          >
+            <div className="flex justify-between items-center mb-6">
+              <div>
+                <h2
+                  className={`text-2xl font-bold ${
+                    theme === "dark" ? "text-white" : "text-gray-900"
+                  }`}
+                >
+                  Customer Reviews
+                </h2>
+                {reviewStats && (
+                  <p
+                    className={`mt-2 ${
+                      theme === "dark" ? "text-gray-300" : "text-gray-600"
+                    }`}
+                  >
+                    Average rating:{" "}
+                    <span className="font-semibold">
+                      {reviewStats.averageRating}/5
+                    </span>
+                    from{" "}
+                    <span className="font-semibold">
+                      {reviewStats.totalFeedback}
+                    </span>{" "}
+                    reviews
+                  </p>
+                )}
+              </div>
+              <button
+                onClick={() => setShowReviewsModal(true)}
+                className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+              >
+                <Eye className="w-4 h-4" />
+                View All Reviews
+              </button>
+            </div>
+
+            {/* Review Summary Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+              <StatCard
+                icon={Star}
+                title="Average Rating"
+                value={reviewStats?.averageRating || "0.0"}
+                trend="+0.2"
+                color="bg-yellow-500"
+                subtitle="out of 5 stars"
+                theme={theme}
+              />
+              <StatCard
+                icon={Users}
+                title="Total Reviews"
+                value={reviewStats?.totalFeedback || 0}
+                trend="+12%"
+                color="bg-blue-500"
+                subtitle="customer feedback"
+                theme={theme}
+              />
+              <StatCard
+                icon={ThumbsUp}
+                title="Positive Reviews"
+                value={reviews.filter((r) => r.rating >= 4).length}
+                trend="+8%"
+                color="bg-green-500"
+                subtitle="4+ stars"
+                theme={theme}
+              />
+              <StatCard
+                icon={TrendingUp}
+                title="Satisfaction Rate"
+                value={`${
+                  reviews.length > 0
+                    ? Math.round(
+                        (reviews.filter((r) => r.rating >= 3).length /
+                          reviews.length) *
+                          100
+                      )
+                    : 0
+                }%`}
+                trend="+5%"
+                color="bg-purple-500"
+                subtitle="happy customers"
+                theme={theme}
+              />
+            </div>
+
+            {/* Recent Reviews */}
+            <div
+              className={`p-6 rounded-lg border ${
+                theme === "dark"
+                  ? "bg-gray-700 border-gray-600"
+                  : "bg-gray-50 border-gray-200"
+              }`}
+            >
+              <h3
+                className={`text-lg font-semibold mb-4 ${
+                  theme === "dark" ? "text-white" : "text-gray-900"
+                }`}
+              >
+                Recent Feedback
+              </h3>
+              <div className="space-y-4">
+                {reviews.slice(0, 5).map((review) => (
+                  <div
+                    key={review.id}
+                    className={`p-4 rounded border ${
+                      theme === "dark"
+                        ? "bg-gray-600 border-gray-500"
+                        : "bg-white border-gray-200"
+                    }`}
+                  >
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <div className="flex items-center gap-2 mb-2">
+                          <div className="flex">
+                            {renderStars(review.rating)}
+                          </div>
+                          <span
+                            className={`font-medium ${
+                              theme === "dark" ? "text-white" : "text-gray-900"
+                            }`}
+                          >
+                            {review.user_first_name} {review.user_last_name}
+                          </span>
+                        </div>
+                        {review.feedback_text && (
+                          <p
+                            className={`text-sm ${
+                              theme === "dark"
+                                ? "text-gray-300"
+                                : "text-gray-600"
+                            }`}
+                          >
+                            {review.feedback_text}
+                          </p>
+                        )}
+                      </div>
+                      <span
+                        className={`text-xs ${
+                          theme === "dark" ? "text-gray-400" : "text-gray-500"
+                        }`}
+                      >
+                        {getTimeAgo(review.created_at)}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+                {reviews.length === 0 && (
+                  <div
+                    className={`text-center py-8 ${
+                      theme === "dark" ? "text-gray-400" : "text-gray-500"
+                    }`}
+                  >
+                    <Star className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                    <p>No reviews yet</p>
+                    <p className="text-sm">
+                      Customer feedback will appear here as you help users
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        );
+
       case "chat":
         return (
           <div className="space-y-6">
-            <div className={`p-6 rounded-xl ${
-              theme === "dark" ? "bg-gray-800" : "bg-white"
-            } border ${theme === "dark" ? "border-gray-700" : "border-gray-200"}`}>
-              <h1 className={`text-2xl font-bold ${
-                theme === "dark" ? "text-white" : "text-gray-900"
-              }`}>
+            <div
+              className={`p-6 rounded-xl ${
+                theme === "dark" ? "bg-gray-800" : "bg-white"
+              } border ${
+                theme === "dark" ? "border-gray-700" : "border-gray-200"
+              }`}
+            >
+              <h1
+                className={`text-2xl font-bold ${
+                  theme === "dark" ? "text-white" : "text-gray-900"
+                }`}
+              >
                 Support Chat
               </h1>
-              <p className={`${theme === "dark" ? "text-gray-300" : "text-gray-600"}`}>
+              <p
+                className={`${
+                  theme === "dark" ? "text-gray-300" : "text-gray-600"
+                }`}
+              >
                 Communicate directly with users through the support system.
               </p>
             </div>
@@ -1516,33 +2851,51 @@ const SupportAgentsDashboard = () => {
   }
 
   return (
-    <div className={`min-h-screen ${
-      theme === "dark" 
-        ? "bg-gradient-to-r from-gray-900 via-black to-gray-900 text-white" 
-        : "bg-gray-100 text-gray-900"
-    } flex transition-colors duration-300`}>
-      
+    <div
+      className={`min-h-screen ${
+        theme === "dark"
+          ? "bg-gradient-to-r from-gray-900 via-black to-gray-900 text-white"
+          : "bg-gray-100 text-gray-900"
+      } flex transition-colors duration-300`}
+    >
       {/* Sidebar */}
-      <div className={`fixed lg:static w-64 min-h-screen flex-shrink-0 shadow-lg transform transition-transform duration-300 ${
-        isMobileMenuOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
-      } ${
-        theme === "dark" 
-          ? "bg-gray-900/40 backdrop-blur-lg border-r border-gray-700/30" 
-          : "bg-white border-r border-gray-200"
-      } flex flex-col z-30`}>
-        
+      <div
+        className={`fixed lg:static w-64 min-h-screen flex-shrink-0 shadow-lg transform transition-transform duration-300 ${
+          isMobileMenuOpen
+            ? "translate-x-0"
+            : "-translate-x-full lg:translate-x-0"
+        } ${
+          theme === "dark"
+            ? "bg-gray-900/40 backdrop-blur-lg border-r border-gray-700/30"
+            : "bg-white border-r border-gray-200"
+        } flex flex-col z-30`}
+      >
         {/* Logo */}
-        <div className={`flex items-center gap-4 px-8 py-3 border-b ${
-          theme === "dark" ? "border-gray-700/40 bg-gray-900/30" : "border-gray-200"
-        }`}>
-          <img src="/vectors/smallLogo.svg" alt="WubLand Logo" className="w-16 h-16 md:w-22 md:h-22" />
-          <span className="font-medium text-lg md:text-2xl text-amber-500">WubLand</span>
+        <div
+          className={`flex items-center gap-4 px-8 py-3 border-b ${
+            theme === "dark"
+              ? "border-gray-700/40 bg-gray-900/30"
+              : "border-gray-200"
+          }`}
+        >
+          <img
+            src="/vectors/smallLogo.svg"
+            alt="WubLand Logo"
+            className="w-16 h-16 md:w-22 md:h-22"
+          />
+          <span className="font-medium text-lg md:text-2xl text-amber-500">
+            WubLand
+          </span>
         </div>
 
         {/* Static Profile */}
-        <div className={`p-4 md:p-6 border-b ${
-          theme === "dark" ? "border-gray-700/40 bg-gray-900/30" : "border-gray-200"
-        } flex flex-col items-center`}>
+        <div
+          className={`p-4 md:p-6 border-b ${
+            theme === "dark"
+              ? "border-gray-700/40 bg-gray-900/30"
+              : "border-gray-200"
+          } flex flex-col items-center`}
+        >
           <div className="flex justify-center mb-4">
             <StaticProfileAvatar
               userProfilePicture={user?.profile_picture}
@@ -1557,18 +2910,24 @@ const SupportAgentsDashboard = () => {
         </div>
 
         {/* Navigation */}
-        <nav className={`p-4 flex-1 ${theme === "dark" ? "bg-gray-900/20" : ""}`}>
+        <nav
+          className={`p-4 flex-1 ${theme === "dark" ? "bg-gray-900/20" : ""}`}
+        >
           <div className="space-y-1">
             {[
               { id: "dashboard", label: "Dashboard", icon: BarChart3 },
               { id: "tickets", label: "Support Tickets", icon: MessageSquare },
-              { id: "knowledge", label: "Knowledge Base", icon: HelpCircle },
+              { id: "faqs", label: "FAQ Section", icon: HelpCircle },
               { id: "flags", label: "Flagged Content", icon: Flag },
+              { id: "reviews", label: "Customer Reviews", icon: Star },
               { id: "chat", label: "Support Chat", icon: MessageSquare },
             ].map((item) => (
               <button
                 key={item.id}
-                onClick={() => { setActiveTab(item.id); setIsMobileMenuOpen(false); }}
+                onClick={() => {
+                  setActiveTab(item.id);
+                  setIsMobileMenuOpen(false);
+                }}
                 className={`w-full flex items-center rounded-xl px-4 py-3 transition-all text-left ${
                   activeTab === item.id
                     ? theme === "dark"
@@ -1579,16 +2938,28 @@ const SupportAgentsDashboard = () => {
                     : "text-gray-700 hover:bg-gray-100"
                 }`}
               >
-                <item.icon className={`w-5 h-5 mr-3 ${
-                  activeTab === item.id
-                    ? theme === "dark" ? "text-white" : "text-amber-600"
-                    : theme === "dark" ? "text-amber-400" : "text-gray-600"
-                }`} />
-                <span className={`truncate ${
-                  activeTab === item.id
-                    ? theme === "dark" ? "text-white" : "text-amber-600"
-                    : theme === "dark" ? "text-amber-400" : "text-gray-700"
-                }`}>
+                <item.icon
+                  className={`w-5 h-5 mr-3 ${
+                    activeTab === item.id
+                      ? theme === "dark"
+                        ? "text-white"
+                        : "text-amber-600"
+                      : theme === "dark"
+                      ? "text-amber-400"
+                      : "text-gray-600"
+                  }`}
+                />
+                <span
+                  className={`truncate ${
+                    activeTab === item.id
+                      ? theme === "dark"
+                        ? "text-white"
+                        : "text-amber-600"
+                      : theme === "dark"
+                      ? "text-amber-400"
+                      : "text-gray-700"
+                  }`}
+                >
                   {item.label}
                 </span>
               </button>
@@ -1597,16 +2968,23 @@ const SupportAgentsDashboard = () => {
         </nav>
 
         {/* Logout */}
-        <div className={`p-4 border-t ${
-          theme === "dark" ? "border-gray-700/40 bg-gray-900/30" : "border-gray-200"
-        }`}>
+        <div
+          className={`p-4 border-t ${
+            theme === "dark"
+              ? "border-gray-700/40 bg-gray-900/30"
+              : "border-gray-200"
+          }`}
+        >
           <button
             className={`w-full flex items-center justify-center px-4 py-2 rounded-lg transition-colors ${
-              theme === "dark" 
-                ? "text-gray-300 hover:bg-gray-700/50 backdrop-blur-sm" 
+              theme === "dark"
+                ? "text-gray-300 hover:bg-gray-700/50 backdrop-blur-sm"
                 : "text-gray-600 hover:bg-gray-100"
             }`}
-            onClick={() => { localStorage.removeItem("token"); window.location.href = "/"; }}
+            onClick={() => {
+              localStorage.removeItem("token");
+              window.location.href = "/";
+            }}
           >
             <LogOut className="w-4 h-4 mr-2" />
             Logout
@@ -1617,20 +2995,29 @@ const SupportAgentsDashboard = () => {
       {/* Right Section - Top Bar + Main Content */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* Top Bar */}
-        <div className={`flex-shrink-0 border-b ${
-          theme === "dark" ? "border-gray-700/30" : "border-gray-200"
-        }`} style={{
-          backgroundImage: `url(${theme === "dark" ? "/vectors/TiletDark.svg" : "/vectors/TiletLight.svg"})`,
-          backgroundSize: "cover", backgroundPosition: "bottom", backgroundRepeat: "no-repeat",
-        }}>
+        <div
+          className={`flex-shrink-0 border-b ${
+            theme === "dark" ? "border-gray-700/30" : "border-gray-200"
+          }`}
+          style={{
+            backgroundImage: `url(${
+              theme === "dark"
+                ? "/vectors/TiletDark.svg"
+                : "/vectors/TiletLight.svg"
+            })`,
+            backgroundSize: "cover",
+            backgroundPosition: "bottom",
+            backgroundRepeat: "no-repeat",
+          }}
+        >
           <div className="">
             <div className="flex items-center justify-between p-4">
               {/* Menu Button (mobile only) */}
               <button
                 onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
                 className={`p-2 rounded md:hidden ${
-                  theme === "dark" 
-                    ? "hover:bg-gray-700/50 text-white" 
+                  theme === "dark"
+                    ? "hover:bg-gray-700/50 text-white"
                     : "hover:bg-white/30 text-gray-900"
                 } transition-colors backdrop-blur-sm`}
               >
@@ -1638,15 +3025,24 @@ const SupportAgentsDashboard = () => {
               </button>
 
               {/* Page Title */}
-              <h1 className={`text-xl font-bold flex-1 mt-2 ml-10 text-center md:text-left ${
-                theme === "dark" ? "text-white" : "text-gray-900"
-              }`}>
-                {activeTab === "dashboard" ? "Support Agent Dashboard" : 
-                 activeTab === "tickets" ? "Support Tickets" :
-                 activeTab === "knowledge" ? "Knowledge Base" :
-                 activeTab === "flags" ? "Flagged Content" :
-                 activeTab === "chat" ? "Support Chat" :
-                 activeTab.charAt(0).toUpperCase() + activeTab.slice(1)}
+              <h1
+                className={`text-xl font-bold flex-1 mt-2 ml-10 text-center md:text-left ${
+                  theme === "dark" ? "text-white" : "text-gray-900"
+                }`}
+              >
+                {activeTab === "dashboard"
+                  ? "Support Agent Dashboard"
+                  : activeTab === "tickets"
+                  ? "Support Tickets"
+                  : activeTab === "faqs"
+                  ? "FAQ Section"
+                  : activeTab === "flags"
+                  ? "Flagged Content"
+                  : activeTab === "reviews"
+                  ? "Customer Reviews"
+                  : activeTab === "chat"
+                  ? "Support Chat"
+                  : activeTab.charAt(0).toUpperCase() + activeTab.slice(1)}
               </h1>
 
               {/* Right side - Icons */}
@@ -1656,25 +3052,33 @@ const SupportAgentsDashboard = () => {
                   <button
                     onClick={() => setShowLanguagePicker(!showLanguagePicker)}
                     className={`p-2 rounded-lg transition-colors backdrop-blur-sm ${
-                      theme === "dark" 
-                        ? "hover:bg-gray-700/50 text-gray-300" 
+                      theme === "dark"
+                        ? "hover:bg-gray-700/50 text-gray-300"
                         : "hover:bg-white/30 text-gray-600"
                     }`}
                   >
                     <Globe className="w-5 h-5" />
                   </button>
                   {showLanguagePicker && (
-                    <div className={`absolute right-0 top-12 w-48 rounded-lg shadow-lg z-50 backdrop-blur-md ${
-                      theme === "dark" ? "bg-gray-800/90 border border-gray-700" : "bg-white/90 border border-gray-200"
-                    }`}>
+                    <div
+                      className={`absolute right-0 top-12 w-48 rounded-lg shadow-lg z-50 backdrop-blur-md ${
+                        theme === "dark"
+                          ? "bg-gray-800/90 border border-gray-700"
+                          : "bg-white/90 border border-gray-200"
+                      }`}
+                    >
                       {languages.map((language) => (
                         <button
                           key={language.code}
                           onClick={() => handleLanguageChange(language.code)}
                           className={`w-full text-left px-4 py-2 flex items-center gap-3 ${
                             currentLanguage === language.code
-                              ? theme === "dark" ? "bg-gray-700/50 text-amber-400" : "bg-amber-100/80 text-amber-700"
-                              : theme === "dark" ? "hover:bg-gray-700/50 text-gray-300" : "hover:bg-gray-100/80 text-gray-700"
+                              ? theme === "dark"
+                                ? "bg-gray-700/50 text-amber-400"
+                                : "bg-amber-100/80 text-amber-700"
+                              : theme === "dark"
+                              ? "hover:bg-gray-700/50 text-gray-300"
+                              : "hover:bg-gray-100/80 text-gray-700"
                           } transition-colors`}
                         >
                           <span className="text-lg">{language.flag}</span>
@@ -1690,8 +3094,8 @@ const SupportAgentsDashboard = () => {
                   <button
                     onClick={() => setShowNotifications(!showNotifications)}
                     className={`p-2 rounded-lg transition-colors backdrop-blur-sm relative ${
-                      theme === "dark" 
-                        ? "hover:bg-gray-700/50 text-gray-300" 
+                      theme === "dark"
+                        ? "hover:bg-gray-700/50 text-gray-300"
                         : "hover:bg-white/30 text-gray-600"
                     }`}
                   >
@@ -1703,42 +3107,69 @@ const SupportAgentsDashboard = () => {
                     )}
                   </button>
                   {showNotifications && (
-                    <div className={`absolute right-0 top-12 w-80 rounded-lg shadow-lg z-50 backdrop-blur-md ${
-                      theme === "dark" ? "bg-gray-800/90 border border-gray-700" : "bg-white/90 border border-gray-200"
-                    }`}>
-                      <div className={`p-3 border-b ${
-                        theme === "dark" ? "border-gray-700" : "border-gray-200"
-                      }`}>
-                        <h3 className={`font-semibold ${
-                          theme === "dark" ? "text-white" : "text-gray-900"
-                        }`}>
+                    <div
+                      className={`absolute right-0 top-12 w-80 rounded-lg shadow-lg z-50 backdrop-blur-md ${
+                        theme === "dark"
+                          ? "bg-gray-800/90 border border-gray-700"
+                          : "bg-white/90 border border-gray-200"
+                      }`}
+                    >
+                      <div
+                        className={`p-3 border-b ${
+                          theme === "dark"
+                            ? "border-gray-700"
+                            : "border-gray-200"
+                        }`}
+                      >
+                        <h3
+                          className={`font-semibold ${
+                            theme === "dark" ? "text-white" : "text-gray-900"
+                          }`}
+                        >
                           Notifications
                         </h3>
                       </div>
                       <div className="max-h-96 overflow-y-auto">
                         {notifications.length > 0 ? (
                           notifications.map((notification) => (
-                            <div key={notification.id} className={`p-3 border-b ${
-                              theme === "dark" 
-                                ? "border-gray-700 hover:bg-gray-700/50" 
-                                : "border-gray-200 hover:bg-gray-100/80"
-                            } transition-colors ${!notification.read ? "bg-amber-500/10" : ""}`}>
-                              <p className={`text-sm ${
-                                theme === "dark" ? "text-gray-300" : "text-gray-700"
-                              }`}>
+                            <div
+                              key={notification.id}
+                              className={`p-3 border-b ${
+                                theme === "dark"
+                                  ? "border-gray-700 hover:bg-gray-700/50"
+                                  : "border-gray-200 hover:bg-gray-100/80"
+                              } transition-colors ${
+                                !notification.read ? "bg-amber-500/10" : ""
+                              }`}
+                            >
+                              <p
+                                className={`text-sm ${
+                                  theme === "dark"
+                                    ? "text-gray-300"
+                                    : "text-gray-700"
+                                }`}
+                              >
                                 {notification.message}
                               </p>
-                              <p className={`text-xs ${
-                                theme === "dark" ? "text-gray-500" : "text-gray-400"
-                              } mt-1`}>
+                              <p
+                                className={`text-xs ${
+                                  theme === "dark"
+                                    ? "text-gray-500"
+                                    : "text-gray-400"
+                                } mt-1`}
+                              >
                                 {notification.time}
                               </p>
                             </div>
                           ))
                         ) : (
-                          <p className={`p-4 text-center ${
-                            theme === "dark" ? "text-gray-400" : "text-gray-500"
-                          }`}>
+                          <p
+                            className={`p-4 text-center ${
+                              theme === "dark"
+                                ? "text-gray-400"
+                                : "text-gray-500"
+                            }`}
+                          >
                             No notifications
                           </p>
                         )}
@@ -1757,9 +3188,15 @@ const SupportAgentsDashboard = () => {
                     email={user?.email}
                     role={user?.role}
                     size="sm"
-                    onLogout={() => { localStorage.removeItem("token"); window.location.href = "/"; }}
+                    onLogout={() => {
+                      localStorage.removeItem("token");
+                      window.location.href = "/";
+                    }}
                     onUploadImage={() => setShowProfileModal(true)}
-                    onNavigateToSection={(section) => { setActiveTab(section); setIsMobileMenuOpen(false); }}
+                    onNavigateToSection={(section) => {
+                      setActiveTab(section);
+                      setIsMobileMenuOpen(false);
+                    }}
                     theme={theme}
                   />
                 </div>
@@ -1776,11 +3213,14 @@ const SupportAgentsDashboard = () => {
 
       {/* Mobile Sidebar Overlay */}
       {isMobileMenuOpen && (
-        <div className="fixed inset-0 bg-black h-full bg-opacity-50 md:hidden z-20" onClick={() => setIsMobileMenuOpen(false)} />
+        <div
+          className="fixed inset-0 bg-black h-full bg-opacity-50 md:hidden z-20"
+          onClick={() => setIsMobileMenuOpen(false)}
+        />
       )}
 
       <ThemeToggle theme={theme} onToggle={toggleTheme} />
-      
+
       {/* Modals */}
       <TicketModal
         isOpen={showTicketModal}
@@ -1790,15 +3230,34 @@ const SupportAgentsDashboard = () => {
         onUpdateTicket={handleUpdateTicket}
         currentUser={user}
       />
-      
-      <ArticleModal
-        isOpen={showArticleModal}
-        onClose={() => setShowArticleModal(false)}
-        article={selectedArticle}
+
+      <FAQModal
+        isOpen={showFAQModal}
+        onClose={() => setShowFAQModal(false)}
+        article={selectedFAQ}
         theme={theme}
-        onSaveArticle={handleSaveArticle}
+        onSaveArticle={handleSaveFAQ}
+        currentUser={user}
       />
-      
+
+      <FlaggedContentModal
+        isOpen={showFlagModal}
+        onClose={() => setShowFlagModal(false)}
+        flag={selectedFlag}
+        theme={theme}
+        onResolveFlag={handleResolveFlaggedContent}
+        currentUser={user}
+      />
+
+      <ReviewsModal
+        isOpen={showReviewsModal}
+        onClose={() => setShowReviewsModal(false)}
+        reviews={reviews}
+        theme={theme}
+        currentUser={user}
+        stats={reviewStats}
+      />
+
       {user && (
         <ProfilePictureModal
           isOpen={showProfileModal}

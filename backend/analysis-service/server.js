@@ -228,6 +228,43 @@ const getActivityIcon = (type) => {
   };
   return icons[type] || 'Activity';
 };
+// Support-specific analytics
+app.get('/api/analytics/support', async (req, res) => {
+  try {
+    const supportData = {
+      ticketMetrics: await getTicketMetrics(),
+      agentPerformance: await getAgentPerformance(),
+      responseTimeAnalytics: await getResponseTimeAnalytics(),
+      customerSatisfaction: await getCustomerSatisfaction(),
+      faqEffectiveness: await getFAQEffectiveness()
+    };
+    
+    res.json(supportData);
+  } catch (error) {
+    console.error('Support analytics error:', error);
+    res.status(500).json({ error: 'Failed to fetch support analytics' });
+  }
+});
+
+const getTicketMetrics = async () => {
+  // Connect to support service database or API
+  return {
+    totalTickets: 156,
+    openTickets: 23,
+    resolvedToday: 12,
+    averageResolutionTime: "4.2h",
+    highPriorityTickets: 8
+  };
+};
+
+const getAgentPerformance = async () => {
+  // Fetch from support service and user service
+  return [
+    { agent: 'support_agent1', ticketsResolved: 45, satisfaction: 4.8 },
+    { agent: 'support_agent2', ticketsResolved: 38, satisfaction: 4.6 },
+    { agent: 'support_agent3', ticketsResolved: 52, satisfaction: 4.9 }
+  ];
+};
 
 const PORT = process.env.PORT || 5004;
 server.listen(PORT, () => {

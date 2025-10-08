@@ -1,7 +1,7 @@
 CREATE DATABASE IF NOT EXISTS wubland_portfolio_db;
 USE wubland_portfolio_db;
 
--- Create users table
+-- Create users table with comprehensive role hierarchy
 CREATE TABLE IF NOT EXISTS users (
     id INT AUTO_INCREMENT PRIMARY KEY,
     first_name VARCHAR(255) NOT NULL,
@@ -9,7 +9,7 @@ CREATE TABLE IF NOT EXISTS users (
     username VARCHAR(50) UNIQUE,
     email VARCHAR(255) NOT NULL UNIQUE,
     password VARCHAR(255) NOT NULL,
-    role ENUM('admin', 'broker', 'buyer', 'seller', 'user', 'renter', 'support_agent') NOT NULL DEFAULT 'user',
+    role ENUM('super_admin', 'admin', 'support_admin', 'support_lead', 'support_agent', 'broker', 'buyer', 'seller', 'user', 'renter') NOT NULL DEFAULT 'user',
     profile_picture VARCHAR(255),
     verified BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -19,14 +19,14 @@ CREATE TABLE IF NOT EXISTS users (
     last_message_time TIMESTAMP NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
--- Create todos table (updated with username foreign key)
+-- Create todos table
 CREATE TABLE IF NOT EXISTS todos (
     id INT AUTO_INCREMENT PRIMARY KEY,
     text TEXT NOT NULL,
     completed BOOLEAN DEFAULT FALSE,
     due_date DATE,
     assignee VARCHAR(255),
-    created_by VARCHAR(50), -- Changed to VARCHAR to reference username
+    created_by VARCHAR(50),
     order_index INT DEFAULT 0,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (created_by) REFERENCES users(username) ON DELETE SET NULL
@@ -68,7 +68,7 @@ CREATE TABLE IF NOT EXISTS support_tickets (
     category ENUM('account', 'payment', 'technical', 'property', 'safety', 'general') NOT NULL,
     priority ENUM('low', 'medium', 'high', 'urgent') DEFAULT 'medium',
     status ENUM('open', 'in_progress', 'resolved', 'closed') DEFAULT 'open',
-    assigned_to VARCHAR(50), -- Support agent username
+    assigned_to VARCHAR(50),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     resolved_at TIMESTAMP NULL,
@@ -88,32 +88,34 @@ CREATE TABLE IF NOT EXISTS ticket_responses (
     FOREIGN KEY (responder_username) REFERENCES users(username) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
--- Create knowledge_base_articles table
+-- Create knowledge_base_articles table with video_url
 CREATE TABLE IF NOT EXISTS knowledge_base_articles (
     id INT AUTO_INCREMENT PRIMARY KEY,
     title VARCHAR(255) NOT NULL,
     content TEXT NOT NULL,
     category ENUM('general', 'account', 'payment', 'technical', 'property', 'safety') NOT NULL,
     author_username VARCHAR(50) NOT NULL,
+    video_url VARCHAR(500) NULL,
     views INT DEFAULT 0,
     helpful_votes INT DEFAULT 0,
+    is_published BOOLEAN DEFAULT TRUE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    is_published BOOLEAN DEFAULT TRUE,
     FOREIGN KEY (author_username) REFERENCES users(username) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
--- Create flagged_content table
+-- Create flagged_content table with details
 CREATE TABLE IF NOT EXISTS flagged_content (
     id INT AUTO_INCREMENT PRIMARY KEY,
     content_type ENUM('property_listing', 'user_message', 'user_profile', 'review', 'other') NOT NULL,
-    content_id VARCHAR(255), -- Can reference different types of content
+    content_id VARCHAR(255),
     reported_by_user_id INT NOT NULL,
     reason TEXT NOT NULL,
     severity ENUM('low', 'medium', 'high') DEFAULT 'medium',
-    status ENUM('pending', 'under_review', 'approved', 'rejected', 'action_taken') DEFAULT 'pending',
-    assigned_to VARCHAR(50), -- Support agent username
-    resolved_by VARCHAR(50), -- Support agent who resolved it
+    status ENUM('pending', 'under_review', 'resolved', 'approved', 'rejected', 'action_taken') DEFAULT 'pending',
+    assigned_to VARCHAR(50),
+    resolved_by VARCHAR(50),
+    details TEXT,
     resolved_at TIMESTAMP NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (reported_by_user_id) REFERENCES users(id) ON DELETE CASCADE,
@@ -126,8 +128,8 @@ CREATE TABLE IF NOT EXISTS support_agent_activities (
     id INT AUTO_INCREMENT PRIMARY KEY,
     agent_username VARCHAR(50) NOT NULL,
     activity_type ENUM('ticket_created', 'ticket_updated', 'ticket_resolved', 'article_created', 
-                      'article_updated', 'flag_resolved', 'response_sent', 'user_assisted') NOT NULL,
-    target_id INT, -- Reference to ticket_id, article_id, etc.
+                      'article_updated', 'article_deleted', 'flag_resolved', 'response_sent', 'user_assisted') NOT NULL,
+    target_id INT,
     target_type ENUM('ticket', 'article', 'flag', 'user') NOT NULL,
     details TEXT,
     timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -141,21 +143,30 @@ CREATE TABLE IF NOT EXISTS user_feedback (
     ticket_id INT,
     rating INT CHECK (rating >= 1 AND rating <= 5),
     feedback_text TEXT,
-    responded_to_by VARCHAR(50), -- Support agent username
+    responded_to_by VARCHAR(50),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
     FOREIGN KEY (ticket_id) REFERENCES support_tickets(id) ON DELETE SET NULL,
     FOREIGN KEY (responded_to_by) REFERENCES users(username) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
--- Insert sample support agents
-INSERT INTO users (first_name, last_name, username, email, password, role, status) VALUES
-('Support', 'Agent1', 'support_agent1', 'support1@wubland.com', '$2b$10$examplehashedpassword', 'support_agent', 'active'),
-('Support', 'Agent2', 'support_agent2', 'support2@wubland.com', '$2b$10$examplehashedpassword', 'support_agent', 'active'),
-('Support', 'Agent3', 'support_agent3', 'support3@wubland.com', '$2b$10$examplehashedpassword', 'support_agent', 'active');
+-- Insert sample users with different roles
+INSERT IGNORE INTO users (first_name, last_name, username, email, password, role, status) VALUES
+-- System Owner
+('Sarah', 'Wilson', 'sarah_superadmin', 'sarah.owner@wubland.com', '$2b$10$examplehashedpassword', 'super_admin', 'active'),
+
+-- Support Department
+('David', 'Chen', 'david_supportadmin', 'david.admin@wubland.com', '$2b$10$examplehashedpassword', 'support_admin', 'active'),
+('Maria', 'Garcia', 'maria_lead', 'maria.lead@wubland.com', '$2b$10$examplehashedpassword', 'support_lead', 'active'),
+('Alex', 'Johnson', 'alex_agent', 'alex.agent@wubland.com', '$2b$10$examplehashedpassword', 'support_agent', 'active'),
+('Lisa', 'Brown', 'lisa_agent', 'lisa.agent@wubland.com', '$2b$10$examplehashedpassword', 'support_agent', 'active'),
+
+-- Regular users
+('John', 'Doe', 'john_user', 'john.doe@email.com', '$2b$10$examplehashedpassword', 'user', 'active'),
+('Jane', 'Smith', 'jane_buyer', 'jane.smith@email.com', '$2b$10$examplehashedpassword', 'buyer', 'active');
 
 -- Insert sample knowledge base articles
-INSERT INTO knowledge_base_articles (title, content, category, author_username, views, helpful_votes) VALUES
-('How to Reset Your Password', 'Step-by-step guide to reset your password if you''ve forgotten it...', 'account', 'support_agent1', 1245, 89),
-('Understanding Payment Processing', 'Learn how payments are processed on our platform and typical timelines...', 'payment', 'support_agent2', 876, 67),
-('Property Listing Guidelines', 'Complete guide to creating and managing property listings...', 'property', 'support_agent1', 1543, 112);
+INSERT IGNORE INTO knowledge_base_articles (title, content, category, author_username, views, helpful_votes) VALUES
+('How to Reset Your Password', 'Step-by-step guide to reset your password if you''ve forgotten it...', 'account', 'alex_agent', 1245, 89),
+('Understanding Payment Processing', 'Learn how payments are processed on our platform and typical timelines...', 'payment', 'maria_lead', 876, 67),
+('Property Listing Guidelines', 'Complete guide to creating and managing property listings...', 'property', 'david_supportadmin', 1543, 112);

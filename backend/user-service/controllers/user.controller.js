@@ -98,3 +98,20 @@ export const deleteUser = async (req, res) => {
         res.status(500).json({ message: 'Internal Server Error', error: error.message });
     }
 };
+
+export const getSupportAgents = async (req, res) => {
+    try {
+        const [users] = await db.query(`
+      SELECT id, first_name, last_name, username, email, role, broker_type, status, profile_picture, 
+             created_at, verified 
+      FROM users 
+      WHERE role IN ('support_agent', 'support_lead', 'support_admin', 'super_admin')
+      ORDER BY created_at DESC
+    `);
+
+        res.status(200).json(users);
+    } catch (error) {
+        console.error('getSupportAgents error:', error.message);
+        res.status(500).json({ message: 'Internal Server Error', error: error.message });
+    }
+};

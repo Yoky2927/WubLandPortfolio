@@ -26,14 +26,21 @@ export const signup = async (req, res) => {
     let allowedRoles = ['user', 'broker', 'seller', 'buyer', 'renter'];
     let finalBrokerType = null;
 
-    if (req.user && req.user.role === 'admin') {
-      allowedRoles = allowedRoles.concat(['admin', 'support_agent']);
-      if (role === 'broker') {
-        if (!broker_type || !['internal', 'external'].includes(broker_type)) {
-          return res.status(400).json({ message: "Invalid broker type. Must be 'internal' or 'external'" });
-        }
-        finalBrokerType = broker_type;
+    // Enhanced role permissions
+    if (req.user) {
+      if (req.user.role === 'admin' || req.user.role === 'super_admin') {
+        allowedRoles = allowedRoles.concat(['admin', 'support_agent', 'support_lead']);
       }
+      if (req.user.role === 'support_admin' || req.user.role === 'super_admin') {
+        allowedRoles = allowedRoles.concat(['support_admin']);
+      }
+    }
+
+    if (role === 'broker') {
+      if (!broker_type || !['internal', 'external'].includes(broker_type)) {
+        return res.status(400).json({ message: "Invalid broker type. Must be 'internal' or 'external'" });
+      }
+      finalBrokerType = broker_type;
     } else {
       if (role === 'broker') {
         finalBrokerType = 'external';

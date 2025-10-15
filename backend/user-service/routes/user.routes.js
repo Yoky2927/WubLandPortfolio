@@ -4,6 +4,11 @@ import { getAllUsers, getUserById, updateUserStatus, deleteUser, getSupportAgent
 
 const router = express.Router();
 
+// Add a health check endpoint
+router.get('/health', (req, res) => {
+  res.status(200).json({ status: 'healthy', service: 'user-service' });
+});
+
 // Admin-only routes for user management
 router.get('/', verifyToken, verifyAdmin, getAllUsers);
 router.get('/:id', verifyToken, verifyAdmin, getUserById);

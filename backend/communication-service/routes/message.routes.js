@@ -1,5 +1,5 @@
 import express from 'express';
-import { getUsersForSidebar, getMessages, sendMessage, deleteMessage, uploadMiddleware,checkCloudinaryHealth } from '../controllers/message.controller.js';
+import { getUsersForSidebar, getMessages, sendMessage, deleteMessage, uploadMiddleware,checkCloudinaryHealth,debugUsers } from '../controllers/message.controller.js';
 
 const router = express.Router();
 
@@ -12,9 +12,18 @@ router.post('/test-upload', uploadMiddleware, (req, res) => {
 
 router.get('/health/cloudinary', checkCloudinaryHealth);
 
+router.get('/health', (req, res) => {
+  res.status(200).json({ 
+    status: 'healthy', 
+    service: 'communication-service',
+    timestamp: new Date().toISOString()
+  });
+});
+
 router.get('/users', getUsersForSidebar);
 router.get('/:id', getMessages);
 router.post('/send/:id', uploadMiddleware, sendMessage);
 router.delete('/:id', deleteMessage);
+router.get('/debug/users', debugUsers);
 
 export default router;

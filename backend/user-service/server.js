@@ -53,5 +53,10 @@ app.get("/ping", (req, res) => {
   res.send("pong");
 });
 
+// Exclude /health from authentication middleware
+app.use('/health', (req, res) => {
+  res.status(200).json({ status: 'healthy', service: 'user-service' });
+});
+
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`🚀 User service running on port ${PORT}`));

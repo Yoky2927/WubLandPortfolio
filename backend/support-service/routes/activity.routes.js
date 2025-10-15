@@ -21,4 +21,9 @@ router.get('/feedback', authenticateToken, requireSupportLead, getAllFeedback);
 // Support staff can view feedback for specific agents
 router.get('/feedback/:username', authenticateToken, requireSupportAgent, getAgentFeedback);
 
+// Health check endpoint
+router.get('/health', (req, res) => {
+  res.status(200).json({ status: 'healthy', service: 'support-service' });
+});
+
 export default router;

@@ -5,6 +5,7 @@ import axios from 'axios';
 import db from '../shared/db.js';
 import { Server } from 'socket.io';
 import http from 'http';
+import systemRoutes from './routes/systemRoutes.js';
 
 dotenv.config();
 
@@ -16,7 +17,7 @@ const io = new Server(server, {
 
 app.use(cors());
 app.use(express.json());
-
+app.use('/api/system', systemRoutes);
 // WebSocket connection for real-time updates
 io.on('connection', (socket) => {
   console.log('WebSocket client connected');
@@ -265,6 +266,11 @@ const getAgentPerformance = async () => {
     { agent: 'support_agent3', ticketsResolved: 52, satisfaction: 4.9 }
   ];
 };
+
+// Add a health check endpoint
+app.get('/health', (req, res) => {
+  res.status(200).json({ status: 'healthy', service: 'analysis-service' });
+});
 
 const PORT = process.env.PORT || 5004;
 server.listen(PORT, () => {

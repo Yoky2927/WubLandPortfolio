@@ -1,15 +1,19 @@
-import { Outlet } from "react-router-dom";
-import { ThemeProvider } from "./contexts/ThemeContext";
-import GridOverlay from "./components/GridOverlay";
-import './telegram-theme.css';
+// App.jsx - Add maintenance context
+import React from 'react';
+import { Outlet } from 'react-router-dom';
+import { SystemSettingsProvider } from './contexts/SystemSettingsContext';
+import { ToastProvider } from './contexts/ToastContext';
+import './index.css';
 
 function App() {
   return (
-    <ThemeProvider>
-      <div className="relative min-h-screen overflow-x-hidden">
-        <Outlet /> {/* Renders Home or other routed components */}
-      </div>
-    </ThemeProvider>
+    <ToastProvider>
+      <SystemSettingsProvider>
+        <div className="App">
+          <Outlet />
+        </div>
+      </SystemSettingsProvider>
+    </ToastProvider>
   );
 }
 

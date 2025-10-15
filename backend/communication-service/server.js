@@ -27,6 +27,14 @@ app.use(express.json()); // Ensure express.json is applied (moved from utils/soc
 
 // Routes
 app.use('/api/messages', verifyToken, messageRoutes);
+app.get('/health', (req, res) => {
+  res.status(200).json({ status: 'healthy', service: 'communication-service' });
+});
+
+// Define the /health route separately to exclude it from middleware
+app.get('/health', (req, res) => {
+  res.status(200).json({ status: 'healthy', service: 'communication-service' });
+});
 
 // Ensure Socket.IO CORS is consistent (already handled in utils/socket.js)
 // No need to reconfigure io.on here unless adding specific handlers

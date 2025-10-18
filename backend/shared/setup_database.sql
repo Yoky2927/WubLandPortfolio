@@ -170,3 +170,52 @@ INSERT IGNORE INTO knowledge_base_articles (title, content, category, author_use
 ('How to Reset Your Password', 'Step-by-step guide to reset your password if you''ve forgotten it...', 'account', 'alex_agent', 1245, 89),
 ('Understanding Payment Processing', 'Learn how payments are processed on our platform and typical timelines...', 'payment', 'maria_lead', 876, 67),
 ('Property Listing Guidelines', 'Complete guide to creating and managing property listings...', 'property', 'david_supportadmin', 1543, 112);
+
+-- Add new columns to users table for email verification and security
+ALTER TABLE users 
+ADD COLUMN is_email_verified BOOLEAN DEFAULT FALSE,
+ADD COLUMN email_verification_token VARCHAR(255),
+ADD COLUMN email_verification_expires DATETIME,
+ADD COLUMN password_change_required BOOLEAN DEFAULT FALSE,
+ADD COLUMN last_password_change TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+ADD COLUMN login_attempts INT DEFAULT 0,
+ADD COLUMN lock_until DATETIME;
+
+-- Create security_logs table for monitoring
+CREATE TABLE IF NOT EXISTS security_logs (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    type VARCHAR(100) NOT NULL,
+    severity ENUM('low', 'medium', 'high', 'critical') NOT NULL,
+    description TEXT NOT NULL,
+    ip_address VARCHAR(45),
+    user_agent TEXT,
+    user_id INT NULL,
+    action_taken TEXT,
+    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- Create email_verification_tokens table
+CREATE TABLE IF NOT EXISTS email_verification_tokens (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NOT NULL,
+    token VARCHAR(255) NOT NULL,
+    expires_at DATETIME NOT NULL,
+    used BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- Create payment_reminders table
+CREATE TABLE IF NOT EXISTS payment_reminders (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NOT NULL,
+    amount DECIMAL(10,2) NOT NULL,
+    due_date DATE NOT NULL,
+    property_address TEXT,
+    lease_id VARCHAR(100),
+    sent_at TIMESTAMP NULL,
+    status ENUM('pending', 'sent', 'failed') DEFAULT 'pending',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;

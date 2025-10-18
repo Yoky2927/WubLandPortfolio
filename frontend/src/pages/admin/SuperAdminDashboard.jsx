@@ -1270,15 +1270,41 @@ const SuperAdminDashboard = () => {
 
   const { lineChartData, radarChartData } = getChartData();
 
-  useEffect(() => {
+ useEffect(() => {
     const abortController = new AbortController();
     const fetchUserData = async () => {
       try {
         const token = localStorage.getItem("token");
+        console.log("🔐 SuperAdminDashboard - Token check:", !!token);
+        
         if (!token) {
-          navigate("/login");
+          console.log("🔐 No token, redirecting to login-register");
+          navigate("/login-register");
           return;
         }
+
+        // First, decode the token to check the role immediately
+        try {
+          const payload = JSON.parse(atob(token.split('.')[1]));
+          console.log("🔐 Token payload:", payload);
+          console.log("🔐 User role from token:", payload.role);
+          
+          // Check role from token first (faster than API call)
+          if (payload.role !== "super_admin") {
+            console.log("❌ Access denied - Not a super admin");
+            localStorage.removeItem("token");
+            navigate("/unauthorized");
+            return;
+          }
+        } catch (decodeError) {
+          console.error("❌ Error decoding token:", decodeError);
+          localStorage.removeItem("token");
+          navigate("/login-register");
+          return;
+        }
+
+        // Then make API call to get full user data
+        console.log("🔄 Fetching user data from API...");
         const response = await fetch("http://localhost:5000/api/auth/check", {
           method: "GET",
           headers: {
@@ -1287,24 +1313,34 @@ const SuperAdminDashboard = () => {
           },
           signal: abortController.signal,
         });
+        
+        console.log("🔐 API response status:", response.status);
+        
         if (response.ok) {
           const userData = await response.json();
+          console.log("✅ User data fetched:", userData);
+          
+          // Double-check role from API response
           if (userData.role !== "super_admin") {
+            console.log("❌ API says not super admin, redirecting to unauthorized");
             localStorage.removeItem("token");
-            navigate("/forbidden");
+            navigate("/unauthorized");
             return;
           }
+          
           setUser(userData);
           setIsAuthorized(true);
+          console.log("✅ Super Admin authorized, showing dashboard");
         } else {
+          console.log("❌ API check failed, redirecting to login");
           localStorage.removeItem("token");
-          navigate("/login");
+          navigate("/login-register"); // FIXED: Changed from "/login" to "/login-register"
         }
       } catch (error) {
         if (error.name === "AbortError") return;
-        console.error("Error fetching user data:", error);
+        console.error("💥 Error fetching user data:", error);
         localStorage.removeItem("token");
-        navigate("/login");
+        navigate("/login-register"); // FIXED: Changed from "/login" to "/login-register"
       }
     };
 

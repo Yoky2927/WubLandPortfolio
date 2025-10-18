@@ -1,4 +1,4 @@
-// Router.jsx
+// Router.jsx - FIXED VERSION
 import { Routes, Route, Navigate } from "react-router-dom";
 import { ThemeProvider } from "./contexts/ThemeContext.jsx";
 import { SystemSettingsProvider } from "./contexts/SystemSettingsContext.jsx";
@@ -9,12 +9,11 @@ import LoginRegister from "./pages/public/LoginRegister.jsx";
 import Home from "./pages/public/Home.jsx";
 import DebugAuth from "./pages/public/DebugAuth.jsx";
 
-import MaintenancePage from './components/MaintenancePage';
-
 // Import dashboard pages
 import AdminDashboard from './pages/admin/AdminDashboard.jsx';
 import SupportAgentsDashboard from './pages/support/SupportAgentsDashboard.jsx';
 import SuperAdminDashboard from './pages/admin/SuperAdminDashboard.jsx';
+import MaintenancePage from './components/MaintenancePage';
 
 // User Dashboard Component
 const UserDashboard = () => {
@@ -55,8 +54,8 @@ const UserDashboard = () => {
   );
 };
 
-// ULTRA SIMPLE Protected Route - Just check token exists
-const ProtectedRoute = ({ children }) => {
+// IMPROVED Protected Route - Check token and extract role
+const ProtectedRoute = ({ children, requiredRole = null }) => {
   const token = localStorage.getItem('token');
   
   console.log("🔐 ProtectedRoute - Token exists:", !!token);
@@ -65,13 +64,70 @@ const ProtectedRoute = ({ children }) => {
     console.log("🔐 No token, redirecting to login");
     return <Navigate to="/login-register" replace />;
   }
-  
-  console.log("🔐 Access GRANTED - Token found");
+
+  // Decode token to get user info
+  let userRole = null;
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1]));
+    userRole = payload.role;
+    console.log("🔐 ProtectedRoute - User role from token:", userRole);
+    console.log("🔐 ProtectedRoute - Full token payload:", payload);
+  } catch (error) {
+    console.error("❌ Error decoding token:", error);
+    localStorage.removeItem('token');
+    return <Navigate to="/login-register" replace />;
+  }
+
+  // Check if user has required role (if specified)
+  if (requiredRole && userRole !== requiredRole) {
+    console.log(`🔐 Access DENIED - Required: ${requiredRole}, User has: ${userRole}`);
+    return <Navigate to="/unauthorized" replace />;
+  }
+
+  console.log("🔐 Access GRANTED - Token valid, role:", userRole);
   return children;
 };
 
+// Role-Based Route - Automatically redirects to correct dashboard
+const RoleBasedRoute = ({ children }) => {
+  const token = localStorage.getItem('token');
+  
+  if (!token) {
+    return <Navigate to="/login-register" replace />;
+  }
+
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1]));
+    const userRole = payload.role;
+    
+    console.log("🔄 RoleBasedRoute - User role:", userRole);
+    
+    // Redirect based on role
+    switch (userRole) {
+      case 'super_admin':
+        console.log("🔄 Redirecting to Super Admin Dashboard");
+        return <Navigate to="/super-admin-dashboard" replace />;
+      case 'admin':
+        console.log("🔄 Redirecting to Admin Dashboard");
+        return <Navigate to="/admin-dashboard" replace />;
+      case 'support_agent':
+      case 'support_lead':
+      case 'support_admin':
+        console.log("🔄 Redirecting to Support Dashboard");
+        return <Navigate to="/support-dashboard" replace />;
+      default:
+        console.log("🔄 Redirecting to User Dashboard");
+        return <Navigate to="/user-dashboard" replace />;
+    }
+  } catch (error) {
+    console.error("❌ Error decoding token in RoleBasedRoute:", error);
+    localStorage.removeItem('token');
+    return <Navigate to="/login-register" replace />;
+  }
+};
+
 // Maintenance Wrapper Component
-const MaintenanceWrapper = ({ children, userRole = 'user' }) => {
+const MaintenanceWrapper = ({ children }) => {
   const maintenanceSettings = JSON.parse(localStorage.getItem('maintenanceSettings') || '{"enabled":false}');
   
   // Get user role from token
@@ -87,7 +143,7 @@ const MaintenanceWrapper = ({ children, userRole = 'user' }) => {
     }
   };
 
-  const currentUserRole = userRole === 'auto' ? getUserRole() : userRole;
+  const currentUserRole = getUserRole();
 
   // Check if user can bypass maintenance
   const canUserBypassMaintenance = (role) => {
@@ -157,6 +213,7 @@ const UnauthorizedPage = () => (
     </div>
   </div>
 );
+console.log("🔄 Router rendering - Current path:", window.location.pathname);
 
 function Router() {
   return (
@@ -185,40 +242,36 @@ function Router() {
             {/* Debug Route - Always accessible */}
             <Route path="/debug-auth" element={<DebugAuth />} />
 
+            {/* Auto-Redirect Route - After login, goes to correct dashboard */}
+            <Route path="/dashboard" element={<RoleBasedRoute />} />
+
             {/* Shared Routes with Maintenance Check */}
             <Route path="/document-validator" element={
-              <MaintenanceWrapper userRole="auto">
+              <MaintenanceWrapper>
                 <DocumentValidator />
               </MaintenanceWrapper>
             } />
 
-            {/* TEST ROUTE - No protection but with maintenance check */}
-            <Route path="/test-super-admin" element={
-              <MaintenanceWrapper userRole="super_admin">
-                <SuperAdminDashboard />
-              </MaintenanceWrapper>
-            } />
-
-            {/* Dashboard Routes - PROTECTION + MAINTENANCE CHECK */}
+            {/* Dashboard Routes - ROLE-SPECIFIC PROTECTION + MAINTENANCE CHECK */}
             <Route path="/super-admin-dashboard" element={
-              <ProtectedRoute>
-                <MaintenanceWrapper userRole="super_admin">
+              <ProtectedRoute requiredRole="super_admin">
+                <MaintenanceWrapper>
                   <SuperAdminDashboard />
                 </MaintenanceWrapper>
               </ProtectedRoute>
             } />
 
             <Route path="/admin-dashboard" element={
-              <ProtectedRoute>
-                <MaintenanceWrapper userRole="admin">
+              <ProtectedRoute requiredRole="admin">
+                <MaintenanceWrapper>
                   <AdminDashboard />
                 </MaintenanceWrapper>
               </ProtectedRoute>
             } />
 
             <Route path="/support-dashboard" element={
-              <ProtectedRoute>
-                <MaintenanceWrapper userRole="support_agent">
+              <ProtectedRoute requiredRole="support_agent">
+                <MaintenanceWrapper>
                   <SupportAgentsDashboard />
                 </MaintenanceWrapper>
               </ProtectedRoute>
@@ -226,7 +279,7 @@ function Router() {
 
             <Route path="/user-dashboard" element={
               <ProtectedRoute>
-                <MaintenanceWrapper userRole="user">
+                <MaintenanceWrapper>
                   <UserDashboard />
                 </MaintenanceWrapper>
               </ProtectedRoute>

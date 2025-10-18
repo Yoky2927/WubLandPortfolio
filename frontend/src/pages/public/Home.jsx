@@ -20,31 +20,61 @@ function Home() {
   // Redirect logged-in users to their dashboard
   // In the useEffect for redirecting logged-in users:
   useEffect(() => {
-    const token = localStorage.getItem("token");
-    const userData = JSON.parse(localStorage.getItem("user") || "{}");
+  const token = localStorage.getItem("token");
+  const userData = JSON.parse(localStorage.getItem("user") || "{}");
+  
+  console.log("🏠 Home.jsx - Auth Check:", {
+    hasToken: !!token,
+    userRole: userData.role,
+    userData: userData,
+    currentPath: window.location.pathname
+  });
 
-    if (token && userData.role) {
-      // Define role-based redirects - CORRECTED VERSION
+  // If we have EITHER a token OR user data with role, we're logged in
+  if (token || userData.role) {
+    let userRole = userData.role;
+    
+    // If we have token but no user role, decode the token to get role
+    if (token && !userRole) {
+      try {
+        const payload = JSON.parse(atob(token.split('.')[1]));
+        userRole = payload.role;
+        console.log("🏠 Home.jsx - Got role from token:", userRole);
+      } catch (error) {
+        console.error("❌ Home.jsx - Error decoding token:", error);
+      }
+    }
+
+    if (userRole) {
       const roleRedirects = {
-        admin: "/admin/dashboard",
-        super_admin: "/admin/dashboard",
-        support_agent: "/support/dashboard",
-        support_lead: "/support/dashboard",
-        support_admin: "/support/dashboard",
-        broker: "/user/dashboard",
-        buyer: "/user/dashboard",
-        seller: "/user/dashboard",
-        renter: "/user/dashboard",
-        user: "/user/dashboard",
+        super_admin: "/super-admin-dashboard",
+        admin: "/admin-dashboard",
+        support_agent: "/support-dashboard",
+        support_lead: "/support-dashboard", 
+        support_admin: "/support-dashboard",
+        broker: "/user-dashboard",
+        buyer: "/user-dashboard",
+        seller: "/user-dashboard",
+        renter: "/user-dashboard",
+        user: "/user-dashboard",
       };
 
-      const redirectPath = roleRedirects[userData.role];
-      if (redirectPath) {
-        console.log(`🔄 Redirecting ${userData.role} to: ${redirectPath}`);
+      const redirectPath = roleRedirects[userRole];
+      console.log("🏠 Home.jsx - Redirect Decision:", {
+        role: userRole,
+        redirectPath: redirectPath,
+        currentPath: window.location.pathname
+      });
+
+      if (redirectPath && window.location.pathname === '/') {
+        console.log(`🔄 Home.jsx - Redirecting ${userRole} to: ${redirectPath}`);
         navigate(redirectPath, { replace: true });
       }
     }
-  }, [navigate]);
+  } else {
+    console.log("🏠 Home.jsx - No token or user role found, staying on home page");
+  }
+}, [navigate]);
 
   const handleSignInClick = (e) => {
     e.preventDefault();

@@ -27,6 +27,8 @@ const LoginRegister = () => {
     retypePassword: "",
     accountType: "",
     acceptedTerms: false,
+    newPassword: "",
+    confirmPassword: "",
   });
   const [showTermsModal, setShowTermsModal] = useState(false);
   const [passwordStrength, setPasswordStrength] = useState(0);
@@ -44,6 +46,13 @@ const LoginRegister = () => {
   const [loaderType, setLoaderType] = useState("loading");
   const [loaderMessage, setLoaderMessage] = useState("Loading...");
 
+  // NEW: States for email verification and password change
+  const [requiresEmailVerification, setRequiresEmailVerification] = useState(false);
+  const [requiresPasswordChange, setRequiresPasswordChange] = useState(false);
+  const [tempToken, setTempToken] = useState("");
+  const [emailVerificationSent, setEmailVerificationSent] = useState(false);
+  const [pendingVerificationEmail, setPendingVerificationEmail] = useState("");
+
   // Check if user is already logged in (has token) and redirect based on role
   useEffect(() => {
     const token = localStorage.getItem("token");
@@ -53,18 +62,29 @@ const LoginRegister = () => {
         const payload = JSON.parse(atob(token.split(".")[1]));
         console.log("🔍 Auto-redirect - User role:", payload.role);
 
+        // Check if this is a password change token
+        if (payload.requiresPasswordChange) {
+          setRequiresPasswordChange(true);
+          setTempToken(token);
+          return; // Don't redirect, show password change form
+        }
+
         setIsLoading(true);
         setTimeout(() => {
           if (payload.role === "super_admin") {
+            console.log("🔄 Redirecting to Super Admin Dashboard...");
             window.location.href = "/super-admin-dashboard";
           } else if (payload.role === "admin") {
+            console.log("🔄 Redirecting to Admin Dashboard...");
             window.location.href = "/admin-dashboard";
           } else if (payload.role === "support_agent") {
+            console.log("🔄 Redirecting to Support Dashboard...");
             window.location.href = "/support-dashboard";
           } else {
-            window.location.href = "/";
+            console.log("🔄 Redirecting to User Dashboard...");
+            window.location.href = "/user-dashboard";
           }
-        }, 4000);
+        }, 3000);
       } catch (error) {
         console.error("❌ Error decoding token for auto-redirect:", error);
         // Fallback to homepage if token decoding fails
@@ -75,6 +95,7 @@ const LoginRegister = () => {
       }
     }
   }, []);
+
   // Handle acceptance of terms from modal
   const handleAcceptTerms = () => {
     setShowTermsModal(false);
@@ -119,6 +140,127 @@ const LoginRegister = () => {
     handleInputChange(e);
     if (isSignUpMode && e.target.name === "password") {
       checkPasswordStrength(e.target.value);
+    }
+  };
+
+  // NEW: Handle password change for employees
+  const handlePasswordChangeSubmit = async (e) => {
+    e.preventDefault();
+    const { newPassword, confirmPassword } = formData;
+
+    if (!newPassword || !confirmPassword) {
+      setError("Please fill all password fields");
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      setError("Passwords do not match!");
+      return;
+    }
+
+    if (newPassword.length < 8) {
+      setError("Password must be at least 8 characters long");
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+      setLoaderType("loading");
+      setLoaderMessage("Updating your password...");
+
+      const response = await fetch(
+        "http://localhost:5000/api/auth/change-required-password",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${tempToken}`,
+          },
+          body: JSON.stringify({
+            newPassword,
+            confirmPassword,
+          }),
+        }
+      );
+
+      if (response.ok) {
+        const data = await response.json();
+        setLoaderType("success");
+        setLoaderMessage("Password changed successfully!");
+
+        // Clear the temp token and redirect to login
+        setTimeout(() => {
+          setRequiresPasswordChange(false);
+          setTempToken("");
+          setFormData({
+            firstName: "",
+            lastName: "",
+            username: "",
+            email: "",
+            password: "",
+            retypePassword: "",
+            accountType: "",
+            acceptedTerms: false,
+            newPassword: "",
+            confirmPassword: "",
+          });
+          setIsLoading(false);
+          setIsSignUpMode(false);
+        }, 3000);
+      } else {
+        const errorData = await response.json();
+        setError(errorData.message || "Failed to change password");
+        setLoaderType("error");
+        setLoaderMessage("Password change failed!");
+        setTimeout(() => setIsLoading(false), 2000);
+      }
+    } catch (error) {
+      console.error("Password change error:", error);
+      setError("Password change failed. Please try again.");
+      setLoaderType("error");
+      setLoaderMessage("Password change failed!");
+      setTimeout(() => setIsLoading(false), 2000);
+    }
+  };
+
+  // NEW: Resend verification email
+  const handleResendVerification = async () => {
+    try {
+      setIsLoading(true);
+      setLoaderType("loading");
+      setLoaderMessage("Sending verification email...");
+
+      const response = await fetch(
+        "http://localhost:5000/api/auth/resend-verification",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            email: pendingVerificationEmail || formData.email,
+          }),
+        }
+      );
+
+      if (response.ok) {
+        setLoaderType("success");
+        setLoaderMessage("Verification email sent!");
+        setEmailVerificationSent(true);
+        setTimeout(() => setIsLoading(false), 2000);
+      } else {
+        const errorData = await response.json();
+        setError(errorData.message || "Failed to send verification email");
+        setLoaderType("error");
+        setLoaderMessage("Failed to send email");
+        setTimeout(() => setIsLoading(false), 2000);
+      }
+    } catch (error) {
+      console.error("Resend verification error:", error);
+      setError("Failed to send verification email. Please try again.");
+      setLoaderType("error");
+      setLoaderMessage("Failed to send email");
+      setTimeout(() => setIsLoading(false), 2000);
     }
   };
 
@@ -256,11 +398,21 @@ const LoginRegister = () => {
         if (response.ok) {
           const data = await response.json();
           console.log("🔍 Full signup response data:", data);
-          console.log(
-            "🔍 Token in signup response:",
-            data.token ? "Yes" : "No"
-          );
-          console.log("🔍 Token value:", data.token);
+
+          // 🚨 CRITICAL FIX: Check if email verification is required
+          if (data.requiresVerification || data.success) {
+            setRequiresEmailVerification(true);
+            setPendingVerificationEmail(formData.email);
+            setLoaderType("success");
+            setLoaderMessage("Registration successful! Please verify your email.");
+            setTimeout(() => {
+              setIsLoading(false);
+            }, 3000);
+            return; // Stop further execution
+          }
+
+          // If no verification required (admin-created accounts), proceed with normal flow
+          console.log("🔍 Token in signup response:", data.token ? "Yes" : "No");
 
           // Set success loader
           setLoaderType("success");
@@ -269,18 +421,19 @@ const LoginRegister = () => {
           // Save token if it exists
           if (data.token) {
             localStorage.setItem("token", data.token);
-            console.log("✅ Token saved to localStorage");
-
-            // Verify it was saved
-            const savedToken = localStorage.getItem("token");
-            console.log(
-              "✅ Token retrieved from localStorage:",
-              savedToken ? "Yes" : "No"
-            );
-            console.log(
-              "✅ Saved token length:",
-              savedToken ? savedToken.length : 0
-            );
+            
+            // ALSO save user data to localStorage for Home.jsx redirect
+            const userData = {
+              id: data.user?.id,
+              first_name: data.user?.first_name || formData.firstName,
+              last_name: data.user?.last_name || formData.lastName,
+              username: data.user?.username || formData.username,
+              email: data.user?.email || formData.email,
+              role: data.user?.role || formData.accountType.toLowerCase()
+            };
+            
+            localStorage.setItem("user", JSON.stringify(userData));
+            console.log("✅ Token and user data saved to localStorage:", userData);
           } else {
             console.log("❌ No token in signup response data");
           }
@@ -357,71 +510,79 @@ const LoginRegister = () => {
           response.status,
           response.statusText
         );
-        console.log(
-          "📊 Login response headers:",
-          Object.fromEntries([...response.headers])
-        );
 
         if (response.ok) {
           const data = await response.json();
           console.log("🔍 Full login response data:", data);
-          console.log("🔍 Response keys:", Object.keys(data));
+
+          // Check if password change is required
+          if (data.requiresPasswordChange) {
+            setRequiresPasswordChange(true);
+            setTempToken(data.tempToken);
+            setLoaderType("info");
+            setLoaderMessage("Password change required");
+            setTimeout(() => setIsLoading(false), 2000);
+            return;
+          }
+
           console.log("🔍 Token in response:", data.token ? "Yes" : "No");
-          console.log("🔍 Token value:", data.token);
 
           // Save token if it exists
           if (data.token) {
             localStorage.setItem("token", data.token);
-            console.log("✅ Token saved to localStorage");
+            
+            // ALSO save user data to localStorage for Home.jsx redirect
+            const payload = JSON.parse(atob(data.token.split(".")[1]));
+            const userData = {
+              id: data.user?.id || payload.userId,
+              first_name: data.user?.first_name || "User",
+              last_name: data.user?.last_name || "",
+              username: data.user?.username || payload.username,
+              email: data.user?.email || "",
+              role: data.user?.role || payload.role
+            };
+            
+            localStorage.setItem("user", JSON.stringify(userData));
+            console.log("✅ LoginRegister - Token and user data saved to localStorage:", userData);
 
-            // Verify it was saved
-            const savedToken = localStorage.getItem("token");
-            console.log(
-              "✅ Token retrieved from localStorage:",
-              savedToken ? "Yes" : "No"
-            );
-            console.log(
-              "✅ Saved token length:",
-              savedToken ? savedToken.length : 0
-            );
-            console.log("✅ Saved token value:", savedToken);
+            // Decode token to verify role
+            try {
+              console.log(
+                "🔍 LoginRegister - Token payload after login:",
+                payload
+              );
 
-            // Set success loader and redirect based on user role
-            setLoaderType("success");
-            setLoaderMessage("Login successful!");
+              setLoaderType("success");
+              setLoaderMessage("Login successful!");
 
-            // Decode the JWT token to get user role
-            const token = data.token;
-            if (token) {
-              try {
-                // Decode the JWT token (without verification for quick access)
-                const payload = JSON.parse(atob(token.split(".")[1]));
-                console.log("🔍 User role from token:", payload.role);
-
-                // Redirect based on role
-                setTimeout(() => {
-                  if (payload.role === "super_admin") {
-                    console.log("🔄 Redirecting to Super Admin Dashboard...");
-                    window.location.href = "/super-admin-dashboard";
-                  } else if (payload.role === "admin") {
-                    console.log("🔄 Redirecting to Admin Dashboard...");
-                    window.location.href = "/admin-dashboard";
-                  } else if (payload.role === "support_agent") {
-                    console.log("🔄 Redirecting to Support Agent Dashboard...");
-                    window.location.href = "/support-dashboard";
-                  } else {
-                    console.log("🔄 Redirecting to homepage...");
-                    window.location.href = "/";
-                  }
-                }, 3000);
-              } catch (error) {
-                console.error("❌ Error decoding token:", error);
-                // Fallback to homepage if token decoding fails
-                setTimeout(() => {
+              // Redirect based on role
+              setTimeout(() => {
+                console.log(
+                  "🔄 LoginRegister - Starting redirect for role:",
+                  payload.role
+                );
+                if (payload.role === "super_admin") {
+                  console.log(
+                    "🔄 LoginRegister - Redirecting to Super Admin Dashboard"
+                  );
+                  window.location.href = "/super-admin-dashboard";
+                } else if (payload.role === "admin") {
+                  console.log(
+                    "🔄 LoginRegister - Redirecting to Admin Dashboard"
+                  );
+                  window.location.href = "/admin-dashboard";
+                } else if (payload.role === "support_agent") {
+                  console.log(
+                    "🔄 LoginRegister - Redirecting to Support Dashboard"
+                  );
+                  window.location.href = "/support-dashboard";
+                } else {
+                  console.log("🔄 LoginRegister - Redirecting to homepage");
                   window.location.href = "/";
-                }, 3000);
-              }
-            } else {
+                }
+              }, 3000);
+            } catch (error) {
+              console.error("❌ LoginRegister - Error decoding token:", error);
               setTimeout(() => {
                 window.location.href = "/";
               }, 3000);
@@ -447,6 +608,17 @@ const LoginRegister = () => {
             try {
               const errorData = JSON.parse(errorText);
               console.log("📝 Login error details:", errorData);
+              
+              // 🚨 CRITICAL FIX: Handle email verification requirement in login
+              if (errorData.requiresVerification) {
+                setRequiresEmailVerification(true);
+                setPendingVerificationEmail(errorData.email || formData.username);
+                setLoaderType("info");
+                setLoaderMessage("Email verification required");
+                setTimeout(() => setIsLoading(false), 2000);
+                return;
+              }
+              
               setError(
                 `Login failed: ${errorData.message || "Invalid credentials"}`
               );
@@ -515,6 +687,203 @@ const LoginRegister = () => {
     },
   ];
 
+  // NEW: Password Change Form for Employees
+  const PasswordChangeForm = () => (
+    <div className="fixed inset-0 flex items-center justify-center z-50 bg-black/50 backdrop-filter backdrop-blur-sm">
+      <div
+        className={`p-8 rounded-lg max-w-md w-full mx-4 ${
+          theme === "dark" ? "bg-gray-800" : "bg-white"
+        }`}
+      >
+        <h2
+          className={`text-2xl font-bold mb-4 ${
+            theme === "dark" ? "text-white" : "text-gray-800"
+          }`}
+        >
+          Password Change Required
+        </h2>
+        <p
+          className={`mb-6 ${
+            theme === "dark" ? "text-gray-300" : "text-gray-600"
+          }`}
+        >
+          For security reasons, you are required to change your password before
+          accessing your dashboard.
+        </p>
+        <form onSubmit={handlePasswordChangeSubmit}>
+          <div
+            className={`mb-4 p-3 ${
+              theme === "dark" ? "bg-gray-700" : "bg-gray-100"
+            }`}
+          >
+            <input
+              type="password"
+              name="newPassword"
+              placeholder="New Password"
+              value={formData.newPassword || ""}
+              onChange={handleInputChange}
+              className={`w-full bg-transparent outline-none border-none text-sm font-semibold placeholder-gray-500 ${
+                theme === "dark" ? "text-white" : "text-gray-700"
+              }`}
+            />
+          </div>
+          <div
+            className={`mb-4 p-3 ${
+              theme === "dark" ? "bg-gray-700" : "bg-gray-100"
+            }`}
+          >
+            <input
+              type="password"
+              name="confirmPassword"
+              placeholder="Confirm New Password"
+              value={formData.confirmPassword || ""}
+              onChange={handleInputChange}
+              className={`w-full bg-transparent outline-none border-none text-sm font-semibold placeholder-gray-500 ${
+                theme === "dark" ? "text-white" : "text-gray-700"
+              }`}
+            />
+          </div>
+          {error && (
+            <p
+              className={`text-sm mb-4 ${
+                theme === "dark" ? "text-red-400" : "text-red-600"
+              }`}
+            >
+              {error}
+            </p>
+          )}
+          <button
+            type="submit"
+            className="w-full bg-amber-500 h-12 text-white font-semibold uppercase transition-all duration-300 hover:bg-amber-600"
+          >
+            Change Password
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+
+  // NEW: Enhanced Email Verification Notice
+  const EmailVerificationNotice = () => (
+    <div className="fixed inset-0 flex items-center justify-center z-50 bg-black/50 backdrop-filter backdrop-blur-sm">
+      <div
+        className={`p-8 rounded-lg max-w-md w-full mx-4 ${
+          theme === "dark" ? "bg-gray-800" : "bg-white"
+        }`}
+      >
+        <div className="text-center mb-6">
+          <div className="w-16 h-16 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <svg className="w-8 h-8 text-amber-500" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+            </svg>
+          </div>
+          <h2
+            className={`text-2xl font-bold mb-2 ${
+              theme === "dark" ? "text-white" : "text-gray-800"
+            }`}
+          >
+            Email Verification Required
+          </h2>
+        </div>
+        
+        <p
+          className={`mb-4 text-center ${
+            theme === "dark" ? "text-gray-300" : "text-gray-600"
+          }`}
+        >
+          We've sent a verification link to:
+        </p>
+        
+        <div className={`text-center mb-6 p-3 rounded ${
+          theme === "dark" ? "bg-gray-700" : "bg-amber-50"
+        }`}>
+          <strong className={`text-lg ${
+            theme === "dark" ? "text-amber-400" : "text-amber-600"
+          }`}>
+            {pendingVerificationEmail || formData.email}
+          </strong>
+        </div>
+
+        <p
+          className={`mb-6 text-center ${
+            theme === "dark" ? "text-gray-300" : "text-gray-600"
+          }`}
+        >
+          Please check your inbox and click the verification link to activate your account.
+          The link will expire in 24 hours.
+        </p>
+
+        <div className="space-y-4">
+          {emailVerificationSent ? (
+            <div className={`text-center p-3 rounded ${
+              theme === "dark" ? "bg-green-900/30" : "bg-green-100"
+            }`}>
+              <p className={`text-green-600 font-semibold ${
+                theme === "dark" ? "text-green-400" : "text-green-600"
+              }`}>
+                ✓ Verification email sent!
+              </p>
+              <p className={`text-sm mt-1 ${
+                theme === "dark" ? "text-green-300" : "text-green-700"
+              }`}>
+                Check your inbox again
+              </p>
+            </div>
+          ) : (
+            <button
+              onClick={handleResendVerification}
+              className="w-full bg-amber-500 h-12 text-white font-semibold uppercase transition-all duration-300 hover:bg-amber-600 flex items-center justify-center"
+            >
+              <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+              Resend Verification Email
+            </button>
+          )}
+          
+          <button
+            onClick={() => {
+              setRequiresEmailVerification(false);
+              setPendingVerificationEmail("");
+              setEmailVerificationSent(false);
+              setIsSignUpMode(false);
+              setFormData({
+                firstName: "",
+                lastName: "",
+                username: "",
+                email: "",
+                password: "",
+                retypePassword: "",
+                accountType: "",
+                acceptedTerms: false,
+                newPassword: "",
+                confirmPassword: "",
+              });
+            }}
+            className={`w-full border-2 h-12 font-semibold uppercase transition-all duration-300 flex items-center justify-center ${
+              theme === "dark"
+                ? "border-amber-400 text-white hover:bg-amber-400 hover:text-gray-900"
+                : "border-amber-500 text-gray-900 hover:bg-amber-500 hover:text-white"
+            }`}
+          >
+            <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+            </svg>
+            Back to Login
+          </button>
+        </div>
+
+        <div className={`mt-6 p-3 rounded text-sm ${
+          theme === "dark" ? "bg-gray-700 text-gray-300" : "bg-gray-100 text-gray-600"
+        }`}>
+          <p className="text-center">
+            Didn't receive the email? Check your spam folder or try resending.
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+
   return (
     <div
       className={`min-h-screen flex items-center justify-center overflow-x-hidden transition-all duration-1000 ease-in-out relative 
@@ -527,6 +896,13 @@ const LoginRegister = () => {
       {isLoading && (
         <Loader theme={theme} message={loaderMessage} type={loaderType} />
       )}
+
+      {/* NEW: Show password change form if required */}
+      {requiresPasswordChange && <PasswordChangeForm />}
+
+      {/* NEW: Show email verification notice if required */}
+      {requiresEmailVerification && <EmailVerificationNotice />}
+
       {/* Success popup for signup with blurred transparent background */}
       {showSuccessPopup && (
         <div className="fixed inset-0 flex items-center justify-center z-50 bg-black/50 backdrop-filter backdrop-blur-sm">
@@ -535,6 +911,7 @@ const LoginRegister = () => {
           </div>
         </div>
       )}
+
       <ThemeToggle theme={theme} onToggle={toggleTheme} />
       <FloatingElements theme={theme} reduced={true} />
       <TermsModal
@@ -543,6 +920,7 @@ const LoginRegister = () => {
         onAccept={handleAcceptTerms}
         theme={theme}
       />
+
       <div
         className="absolute top-32 right-[47%] translate-x-1/2 -translate-y-1/2 w-[1100px] 
            h-[1100px] transition-all duration-1000 ease-in-out z-0"
@@ -590,8 +968,7 @@ const LoginRegister = () => {
           Go back Home
         </Link>
       </div>
-      {/* ProfilePictureButton is not rendered here due to redirect logic */}
-      {/* To persist profile picture across pages, include ProfilePictureButton in a layout component (e.g., App.js or Layout.js) */}
+
       <div className="relative w-full max-w-6xl mx-4">
         <div
           className="absolute top-1/2 left-1/2 md:w-1/2 transform -translate-x-1/2 -translate-y-1/2 transition-all duration-700 ease-in-out z-30 pointer-events-auto"

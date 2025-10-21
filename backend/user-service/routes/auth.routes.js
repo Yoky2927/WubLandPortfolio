@@ -49,6 +49,43 @@ router.put('/role', verifyToken, verifyAdmin, updateRole);
 router.put('/username', verifyToken, updateUsername);
 router.post('/admin/create-user', verifyToken, verifyAdmin, adminCreateUser);
 router.post('/change-required-password', verifyToken, changeRequiredPassword);
+// Add to auth.routes.js
+router.post('/test-login', async (req, res) => {
+  const { username, password } = req.body;
+  
+  try {
+    const user = await User.findByUsername(username);
+    if (!user) {
+      return res.status(400).json({ message: "User not found" });
+    }
+    
+    const isValid = await bcrypt.compare(password, user.password);
+    if (!isValid) {
+      return res.status(400).json({ message: "Invalid password" });
+    }
+    
+    // Test token generation with minimal user object
+    const testToken = generateToken({
+      id: user.id,
+      username: user.username,
+      role: user.role
+    }, res);
+    
+    res.json({
+      success: true,
+      message: "Test login successful",
+      token: testToken,
+      user: {
+        id: user.id,
+        username: user.username,
+        role: user.role
+      }
+    });
+  } catch (error) {
+    console.error("Test login error:", error);
+    res.status(500).json({ message: "Test failed", error: error.message });
+  }
+});
 
 // Keep your existing upload route for compatibility (FIXED VERSION)
 router.post('/upload-profile', verifyToken, upload.single('profilePicture'), async (req, res) => {

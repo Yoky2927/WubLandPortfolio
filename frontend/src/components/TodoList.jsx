@@ -78,38 +78,43 @@ const TodoList = ({ theme, user, todoItems, setTodoItems, newTodo, setNewTodo, n
     };
 
     const addTodo = async () => {
-    if (newTodo.trim()) {
-        const newItem = {
-            text: newTodo.trim(),
-            completed: false,
-            dueDate: newTodoDueDate,
-            assignee: newTodoAssignee,
-        };
+        if (newTodo.trim()) {
+            const newItem = {
+                title: newTodo.trim(),
+                description: "",
+                category: "other",
+                priority: "medium",
+                dueDate: newTodoDueDate,
+                assignedTo: newTodoAssignee,
+                department: "administration"
+            };
 
-        try {
-            const token = localStorage.getItem('token');
-            const response = await fetch('http://localhost:5003/api/todos', {
-                method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(newItem),
-            });
-            if (response.ok) {
-                const savedTodo = await response.json();
-                setTodoItems([...todoItems, savedTodo]);
-                setNewTodo('');
-                setNewTodoDueDate('');
-                setNewTodoAssignee('Support Team');
-            } else {
-                console.error('Failed to save todo');
+            try {
+                const token = localStorage.getItem('token');
+                const response = await fetch('http://localhost:5003/api/todos', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(newItem),
+                });
+                if (response.ok) {
+                    const savedTodo = await response.json();
+                    setTodoItems([...todoItems, savedTodo]);
+                    setNewTodo('');
+                    setNewTodoDueDate('');
+                    setNewTodoAssignee('Support Team');
+                } else {
+                    console.error('Failed to save todo');
+                const errorData = await response.json();
+                    console.error('Error details:', errorData);
+                }
+            } catch (error) {
+                console.error('Error saving todo:', error);
             }
-        } catch (error) {
-            console.error('Error saving todo:', error);
         }
-    }
-};
+    };
 
     const handleAddTodo = () => {
         if (newTodo.trim()) {
@@ -129,6 +134,8 @@ const TodoList = ({ theme, user, todoItems, setTodoItems, newTodo, setNewTodo, n
 
     const toggleTodo = async (id) => {
         const todo = todoItems.find(item => item.id === id);
+        const completed = !todo.completed;
+        
         try {
             const token = localStorage.getItem('token');
             await fetch(`http://localhost:5003/api/todos/${id}`, {
@@ -137,10 +144,10 @@ const TodoList = ({ theme, user, todoItems, setTodoItems, newTodo, setNewTodo, n
                     'Authorization': `Bearer ${token}`,
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({ ...todo, completed: !todo.completed }),
+                body: JSON.stringify({ completed }),
             });
             setTodoItems(todoItems.map(item =>
-                item.id === id ? { ...item, completed: !item.completed } : item
+                item.id === id ? { ...item, completed, status: completed ? 'completed' : 'pending' } : item
             ));
         } catch (error) {
             console.error('Error updating todo:', error);
@@ -171,16 +178,79 @@ const TodoList = ({ theme, user, todoItems, setTodoItems, newTodo, setNewTodo, n
         return date.toLocaleDateString('en-US', {
             year: 'numeric',
             month: 'short',
-            day: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit'
+            day: 'numeric'
         });
     };
 
     // Check if a task is overdue
     const isOverdue = (dueDate) => {
         if (!dueDate) return false;
-        return new Date(dueDate) < new Date();
+        return new Date(dueDate) < new Date() && new Date(dueDate).toDateString() !== new Date().toDateString();
+    };
+
+    // Get assignee display name
+    const getAssigneeDisplay = (assignedTo) => {
+        if (!assignedTo) return 'Unassigned';
+        
+        // Map user IDs to display names (you might want to fetch this from your users API)
+        const assigneeMap = {
+            1: 'Yokabd Admin',
+            2: 'Saron Admin',
+            3: 'Beza Broker',
+            4: 'Birtukan Support',
+            // Add more mappings as needed
+        };
+        
+        return assigneeMap[assignedTo] || `User ${assignedTo}`;
+    };
+
+    // Get creator display name
+    const getCreatorDisplay = (createdBy) => {
+        if (!createdBy) return 'Unknown';
+        
+        const creatorMap = {
+            1: 'Yokabd Admin',
+            2: 'Saron Admin',
+            3: 'Beza Broker',
+            4: 'Birtukan Support',
+            // Add more mappings as needed
+        };
+        
+        return creatorMap[createdBy] || `User ${createdBy}`;
+    };
+
+    // Get priority badge color
+    const getPriorityColor = (priority) => {
+        const colors = {
+            urgent: 'bg-red-100 text-red-800 border-red-200',
+            high: 'bg-orange-100 text-orange-800 border-orange-200',
+            medium: 'bg-yellow-100 text-yellow-800 border-yellow-200',
+            low: 'bg-blue-100 text-blue-800 border-blue-200'
+        };
+        return colors[priority] || 'bg-gray-100 text-gray-800 border-gray-200';
+    };
+
+    // Get category badge color
+    const getCategoryColor = (category) => {
+        const colors = {
+            user_management: 'bg-purple-100 text-purple-800 border-purple-200',
+            content_moderation: 'bg-pink-100 text-pink-800 border-pink-200',
+            system_maintenance: 'bg-indigo-100 text-indigo-800 border-indigo-200',
+            security_review: 'bg-red-100 text-red-800 border-red-200',
+            support_tickets: 'bg-green-100 text-green-800 border-green-200',
+            knowledge_base: 'bg-teal-100 text-teal-800 border-teal-200',
+            flagged_content: 'bg-amber-100 text-amber-800 border-amber-200',
+            financial_review: 'bg-emerald-100 text-emerald-800 border-emerald-200',
+            property_verification: 'bg-cyan-100 text-cyan-800 border-cyan-200',
+            report_generation: 'bg-blue-100 text-blue-800 border-blue-200',
+            team_coordination: 'bg-violet-100 text-violet-800 border-violet-200',
+            training_development: 'bg-lime-100 text-lime-800 border-lime-200',
+            meeting_preparation: 'bg-fuchsia-100 text-fuchsia-800 border-fuchsia-200',
+            policy_update: 'bg-rose-100 text-rose-800 border-rose-200',
+            performance_review: 'bg-sky-100 text-sky-800 border-sky-200',
+            other: 'bg-gray-100 text-gray-800 border-gray-200'
+        };
+        return colors[category] || 'bg-gray-100 text-gray-800 border-gray-200';
     };
 
     return (
@@ -201,34 +271,44 @@ const TodoList = ({ theme, user, todoItems, setTodoItems, newTodo, setNewTodo, n
                             onClick={() => toggleTodo(item.id)}
                             className="mr-4 transition-transform duration-200 hover:scale-110"
                         >
-                            {item.completed ? (
+                            {item.status === 'completed' ? (
                                 <CheckSquare className="w-5 h-5 text-green-500" />
                             ) : (
                                 <Square className="w-5 h-5 text-gray-400 hover:text-amber-400" />
                             )}
                         </button>
                         <div className="flex-1 min-w-0">
-                            <p className={`text-sm font-medium transition-all duration-300 ${item.completed ? 'line-through text-gray-500' : theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
-                                {item.text}
+                            <p className={`text-sm font-medium transition-all duration-300 ${item.status === 'completed' ? 'line-through text-gray-500' : theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
+                                {item.title}
                             </p>
-                            <div className="flex flex-wrap items-center gap-2 mt-1">
-                                <span className={`text-xs px-2 py-1  ${theme === 'dark' ? 'bg-gray-600 text-gray-300' : 'bg-gray-200 text-gray-600'}`}>
-                                    👤 {item.assignee}
+                            {item.description && (
+                                <p className={`text-xs mt-1 ${theme === 'dark' ? 'text-gray-400' : 'text-gray-600'}`}>
+                                    {item.description}
+                                </p>
+                            )}
+                            <div className="flex flex-wrap items-center gap-2 mt-2">
+                                <span className={`text-xs px-2 py-1 rounded-full border ${getPriorityColor(item.priority)}`}>
+                                    {item.priority}
                                 </span>
-                                <span className={`text-xs px-2 py-1  ${theme === 'dark' ? 'bg-gray-600 text-gray-300' : 'bg-gray-200 text-gray-600'}`}>
-                                    🧑‍💼 {item.created_by || item.createdBy}
+                                <span className={`text-xs px-2 py-1 rounded-full border ${getCategoryColor(item.category)}`}>
+                                    {item.category?.replace('_', ' ') || 'other'}
+                                </span>
+                                <span className={`text-xs px-2 py-1 rounded-full ${theme === 'dark' ? 'bg-gray-600 text-gray-300' : 'bg-gray-200 text-gray-600'}`}>
+                                    👤 {getAssigneeDisplay(item.assigned_to)}
+                                </span>
+                                <span className={`text-xs px-2 py-1 rounded-full ${theme === 'dark' ? 'bg-gray-600 text-gray-300' : 'bg-gray-200 text-gray-600'}`}>
+                                    🧑‍💼 {getCreatorDisplay(item.created_by)}
                                 </span>
                                 {item.due_date && (
-                                    <span className={`text-xs px-2 py-1  flex items-center gap-1 ${isOverdue(item.due_date) && !item.completed ? 'bg-red-100 text-red-800' : theme === 'dark' ? 'bg-gray-600 text-gray-300' : 'bg-gray-200 text-gray-600'}`}>
+                                    <span className={`text-xs px-2 py-1 rounded-full flex items-center gap-1 ${isOverdue(item.due_date) && item.status !== 'completed' ? 'bg-red-100 text-red-800 border border-red-200' : theme === 'dark' ? 'bg-gray-600 text-gray-300' : 'bg-gray-200 text-gray-600'}`}>
                                         <Calendar className="w-3 h-3" />
                                         {formatDate(item.due_date)}
-                                        {isOverdue(item.due_date) && !item.completed && ' ⚠️'}
+                                        {isOverdue(item.due_date) && item.status !== 'completed' && ' ⚠️'}
                                     </span>
                                 )}
-                                {item.created_at && (
-                                    <span className={`text-xs px-2 py-1  flex items-center gap-1 ${theme === 'dark' ? 'bg-gray-600 text-gray-300' : 'bg-gray-200 text-gray-600'}`}>
-                                        <Clock className="w-3 h-3" />
-                                        Created: {formatDate(item.created_at)}
+                                {item.estimated_hours && (
+                                    <span className={`text-xs px-2 py-1 rounded-full ${theme === 'dark' ? 'bg-gray-600 text-gray-300' : 'bg-gray-200 text-gray-600'}`}>
+                                        ⏱️ {item.estimated_hours}h
                                     </span>
                                 )}
                             </div>
@@ -254,18 +334,19 @@ const TodoList = ({ theme, user, todoItems, setTodoItems, newTodo, setNewTodo, n
                             value={newTodo}
                             onChange={(e) => setNewTodo(e.target.value)}
                             onKeyPress={handleKeyPress}
-                            placeholder="Enter new task..."
-                            className={`w-full px-4 py-2 border  text-sm transition-all duration-300 focus:ring-2 focus:ring-amber-400 focus:border-transparent ${theme === 'dark' ? 'bg-gray-600 border-gray-500 text-white placeholder-gray-400' : 'bg-white border-gray-300 text-gray-900 placeholder-gray-500'}`}
+                            placeholder="Enter task title..."
+                            className={`w-full px-4 py-2 border rounded-lg text-sm transition-all duration-300 focus:ring-2 focus:ring-amber-400 focus:border-transparent ${theme === 'dark' ? 'bg-gray-600 border-gray-500 text-white placeholder-gray-400' : 'bg-white border-gray-300 text-gray-900 placeholder-gray-500'}`}
                         />
                     </div>
                     <select
                         value={newTodoAssignee}
                         onChange={(e) => setNewTodoAssignee(e.target.value)}
-                        className={`px-4 py-2 border text-sm transition-all duration-300 focus:ring-2 focus:ring-amber-400 focus:border-transparent ${theme === 'dark' ? 'bg-gray-600 border-gray-500 text-white' : 'bg-white border-gray-300 text-gray-900'}`}
+                        className={`px-4 py-2 border rounded-lg text-sm transition-all duration-300 focus:ring-2 focus:ring-amber-400 focus:border-transparent ${theme === 'dark' ? 'bg-gray-600 border-gray-500 text-white' : 'bg-white border-gray-300 text-gray-900'}`}
                     >
-                        <option value="Support Team">Support Team</option>
-                        <option value="Broker Team">Broker Team</option>
-                        <option value="Admin">Admin</option>
+                        <option value="1">Yokabd Admin</option>
+                        <option value="2">Saron Admin</option>
+                        <option value="3">Beza Broker</option>
+                        <option value="4">Birtukan Support</option>
                     </select>
                     <div className="relative">
                         <Calendar className={`absolute left-3 top-1/2 transform -translate-y-1/2 ${theme === 'dark' ? 'text-gray-400' : 'text-gray-600'} w-4 h-4`} />
@@ -275,7 +356,7 @@ const TodoList = ({ theme, user, todoItems, setTodoItems, newTodo, setNewTodo, n
                             onChange={(e) => setNewTodoDueDate(e.target.value)}
                             onFocus={() => setShowCalendar(true)}
                             placeholder="YYYY-MM-DD"
-                            className={`w-full pl-10 pr-3 py-2 border  text-sm transition-all duration-300 focus:ring-2 focus:ring-amber-400 focus:border-transparent ${theme === 'dark' ? 'bg-gray-600 border-gray-500 text-white placeholder-gray-400' : 'bg-white border-gray-300 text-gray-900 placeholder-gray-500'}`}
+                            className={`w-full pl-10 pr-3 py-2 border rounded-lg text-sm transition-all duration-300 focus:ring-2 focus:ring-amber-400 focus:border-transparent ${theme === 'dark' ? 'bg-gray-600 border-gray-500 text-white placeholder-gray-400' : 'bg-white border-gray-300 text-gray-900 placeholder-gray-500'}`}
                         />
                         {showCalendar && (
                             <CalendarPopup
@@ -294,7 +375,7 @@ const TodoList = ({ theme, user, todoItems, setTodoItems, newTodo, setNewTodo, n
                 <button
                     onClick={handleAddTodo}
                     disabled={!newTodo.trim()}
-                    className={`w-full py-3  border-2 transition-all duration-300 transform ${isAdding ? 'scale-95' : 'hover:scale-[1.02]'} disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none ${theme === 'dark' ? 'border-amber-400/50 hover:border-amber-400' : 'border-amber-300/50 hover:border-amber-400'}`}
+                    className={`w-full py-3 rounded-lg border-2 transition-all duration-300 transform ${isAdding ? 'scale-95' : 'hover:scale-[1.02]'} disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none ${theme === 'dark' ? 'border-amber-400/50 hover:border-amber-400' : 'border-amber-300/50 hover:border-amber-400'}`}
                 >
                     <div className="flex items-center justify-center gap-2">
                         <div className={`w-6 h-6 rounded-full flex items-center justify-center transition-all duration-300 ${theme === 'dark' ? 'bg-gradient-to-r from-amber-400 to-orange-500' : 'bg-gradient-to-r from-amber-300 to-amber-400'}`}>

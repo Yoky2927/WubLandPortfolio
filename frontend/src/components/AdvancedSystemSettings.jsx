@@ -23,7 +23,19 @@ import {
   ShieldCheck,
   Wrench,
   Calendar,
-  Clock
+  Clock,
+  Users,
+  Key,
+  Bell,
+  Eye,
+  EyeOff,
+  Download,
+  Upload,
+  RotateCw,
+  Archive,
+  FileText,
+  ShieldAlert,
+  Network as NetworkIcon
 } from 'lucide-react';
 
 // Import Maintenance Mode Component
@@ -43,8 +55,13 @@ const AdvancedSystemSettings = ({ theme }) => {
     performBackup,
     optimizeDatabase,
     clearCache,
-    runSecurityScan
-  } = useSystemSettings(); // FIXED: Changed from useToast() to useSystemSettings()
+    runSecurityScan,
+    updateSetting,
+    enableMaintenanceMode,
+    disableMaintenanceMode,
+    scheduleMaintenance,
+    maintenance
+  } = useSystemSettings();
   
   const { addToast } = useToast();
   const [isLoading, setIsLoading] = useState({});
@@ -58,28 +75,45 @@ const AdvancedSystemSettings = ({ theme }) => {
     'transaction-service': 'checking'
   });
 
+  const [systemConfig, setSystemConfig] = useState({
+    maxFileSize: 50,
+    sessionTimeout: 60,
+    maxLoginAttempts: 5,
+    apiRateLimit: 1000,
+    backupRetention: 30,
+    logLevel: 'info',
+    emailNotifications: true,
+    smsNotifications: false,
+    autoUpdates: true,
+    debugMode: false
+  });
+
   // Ensure checkAllServers is declared before use
   const checkAllServers = useCallback(async () => {
     setIsLoading((prev) => ({ ...prev, servers: true }));
     
     const servers = [
-      { name: 'user-service', url: 'http://localhost:5000/health' },
-      { name: 'communication-service', url: 'http://localhost:5001/health' },
-      { name: 'todo-service', url: 'http://localhost:5003/health' },
-      { name: 'analysis-service', url: 'http://localhost:5004/health' },
-      { name: 'support-service', url: 'http://localhost:5005/health' },
-      { name: 'property-service', url: 'http://localhost:5002/health' },
-      { name: 'transaction-service', url: 'http://localhost:5006/health' }
+      { name: 'User Service', key: 'user-service', port: 5000, description: 'Authentication & User Management' },
+      { name: 'Communication', key: 'communication-service', port: 5001, description: 'Real-time Chat & Messaging' },
+      { name: 'Property Service', key: 'property-service', port: 5002, description: 'Property Listings & Management' },
+      { name: 'Todo Service', key: 'todo-service', port: 5003, description: 'Task Management & Workflows' },
+      { name: 'Analysis', key: 'analysis-service', port: 5004, description: 'Analytics & Reporting' },
+      { name: 'Support', key: 'support-service', port: 5005, description: 'Customer Support & Tickets' },
+      { name: 'Transaction', key: 'transaction-service', port: 5006, description: 'Payment Processing & Transactions' }
     ];
 
     const statusUpdates = await Promise.all(
       servers.map(async (server) => {
         try {
-          const response = await fetch(server.url);
+          const response = await fetch(`http://localhost:${server.port}/health`, {
+            method: 'GET',
+            headers: { 'Content-Type': 'application/json' },
+          });
           if (!response.ok) throw new Error('Service unavailable');
-          return { [server.name]: 'online' };
+          const data = await response.json();
+          return { [server.key]: 'online', details: data };
         } catch {
-          return { [server.name]: 'offline' };
+          return { [server.key]: 'offline', details: null };
         }
       })
     );
@@ -101,10 +135,12 @@ const AdvancedSystemSettings = ({ theme }) => {
   const handleAction = async (action, actionFunction, successMessage) => {
     setIsLoading((prev) => ({ ...prev, [action]: true }));
     try {
-      await actionFunction();
+      const result = await actionFunction();
       addToast(successMessage, { appearance: 'success' });
-    } catch {
+      return result;
+    } catch (error) {
       addToast('Action failed. Please try again.', { appearance: 'error' });
+      throw error;
     } finally {
       setIsLoading((prev) => ({ ...prev, [action]: false }));
     }
@@ -122,6 +158,65 @@ const AdvancedSystemSettings = ({ theme }) => {
       resolveSecurityAlert(alert.id);
       addToast('Security alert resolved', 'info');
     }
+  };
+
+  // NEW: System configuration handlers
+  const handleConfigChange = (key, value) => {
+    setSystemConfig(prev => ({
+      ...prev,
+      [key]: value
+    }));
+    updateSetting(key, value);
+  };
+
+  // NEW: Export system logs
+  const exportSystemLogs = async () => {
+    return handleAction('exportLogs', async () => {
+      // Simulate log export
+      return new Promise((resolve) => {
+        setTimeout(() => {
+          resolve({
+            success: true,
+            message: 'System logs exported successfully',
+            fileUrl: 'data:application/json;charset=utf-8,' + encodeURIComponent(JSON.stringify({
+              timestamp: new Date().toISOString(),
+              logs: securityAlerts,
+              metrics: systemMetrics,
+              settings: systemConfig
+            }, null, 2))
+          });
+        }, 2000);
+      });
+    }, 'System logs exported successfully');
+  };
+
+  // NEW: System diagnostics
+  const runSystemDiagnostics = async () => {
+    return handleAction('diagnostics', async () => {
+      await checkAllServers();
+      
+      // Simulate comprehensive diagnostics
+      return new Promise((resolve) => {
+        setTimeout(() => {
+          const issues = [];
+          if (systemMetrics.cpu > 80) issues.push('High CPU usage detected');
+          if (systemMetrics.memory > 90) issues.push('High memory usage');
+          if (securityAlerts.filter(a => a.status === 'active').length > 0) {
+            issues.push('Active security alerts need attention');
+          }
+          
+          resolve({
+            success: true,
+            issues,
+            recommendations: issues.length === 0 ? ['All systems optimal'] : [
+              'Consider scaling resources',
+              'Review security configurations',
+              'Monitor system performance'
+            ]
+          });
+        }, 3000);
+      });
+    }, 'System diagnostics completed');
   };
 
   const ServerStatusCard = ({ server }) => {
@@ -169,7 +264,7 @@ const AdvancedSystemSettings = ({ theme }) => {
           <div className={`text-xs ${
             theme === 'dark' ? 'text-gray-500' : 'text-gray-400'
           }`}>
-            Port {server.port}
+            Port {server.port} • {server.description}
           </div>
           <div className={`text-sm font-semibold mt-1 ${
             serverStatus[server.key] === 'online' ? 'text-green-500' : 
@@ -182,6 +277,307 @@ const AdvancedSystemSettings = ({ theme }) => {
       </div>
     );
   };
+
+  // NEW: System Configuration Panel
+  const SystemConfiguration = () => (
+    <div className={`p-6 rounded-2xl border-2 backdrop-blur-lg ${
+      theme === 'dark' 
+        ? 'bg-gradient-to-br from-gray-800 to-gray-900 border-gray-700' 
+        : 'bg-gradient-to-br from-white to-gray-50 border-gray-200'
+    }`}>
+      <div className="flex items-center gap-3 mb-6">
+        <div className={`p-3 rounded-xl ${
+          theme === 'dark' ? 'bg-indigo-900/30' : 'bg-indigo-100'
+        }`}>
+          <Settings className="w-6 h-6 text-indigo-500" />
+        </div>
+        <div>
+          <h3 className={`text-xl font-bold ${
+            theme === 'dark' ? 'text-white' : 'text-gray-900'
+          }`}>
+            System Configuration
+          </h3>
+          <p className={`text-sm ${
+            theme === 'dark' ? 'text-gray-400' : 'text-gray-600'
+          }`}>
+            Configure system behavior and limits
+          </p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {/* Security Settings */}
+        <div className="space-y-4">
+          <h4 className={`font-semibold ${
+            theme === 'dark' ? 'text-white' : 'text-gray-900'
+          }`}>Security</h4>
+          
+          <div>
+            <label className={`text-sm font-medium ${
+              theme === 'dark' ? 'text-gray-300' : 'text-gray-700'
+            }`}>Max Login Attempts</label>
+            <input
+              type="number"
+              value={systemConfig.maxLoginAttempts}
+              onChange={(e) => handleConfigChange('maxLoginAttempts', parseInt(e.target.value))}
+              className={`w-full mt-1 px-3 py-2 border rounded-lg ${
+                theme === 'dark' 
+                  ? 'bg-gray-700 border-gray-600 text-white' 
+                  : 'bg-white border-gray-300 text-gray-900'
+              }`}
+              min="1"
+              max="10"
+            />
+          </div>
+
+          <div>
+            <label className={`text-sm font-medium ${
+              theme === 'dark' ? 'text-gray-300' : 'text-gray-700'
+            }`}>Session Timeout (min)</label>
+            <input
+              type="number"
+              value={systemConfig.sessionTimeout}
+              onChange={(e) => handleConfigChange('sessionTimeout', parseInt(e.target.value))}
+              className={`w-full mt-1 px-3 py-2 border rounded-lg ${
+                theme === 'dark' 
+                  ? 'bg-gray-700 border-gray-600 text-white' 
+                  : 'bg-white border-gray-300 text-gray-900'
+              }`}
+              min="5"
+              max="240"
+            />
+          </div>
+        </div>
+
+        {/* File & Storage Settings */}
+        <div className="space-y-4">
+          <h4 className={`font-semibold ${
+            theme === 'dark' ? 'text-white' : 'text-gray-900'
+          }`}>Storage</h4>
+          
+          <div>
+            <label className={`text-sm font-medium ${
+              theme === 'dark' ? 'text-gray-300' : 'text-gray-700'
+            }`}>Max File Size (MB)</label>
+            <input
+              type="number"
+              value={systemConfig.maxFileSize}
+              onChange={(e) => handleConfigChange('maxFileSize', parseInt(e.target.value))}
+              className={`w-full mt-1 px-3 py-2 border rounded-lg ${
+                theme === 'dark' 
+                  ? 'bg-gray-700 border-gray-600 text-white' 
+                  : 'bg-white border-gray-300 text-gray-900'
+              }`}
+              min="1"
+              max="100"
+            />
+          </div>
+
+          <div>
+            <label className={`text-sm font-medium ${
+              theme === 'dark' ? 'text-gray-300' : 'text-gray-700'
+            }`}>Backup Retention (days)</label>
+            <input
+              type="number"
+              value={systemConfig.backupRetention}
+              onChange={(e) => handleConfigChange('backupRetention', parseInt(e.target.value))}
+              className={`w-full mt-1 px-3 py-2 border rounded-lg ${
+                theme === 'dark' 
+                  ? 'bg-gray-700 border-gray-600 text-white' 
+                  : 'bg-white border-gray-300 text-gray-900'
+              }`}
+              min="1"
+              max="365"
+            />
+          </div>
+        </div>
+
+        {/* API & Performance Settings */}
+        <div className="space-y-4">
+          <h4 className={`font-semibold ${
+            theme === 'dark' ? 'text-white' : 'text-gray-900'
+          }`}>Performance</h4>
+          
+          <div>
+            <label className={`text-sm font-medium ${
+              theme === 'dark' ? 'text-gray-300' : 'text-gray-700'
+            }`}>API Rate Limit</label>
+            <input
+              type="number"
+              value={systemConfig.apiRateLimit}
+              onChange={(e) => handleConfigChange('apiRateLimit', parseInt(e.target.value))}
+              className={`w-full mt-1 px-3 py-2 border rounded-lg ${
+                theme === 'dark' 
+                  ? 'bg-gray-700 border-gray-600 text-white' 
+                  : 'bg-white border-gray-300 text-gray-900'
+              }`}
+              min="100"
+              max="10000"
+            />
+          </div>
+
+          <div className="flex items-center justify-between">
+            <label className={`text-sm font-medium ${
+              theme === 'dark' ? 'text-gray-300' : 'text-gray-700'
+            }`}>Auto Updates</label>
+            <button
+              onClick={() => handleConfigChange('autoUpdates', !systemConfig.autoUpdates)}
+              className={`relative inline-flex h-6 w-11 items-center rounded-full ${
+                systemConfig.autoUpdates 
+                  ? 'bg-green-500' 
+                  : 'bg-gray-300'
+              }`}
+            >
+              <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition ${
+                systemConfig.autoUpdates ? 'translate-x-6' : 'translate-x-1'
+              }`} />
+            </button>
+          </div>
+
+          <div className="flex items-center justify-between">
+            <label className={`text-sm font-medium ${
+              theme === 'dark' ? 'text-gray-300' : 'text-gray-700'
+            }`}>Debug Mode</label>
+            <button
+              onClick={() => handleConfigChange('debugMode', !systemConfig.debugMode)}
+              className={`relative inline-flex h-6 w-11 items-center rounded-full ${
+                systemConfig.debugMode 
+                  ? 'bg-yellow-500' 
+                  : 'bg-gray-300'
+              }`}
+            >
+              <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition ${
+                systemConfig.debugMode ? 'translate-x-6' : 'translate-x-1'
+              }`} />
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
+  // NEW: System Metrics Dashboard
+  const SystemMetricsDashboard = () => (
+    <div className={`p-6 rounded-2xl border-2 backdrop-blur-lg ${
+      theme === 'dark' 
+        ? 'bg-gradient-to-br from-gray-800 to-gray-900 border-gray-700' 
+        : 'bg-gradient-to-br from-white to-gray-50 border-gray-200'
+    }`}>
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center gap-3">
+          <div className={`p-3 rounded-xl ${
+            theme === 'dark' ? 'bg-green-900/30' : 'bg-green-100'
+          }`}>
+            <Activity className="w-6 h-6 text-green-500" />
+          </div>
+          <div>
+            <h3 className={`text-xl font-bold ${
+              theme === 'dark' ? 'text-white' : 'text-gray-900'
+            }`}>
+              System Metrics
+            </h3>
+            <p className={`text-sm ${
+              theme === 'dark' ? 'text-gray-400' : 'text-gray-600'
+            }`}>
+              Real-time performance monitoring
+            </p>
+          </div>
+        </div>
+        <button
+          onClick={runSystemDiagnostics}
+          disabled={isLoading.diagnostics}
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all duration-200 ${
+            theme === 'dark'
+              ? 'bg-blue-600 hover:bg-blue-700 text-white'
+              : 'bg-blue-500 hover:bg-blue-600 text-white'
+          } disabled:opacity-50`}
+        >
+          <RotateCw className={`w-4 h-4 ${isLoading.diagnostics ? 'animate-spin' : ''}`} />
+          {isLoading.diagnostics ? 'Running...' : 'Run Diagnostics'}
+        </button>
+      </div>
+
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className={`p-4 rounded-xl border-2 ${
+          theme === 'dark' ? 'bg-gray-700/50 border-gray-600' : 'bg-gray-50 border-gray-200'
+        }`}>
+          <div className="flex items-center justify-between mb-2">
+            <Cpu className={`w-5 h-5 ${
+              systemMetrics.cpu > 80 ? 'text-red-500' : 
+              systemMetrics.cpu > 60 ? 'text-yellow-500' : 'text-green-500'
+            }`} />
+            <span className={`text-sm ${
+              theme === 'dark' ? 'text-gray-400' : 'text-gray-600'
+            }`}>CPU</span>
+          </div>
+          <div className={`text-2xl font-bold ${
+            systemMetrics.cpu > 80 ? 'text-red-500' : 
+            systemMetrics.cpu > 60 ? 'text-yellow-500' : 'text-green-500'
+          }`}>
+            {systemMetrics.cpu}%
+          </div>
+        </div>
+
+        <div className={`p-4 rounded-xl border-2 ${
+          theme === 'dark' ? 'bg-gray-700/50 border-gray-600' : 'bg-gray-50 border-gray-200'
+        }`}>
+          <div className="flex items-center justify-between mb-2">
+            <MemoryStick className={`w-5 h-5 ${
+              systemMetrics.memory > 90 ? 'text-red-500' : 
+              systemMetrics.memory > 75 ? 'text-yellow-500' : 'text-green-500'
+            }`} />
+            <span className={`text-sm ${
+              theme === 'dark' ? 'text-gray-400' : 'text-gray-600'
+            }`}>Memory</span>
+          </div>
+          <div className={`text-2xl font-bold ${
+            systemMetrics.memory > 90 ? 'text-red-500' : 
+            systemMetrics.memory > 75 ? 'text-yellow-500' : 'text-green-500'
+          }`}>
+            {systemMetrics.memory}%
+          </div>
+        </div>
+
+        <div className={`p-4 rounded-xl border-2 ${
+          theme === 'dark' ? 'bg-gray-700/50 border-gray-600' : 'bg-gray-50 border-gray-200'
+        }`}>
+          <div className="flex items-center justify-between mb-2">
+            <HardDrive className={`w-5 h-5 ${
+              systemMetrics.storage > 90 ? 'text-red-500' : 
+              systemMetrics.storage > 80 ? 'text-yellow-500' : 'text-green-500'
+            }`} />
+            <span className={`text-sm ${
+              theme === 'dark' ? 'text-gray-400' : 'text-gray-600'
+            }`}>Storage</span>
+          </div>
+          <div className={`text-2xl font-bold ${
+            systemMetrics.storage > 90 ? 'text-red-500' : 
+            systemMetrics.storage > 80 ? 'text-yellow-500' : 'text-green-500'
+          }`}>
+            {systemMetrics.storage}%
+          </div>
+        </div>
+
+        <div className={`p-4 rounded-xl border-2 ${
+          theme === 'dark' ? 'bg-gray-700/50 border-gray-600' : 'bg-gray-50 border-gray-200'
+        }`}>
+          <div className="flex items-center justify-between mb-2">
+            <NetworkIcon className={`w-5 h-5 ${
+              systemMetrics.network > 80 ? 'text-yellow-500' : 'text-green-500'
+            }`} />
+            <span className={`text-sm ${
+              theme === 'dark' ? 'text-gray-400' : 'text-gray-600'
+            }`}>Network</span>
+          </div>
+          <div className={`text-2xl font-bold ${
+            systemMetrics.network > 80 ? 'text-yellow-500' : 'text-green-500'
+          }`}>
+            {systemMetrics.network}%
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 
   // Server monitoring section
   const ServerMonitor = () => (
@@ -225,13 +621,13 @@ const AdvancedSystemSettings = ({ theme }) => {
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <ServerStatusCard server={{ name: 'User Service', key: 'user-service', port: 5000 }} />
-        <ServerStatusCard server={{ name: 'Communication', key: 'communication-service', port: 5001 }} />
-        <ServerStatusCard server={{ name: 'Todo Service', key: 'todo-service', port: 5003 }} />
-        <ServerStatusCard server={{ name: 'Analysis', key: 'analysis-service', port: 5004 }} />
-        <ServerStatusCard server={{ name: 'Support', key: 'support-service', port: 5005 }} />
-        <ServerStatusCard server={{ name: 'Property Service', key: 'property-service', port: 5002 }} />
-        <ServerStatusCard server={{ name: 'Transaction', key: 'transaction-service', port: 5006 }} />
+        <ServerStatusCard server={{ name: 'User Service', key: 'user-service', port: 5000, description: 'Authentication & User Management' }} />
+        <ServerStatusCard server={{ name: 'Communication', key: 'communication-service', port: 5001, description: 'Real-time Chat & Messaging' }} />
+        <ServerStatusCard server={{ name: 'Property Service', key: 'property-service', port: 5002, description: 'Property Listings & Management' }} />
+        <ServerStatusCard server={{ name: 'Todo Service', key: 'todo-service', port: 5003, description: 'Task Management & Workflows' }} />
+        <ServerStatusCard server={{ name: 'Analysis', key: 'analysis-service', port: 5004, description: 'Analytics & Reporting' }} />
+        <ServerStatusCard server={{ name: 'Support', key: 'support-service', port: 5005, description: 'Customer Support & Tickets' }} />
+        <ServerStatusCard server={{ name: 'Transaction', key: 'transaction-service', port: 5006, description: 'Payment Processing & Transactions' }} />
       </div>
 
       {/* Status Legend */}
@@ -397,17 +793,80 @@ const AdvancedSystemSettings = ({ theme }) => {
             </div>
           </div>
         </button>
+
+        {/* NEW: Additional Actions */}
+        <button 
+          onClick={exportSystemLogs}
+          disabled={isLoading.exportLogs}
+          className={`p-4 rounded-xl border-2 border-dashed transition-all duration-200 ${
+            theme === 'dark'
+              ? 'border-orange-400/30 hover:border-orange-400 bg-orange-900/20'
+              : 'border-orange-300 hover:border-orange-400 bg-orange-50'
+          } disabled:opacity-50`}
+        >
+          <div className="flex items-center gap-3">
+            <Download className={`w-6 h-6 ${
+              theme === 'dark' ? 'text-orange-400' : 'text-orange-600'
+            }`} />
+            <div className="text-left">
+              <div className={`font-semibold ${
+                theme === 'dark' ? 'text-white' : 'text-gray-900'
+              }`}>
+                {isLoading.exportLogs ? 'Exporting...' : 'Export Logs'}
+              </div>
+              <div className={`text-xs ${
+                theme === 'dark' ? 'text-gray-400' : 'text-gray-600'
+              }`}>
+                System logs
+              </div>
+            </div>
+          </div>
+        </button>
+
+        <button 
+          onClick={runSystemDiagnostics}
+          disabled={isLoading.diagnostics}
+          className={`p-4 rounded-xl border-2 border-dashed transition-all duration-200 ${
+            theme === 'dark'
+              ? 'border-cyan-400/30 hover:border-cyan-400 bg-cyan-900/20'
+              : 'border-cyan-300 hover:border-cyan-400 bg-cyan-50'
+          } disabled:opacity-50`}
+        >
+          <div className="flex items-center gap-3">
+            <Wrench className={`w-6 h-6 ${
+              theme === 'dark' ? 'text-cyan-400' : 'text-cyan-600'
+            }`} />
+            <div className="text-left">
+              <div className={`font-semibold ${
+                theme === 'dark' ? 'text-white' : 'text-gray-900'
+              }`}>
+                {isLoading.diagnostics ? 'Running...' : 'Diagnostics'}
+              </div>
+              <div className={`text-xs ${
+                theme === 'dark' ? 'text-gray-400' : 'text-gray-600'
+              }`}>
+                System check
+              </div>
+            </div>
+          </div>
+        </button>
       </div>
     </div>
   );
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
+      {/* System Metrics Dashboard */}
+      <SystemMetricsDashboard />
+
       {/* Server Monitoring */}
       <ServerMonitor />
 
       {/* Maintenance Mode Section */}
       <MaintenanceMode theme={theme} />
+
+      {/* System Configuration */}
+      <SystemConfiguration />
 
       {/* Quick Actions */}
       <QuickActions />

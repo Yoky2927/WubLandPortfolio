@@ -1,40 +1,29 @@
-// backend/user-service/models/user.model.js
 import db from "../../shared/db.js";
 
 export const User = {
   findByEmail: async (email) => {
-    const [rows] = await db.query("SELECT * FROM users WHERE email = ?", [
-      email,
-    ]);
+    const [rows] = await db.query("SELECT * FROM users WHERE email = ?", [email]);
     return rows[0];
   },
 
   findByUsername: async (username) => {
-    const [rows] = await db.query("SELECT * FROM users WHERE username = ?", [
-      username,
-    ]);
-    console.log("findByUsername result:", rows[0]);
+    const [rows] = await db.query("SELECT * FROM users WHERE username = ?", [username]);
     return rows[0];
   },
 
   findById: async (id) => {
-    const [rows] = await db.query(
-      `
-    SELECT id, first_name, last_name, username, email, password, role, 
-           broker_type, profile_picture, status, created_at, verified,
-           is_email_verified, email_verification_token, email_verification_expires,
-           password_change_required, last_password_change, login_attempts, lock_until
-    FROM users 
-    WHERE id = ?
-  `,
-      [id]
-    );
-    console.log("findById result:", rows[0]);
+    const [rows] = await db.query(`
+      SELECT id, first_name, last_name, username, email, password, role, 
+             broker_type, profile_picture, status, created_at, verified,
+             is_email_verified, email_verification_token, email_verification_expires,
+             password_change_required, last_password_change, login_attempts, lock_until,
+             privilege_tier, feature_flags, last_login, last_activity
+      FROM users 
+      WHERE id = ?
+    `, [id]);
     return rows[0];
   },
 
-  // 💡 FIXED: Updated 'create' to handle verification token and expiry in a single DB call,
-  // and to return the new ID and token.
   create: async (
     firstName,
     lastName,
@@ -43,14 +32,15 @@ export const User = {
     hashedPassword,
     role,
     broker_type = null,
-    is_email_verified = 0, // 0 for public signup, 1 for admin
-    emailVerificationToken = null, // NEW PARAMETER
-    emailVerificationExpires = null // NEW PARAMETER
+    is_email_verified = 0,
+    emailVerificationToken = null,
+    emailVerificationExpires = null
   ) => {
     const [result] = await db.query(
-      // NOTE: We now explicitly set is_email_verified, verified, token, and expiry.
-      `INSERT INTO users (first_name, last_name, username, email, password, role, broker_type, is_email_verified, verified, email_verification_token, email_verification_expires, created_at)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
+      `INSERT INTO users (first_name, last_name, username, email, password, role, broker_type, 
+                          is_email_verified, verified, email_verification_token, email_verification_expires, 
+                          privilege_tier, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'basic', NOW())`,
       [
         firstName,
         lastName,
@@ -65,10 +55,35 @@ export const User = {
         emailVerificationExpires,
       ]
     );
-    // Return an object with the ID and token
     return { insertId: result.insertId, emailVerificationToken };
   },
 
+  // Add missing methods for support service
+  findByRole: async (role) => {
+    const [rows] = await db.query(
+      "SELECT id, first_name, last_name, username, email, role, broker_type, status, profile_picture FROM users WHERE role = ?",
+      [role]
+    );
+    return rows;
+  },
+
+  findByUsername: async (username) => {
+    const [rows] = await db.query(
+      "SELECT * FROM users WHERE username = ?",
+      [username]
+    );
+    return rows[0];
+  },
+
+  updateLastActivity: async (userId) => {
+    const [result] = await db.query(
+      "UPDATE users SET last_activity = NOW() WHERE id = ?",
+      [userId]
+    );
+    return result.affectedRows > 0;
+  },
+
+  // Keep all existing methods from your current file...
   updateProfile: async (id, firstName, lastName, username) => {
     const [result] = await db.query(
       "UPDATE users SET first_name = ?, last_name = ?, username = ? WHERE id = ?",
@@ -77,7 +92,6 @@ export const User = {
     return result.affectedRows > 0;
   },
 
-  // ADD THIS METHOD FOR PROFILE PICTURE UPDATES
   updateProfilePicture: async (id, profilePictureUrl) => {
     const [result] = await db.query(
       "UPDATE users SET profile_picture = ? WHERE id = ?",
@@ -86,7 +100,6 @@ export const User = {
     return result.affectedRows > 0;
   },
 
-  // NEW: Email verification methods
   verifyEmail: async (userId) => {
     const [result] = await db.query(
       `UPDATE users 
@@ -121,7 +134,6 @@ export const User = {
     return rows[0];
   },
 
-  // NEW: Password and security methods
   updatePassword: async (userId, hashedPassword) => {
     const [result] = await db.query(
       `UPDATE users 
@@ -135,15 +147,24 @@ export const User = {
     );
     return result.affectedRows > 0;
   },
+  
+  // Add to User model in user.model.js
+updateLastLogin: async (userId) => {
+  const [result] = await db.query(
+    `UPDATE users 
+     SET last_login = NOW(), last_activity = NOW() 
+     WHERE id = ?`,
+    [userId]
+  );
+  return result.affectedRows > 0;
+},
 
   handleFailedLogin: async (userId) => {
-    // Get current attempts
     const user = await User.findById(userId);
     const newAttempts = (user.login_attempts || 0) + 1;
     
     let lockUntil = null;
     if (newAttempts >= 5) {
-      // Lock for 30 minutes
       lockUntil = new Date(Date.now() + 30 * 60 * 1000);
     }
 

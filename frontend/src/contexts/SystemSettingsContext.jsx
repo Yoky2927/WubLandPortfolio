@@ -21,19 +21,23 @@ export const SystemSettingsProvider = ({ children }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [backendAvailable, setBackendAvailable] = useState(false);
   const [systemMetrics, setSystemMetrics] = useState({
-    cpu: 0,
-    memory: 0,
-    storage: 0,
-    network: 0,
-    activeThreats: 0
+    cpu: 25,
+    memory: 45,
+    storage: 32,
+    network: 12,
+    activeThreats: 0,
+    activeUsers: 0,
+    apiRequests: 0
   });
   const [maintenance, setMaintenance] = useState({
     enabled: false,
     message: 'System is undergoing maintenance. Please check back later.',
     startTime: null,
     estimatedEndTime: null,
-    allowedUsers: [] // Super admins who can bypass maintenance
+    allowedUsers: [], // Super admins who can bypass maintenance
+    scheduled: false
   });
+  const [systemLogs, setSystemLogs] = useState([]);
 
   // Check maintenance status on load
   useEffect(() => {
@@ -128,10 +132,15 @@ export const SystemSettingsProvider = ({ children }) => {
           maintenanceMode: false,
           userRegistration: true,
           propertyVerification: true,
-          maxFileSize: 10,
+          maxFileSize: 50,
           sessionTimeout: 60,
           maxLoginAttempts: 5,
-          securityLevel: "high"
+          securityLevel: "high",
+          apiRateLimit: 1000,
+          backupRetention: 30,
+          logLevel: "info",
+          autoUpdates: true,
+          debugMode: false
         };
         setSettings(defaultSettings);
         localStorage.setItem('systemSettings', JSON.stringify(defaultSettings));
@@ -144,7 +153,7 @@ export const SystemSettingsProvider = ({ children }) => {
   };
 
   // Enhanced maintenance mode functions
-  const enableMaintenanceMode = (message = 'System is undergoing maintenance. Please check back later.', durationHours = 2) => {
+  const enableMaintenanceMode = (message = 'System is undergoing maintenance. Please check back later.', durationHours = 2, allowedUsers = ['super_admin']) => {
     const startTime = new Date();
     const estimatedEndTime = new Date(startTime.getTime() + durationHours * 60 * 60 * 1000);
     
@@ -153,7 +162,8 @@ export const SystemSettingsProvider = ({ children }) => {
       message,
       startTime,
       estimatedEndTime,
-      allowedUsers: ['super_admin'] // Super admins can always bypass
+      allowedUsers,
+      scheduled: false
     };
     
     setMaintenance(newMaintenance);
@@ -161,6 +171,9 @@ export const SystemSettingsProvider = ({ children }) => {
     
     // Update settings as well
     updateSetting('maintenanceMode', true);
+    
+    // Log the maintenance event
+    addSystemLog('MAINTENANCE', `Maintenance mode enabled: ${message}`, 'info');
     
     return newMaintenance;
   };
@@ -171,7 +184,8 @@ export const SystemSettingsProvider = ({ children }) => {
       message: '',
       startTime: null,
       estimatedEndTime: null,
-      allowedUsers: []
+      allowedUsers: [],
+      scheduled: false
     };
     
     setMaintenance(newMaintenance);
@@ -179,25 +193,32 @@ export const SystemSettingsProvider = ({ children }) => {
     
     // Update settings as well
     updateSetting('maintenanceMode', false);
+    
+    // Log the maintenance event
+    addSystemLog('MAINTENANCE', 'Maintenance mode disabled', 'info');
   };
 
-  const scheduleMaintenance = (startTime, durationHours = 2, message = 'Scheduled system maintenance') => {
+  const scheduleMaintenance = (startTime, durationHours = 2, message = 'Scheduled system maintenance', allowedUsers = ['super_admin']) => {
     const scheduledMaintenance = {
       enabled: false, // Will be enabled automatically at startTime
       message,
       startTime: new Date(startTime),
       estimatedEndTime: new Date(new Date(startTime).getTime() + durationHours * 60 * 60 * 1000),
-      allowedUsers: ['super_admin'],
+      allowedUsers,
       scheduled: true
     };
     
     localStorage.setItem('scheduledMaintenance', JSON.stringify(scheduledMaintenance));
     
+    // Log the scheduling
+    addSystemLog('MAINTENANCE', `Maintenance scheduled for ${startTime}`, 'info');
+    
     // Set up automatic enablement
     const timeUntilStart = new Date(startTime).getTime() - Date.now();
     if (timeUntilStart > 0) {
       setTimeout(() => {
-        enableMaintenanceMode(message, durationHours);
+        enableMaintenanceMode(message, durationHours, allowedUsers);
+        addSystemLog('MAINTENANCE', 'Scheduled maintenance started automatically', 'info');
       }, timeUntilStart);
     }
     
@@ -210,6 +231,20 @@ export const SystemSettingsProvider = ({ children }) => {
 
   const isMaintenanceActive = () => {
     return maintenance.enabled;
+  };
+
+  // NEW: System logging function
+  const addSystemLog = (category, message, level = 'info') => {
+    const logEntry = {
+      id: Date.now(),
+      timestamp: new Date(),
+      category,
+      message,
+      level,
+      user: 'system' // Could be enhanced to track which admin performed the action
+    };
+    
+    setSystemLogs(prev => [logEntry, ...prev.slice(0, 999)]); // Keep last 1000 logs
   };
 
   const initializeSystemMonitoring = () => {
@@ -276,6 +311,13 @@ export const SystemSettingsProvider = ({ children }) => {
         title: 'Suspicious User Behavior',
         description: 'Unusual access patterns detected',
         probability: 0.5
+      },
+      {
+        type: 'file_upload_abuse',
+        severity: 'medium',
+        title: 'Suspicious File Upload',
+        description: 'Multiple large file uploads detected',
+        probability: 0.2
       }
     ];
 
@@ -292,25 +334,31 @@ export const SystemSettingsProvider = ({ children }) => {
           user: Math.random() > 0.5 ? `user_${Math.floor(Math.random() * 1000)}` : null,
           status: 'active'
         };
-        setSecurityAlerts(prev => [newAlert, ...prev.slice(0, 9)]);
+        setSecurityAlerts(prev => [newAlert, ...prev.slice(0, 19)]); // Keep last 20 alerts
+        addSystemLog('SECURITY', `${event.title} - ${event.description}`, event.severity);
       }
     });
   };
 
   const updateSystemMetrics = () => {
-    setSystemMetrics({
-      cpu: Math.min(100, Math.max(0, systemMetrics.cpu + (Math.random() * 10 - 5))),
-      memory: Math.min(100, Math.max(0, systemMetrics.memory + (Math.random() * 8 - 4))),
-      storage: Math.min(100, Math.max(0, systemMetrics.storage + (Math.random() * 2 - 1))),
-      network: Math.min(100, Math.max(0, systemMetrics.network + (Math.random() * 15 - 7.5))),
-      activeThreats: securityAlerts.filter(alert => alert.status === 'active').length
-    });
+    setSystemMetrics(prev => ({
+      cpu: Math.min(100, Math.max(5, prev.cpu + (Math.random() * 10 - 5))),
+      memory: Math.min(100, Math.max(10, prev.memory + (Math.random() * 8 - 4))),
+      storage: Math.min(100, Math.max(15, prev.storage + (Math.random() * 2 - 1))),
+      network: Math.min(100, Math.max(0, prev.network + (Math.random() * 15 - 7.5))),
+      activeThreats: securityAlerts.filter(alert => alert.status === 'active').length,
+      activeUsers: Math.floor(Math.random() * 50) + 10,
+      apiRequests: prev.apiRequests + Math.floor(Math.random() * 100)
+    }));
   };
 
   const updateSetting = (key, value) => {
     const newSettings = { ...settings, [key]: value };
     setSettings(newSettings);
     localStorage.setItem('systemSettings', JSON.stringify(newSettings));
+    
+    // Log configuration changes
+    addSystemLog('CONFIG', `Setting updated: ${key} = ${value}`, 'info');
     
     // Special handling for maintenance mode
     if (key === 'maintenanceMode') {
@@ -328,6 +376,7 @@ export const SystemSettingsProvider = ({ children }) => {
         alert.id === alertId ? { ...alert, status: 'resolved' } : alert
       )
     );
+    addSystemLog('SECURITY', `Security alert resolved: ${alertId}`, 'info');
   };
 
   const blockUser = (username) => {
@@ -336,6 +385,7 @@ export const SystemSettingsProvider = ({ children }) => {
         alert.user === username ? { ...alert, status: 'blocked' } : alert
       )
     );
+    addSystemLog('SECURITY', `User blocked: ${username}`, 'warning');
   };
 
   const blockIP = (ipAddress) => {
@@ -344,56 +394,112 @@ export const SystemSettingsProvider = ({ children }) => {
         alert.source === ipAddress ? { ...alert, status: 'blocked' } : alert
       )
     );
+    addSystemLog('SECURITY', `IP blocked: ${ipAddress}`, 'warning');
   };
 
   const performBackup = async () => {
+    addSystemLog('BACKUP', 'System backup initiated', 'info');
+    
     return new Promise((resolve) => {
       setTimeout(() => {
-        resolve({ 
+        const result = { 
           success: true, 
           message: 'System backup completed successfully',
           backupId: `backup_${Date.now()}`,
-          size: `${(Math.random() * 50 + 20).toFixed(1)} GB`
-        });
+          size: `${(Math.random() * 50 + 20).toFixed(1)} GB`,
+          timestamp: new Date()
+        };
+        
+        addSystemLog('BACKUP', `Backup completed: ${result.backupId}`, 'success');
+        resolve(result);
       }, 3000);
     });
   };
 
   const optimizeDatabase = async () => {
+    addSystemLog('DATABASE', 'Database optimization initiated', 'info');
+    
     return new Promise((resolve) => {
       setTimeout(() => {
-        resolve({ 
+        const result = { 
           success: true, 
           message: 'Database optimization completed',
-          performanceGain: `${(Math.random() * 15 + 5).toFixed(1)}%`
-        });
+          performanceGain: `${(Math.random() * 15 + 5).toFixed(1)}%`,
+          duration: `${(Math.random() * 30 + 10).toFixed(1)}s`
+        };
+        
+        addSystemLog('DATABASE', `Database optimized: ${result.performanceGain} performance gain`, 'success');
+        resolve(result);
       }, 2000);
     });
   };
 
   const clearCache = async () => {
+    addSystemLog('SYSTEM', 'Cache clearance initiated', 'info');
+    
     return new Promise((resolve) => {
       setTimeout(() => {
-        resolve({ 
+        const result = { 
           success: true, 
           message: 'Cache cleared successfully',
-          clearedItems: Math.floor(Math.random() * 5000) + 1000
-        });
+          clearedItems: Math.floor(Math.random() * 5000) + 1000,
+          freedSpace: `${(Math.random() * 2 + 0.5).toFixed(2)} GB`
+        };
+        
+        addSystemLog('SYSTEM', `Cache cleared: ${result.clearedItems} items`, 'success');
+        resolve(result);
       }, 1000);
     });
   };
 
   const runSecurityScan = async () => {
+    addSystemLog('SECURITY', 'Security scan initiated', 'info');
+    
     return new Promise((resolve) => {
       setTimeout(() => {
         const threatsFound = Math.floor(Math.random() * 3);
-        resolve({ 
+        const result = { 
           success: true, 
           message: `Security scan completed - ${threatsFound} potential threats found`,
           threatsFound,
-          scanDuration: `${(Math.random() * 5 + 2).toFixed(1)}s`
-        });
+          scanDuration: `${(Math.random() * 5 + 2).toFixed(1)}s`,
+          scannedItems: Math.floor(Math.random() * 10000) + 5000
+        };
+        
+        addSystemLog('SECURITY', `Security scan completed: ${result.threatsFound} threats found`, 
+          threatsFound > 0 ? 'warning' : 'success');
+        resolve(result);
       }, 4000);
+    });
+  };
+
+  // NEW: Export system logs
+  const exportSystemLogs = async () => {
+    addSystemLog('SYSTEM', 'System logs export initiated', 'info');
+    
+    return new Promise((resolve) => {
+      setTimeout(() => {
+        const logData = {
+          exportTimestamp: new Date(),
+          logCount: systemLogs.length,
+          logs: systemLogs,
+          systemInfo: {
+            metrics: systemMetrics,
+            settings: settings,
+            maintenance: maintenance
+          }
+        };
+        
+        const blob = new Blob([JSON.stringify(logData, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        
+        addSystemLog('SYSTEM', `System logs exported: ${systemLogs.length} entries`, 'success');
+        resolve({
+          success: true,
+          url,
+          filename: `system-logs-${new Date().toISOString().split('T')[0]}.json`
+        });
+      }, 2000);
     });
   };
 
@@ -419,6 +525,7 @@ export const SystemSettingsProvider = ({ children }) => {
     systemMetrics,
     securityAlerts,
     maintenance,
+    systemLogs,
     isLoading,
     backendAvailable,
     updateSetting,
@@ -431,10 +538,12 @@ export const SystemSettingsProvider = ({ children }) => {
     optimizeDatabase,
     clearCache,
     runSecurityScan,
+    exportSystemLogs,
     resolveSecurityAlert,
     blockUser,
     blockIP,
-    checkSystemHealth: checkBackendAvailability
+    checkSystemHealth: checkBackendAvailability,
+    addSystemLog
   };
 
   return (

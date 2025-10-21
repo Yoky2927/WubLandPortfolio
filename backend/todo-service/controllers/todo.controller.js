@@ -1,3 +1,4 @@
+// todo-service/controllers/todo.controller.js
 import Todo from "../models/todo.model.js";
 
 export const getTodos = async (req, res) => {
@@ -10,19 +11,46 @@ export const getTodos = async (req, res) => {
   }
 };
 
+export const getUserTodos = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const todos = await Todo.getByUser(userId);
+    res.json(todos);
+  } catch (error) {
+    console.error("Error fetching user todos:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
 export const createTodo = async (req, res) => {
   try {
-    const { text, completed, dueDate, assignee } = req.body;
-    const created_by = req.user.username; // Now using username
+    const { 
+      title, 
+      description, 
+      category, 
+      priority, 
+      dueDate, 
+      estimatedHours,
+      assignedTo,
+      department 
+    } = req.body;
+    
+    const created_by = req.user.id; // Use user ID instead of username
+    const user_id = req.user.id;
 
-    console.log('Creating todo with username:', created_by);
+    console.log('Creating todo for user ID:', user_id);
 
     const newTodo = await Todo.create({
-      text,
-      completed,
+      title,
+      description,
+      user_id,
+      category: category || 'other',
+      priority: priority || 'medium',
       due_date: dueDate,
-      assignee,
-      created_by, // This is now the username string
+      estimated_hours: estimatedHours,
+      assigned_to: assignedTo,
+      created_by: created_by,
+      department: department || 'administration'
     });
 
     // Emit WebSocket event
@@ -34,16 +62,40 @@ export const createTodo = async (req, res) => {
     res.status(201).json(newTodo);
   } catch (error) {
     console.error("Error creating todo:", error);
-    res.status(500).json({ message: "Server error" });
+    res.status(500).json({ message: "Server error", error: error.message });
   }
 };
 
 export const updateTodo = async (req, res) => {
   try {
     const { id } = req.params;
-    const { completed } = req.body;
+    const { 
+      title, 
+      description, 
+      category, 
+      priority, 
+      status, 
+      dueDate, 
+      estimatedHours,
+      actualHours,
+      assignedTo,
+      department,
+      completed
+    } = req.body;
     
-    const updatedTodo = await Todo.update(id, { completed });
+    const updatedTodo = await Todo.update(id, { 
+      title, 
+      description, 
+      category, 
+      priority, 
+      status, 
+      due_date: dueDate,
+      estimated_hours: estimatedHours,
+      actual_hours: actualHours,
+      assigned_to: assignedTo,
+      department,
+      completed
+    });
 
     // Emit WebSocket event after successful update
     const io = req.app.get("socketio");

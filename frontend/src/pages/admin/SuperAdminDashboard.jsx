@@ -273,7 +273,7 @@ const CreateUserModal = ({
     if (name === "password") {
       checkPasswordStrength(value);
     }
-    if (name === "role" && value !== "broker") {
+    if (name === "role" && !value.includes('broker')) {
       setNewUser((prev) => ({ ...prev, broker_type: "" }));
     }
   };
@@ -285,17 +285,11 @@ const CreateUserModal = ({
 
   const availableRoles = isSuperAdmin
     ? [
-        "super_admin",
-        "admin",
-        "support_lead",
-        "support_agent",
-        "broker",
-        "buyer",
-        "seller",
-        "renter",
-        "user",
+        "super_admin", "admin", "support_admin", "support_lead", 
+        "support_agent", "internal_broker", "external_broker", 
+        "buyer", "seller", "landlord", "renter", "user"
       ]
-    : ["admin", "support_agent", "broker", "buyer", "seller", "renter", "user"];
+    : ["admin", "support_agent", "internal_broker", "external_broker", "buyer", "seller", "landlord", "renter", "user"];
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
@@ -400,6 +394,24 @@ const CreateUserModal = ({
             value={newUser.phone}
             onChange={handleInputChange}
           />
+          
+          {/* Privilege Tier Selection */}
+          <select
+            name="privilege_tier"
+            value={newUser.privilege_tier}
+            onChange={handleInputChange}
+            className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-400 transition-colors ${
+              theme === "dark"
+                ? "bg-gray-700 border-gray-600 text-white"
+                : "bg-white border-gray-300 text-gray-900"
+            }`}
+          >
+            <option value="basic">Basic</option>
+            <option value="standard">Standard</option>
+            <option value="premium">Premium</option>
+            <option value="enterprise">Enterprise</option>
+          </select>
+
           <select
             name="role"
             value={newUser.role}
@@ -420,7 +432,9 @@ const CreateUserModal = ({
               </option>
             ))}
           </select>
-          {newUser.role === "broker" && (
+
+          {/* Broker Type Selection */}
+          {newUser.role.includes('broker') && (
             <select
               name="broker_type"
               value={newUser.broker_type}
@@ -430,12 +444,13 @@ const CreateUserModal = ({
                   ? "bg-gray-700 border-gray-600 text-white"
                   : "bg-white border-gray-300 text-gray-900"
               }`}
-              required
+              required={newUser.role.includes('broker')}
             >
-              <option value="external">External</option>
-              <option value="internal">Internal</option>
+              <option value="internal">Internal Broker</option>
+              <option value="external">External Broker</option>
             </select>
           )}
+
           <div className="flex gap-3 justify-end pt-2">
             <button
               type="button"
@@ -454,7 +469,7 @@ const CreateUserModal = ({
               disabled={
                 newUser.password.length < 8 ||
                 passwordStrength < 50 ||
-                (newUser.role === "broker" && !newUser.broker_type)
+                (newUser.role.includes('broker') && !newUser.broker_type)
               }
             >
               Create User
@@ -480,7 +495,7 @@ const EditUserModal = ({
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     setEditUser((prev) => ({ ...prev, [name]: value }));
-    if (name === "role" && value !== "broker") {
+    if (name === "role" && !value.includes('broker')) {
       setEditUser((prev) => ({ ...prev, broker_type: "" }));
     }
   };
@@ -493,17 +508,11 @@ const EditUserModal = ({
 
   const availableRoles = isSuperAdmin
     ? [
-        "super_admin",
-        "admin",
-        "support_lead",
-        "support_agent",
-        "broker",
-        "buyer",
-        "seller",
-        "renter",
-        "user",
+        "super_admin", "admin", "support_admin", "support_lead", 
+        "support_agent", "internal_broker", "external_broker", 
+        "buyer", "seller", "landlord", "renter", "user"
       ]
-    : ["admin", "support_agent", "broker", "buyer", "seller", "renter", "user"];
+    : ["admin", "support_agent", "internal_broker", "external_broker", "buyer", "seller", "landlord", "renter", "user"];
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
@@ -522,6 +531,24 @@ const EditUserModal = ({
           Edit User
         </h3>
         <form onSubmit={handleSave} className="space-y-4">
+          {/* Privilege Tier Selection */}
+          <select
+            name="privilege_tier"
+            value={editUser.privilege_tier || ''}
+            onChange={handleInputChange}
+            className={`w-full px-3 py-2 border rounded-lg ${
+              theme === "dark"
+                ? "bg-gray-700 border-gray-600 text-white"
+                : "bg-white border-gray-300 text-gray-900"
+            }`}
+            required
+          >
+            <option value="basic">Basic</option>
+            <option value="standard">Standard</option>
+            <option value="premium">Premium</option>
+            <option value="enterprise">Enterprise</option>
+          </select>
+
           <select
             name="role"
             value={editUser.role || ""}
@@ -542,7 +569,9 @@ const EditUserModal = ({
               </option>
             ))}
           </select>
-          {editUser.role === "broker" && (
+
+          {/* Broker Type Selection */}
+          {editUser.role && editUser.role.includes('broker') && (
             <select
               name="broker_type"
               value={editUser.broker_type || ""}
@@ -554,10 +583,11 @@ const EditUserModal = ({
               }`}
               required
             >
-              <option value="external">External</option>
-              <option value="internal">Internal</option>
+              <option value="internal">Internal Broker</option>
+              <option value="external">External Broker</option>
             </select>
           )}
+
           <select
             name="status"
             value={editUser.status || ""}
@@ -593,6 +623,185 @@ const EditUserModal = ({
             </button>
           </div>
         </form>
+      </div>
+    </div>
+  );
+};
+
+const UserPrivilegesModal = ({
+  isOpen,
+  onClose,
+  selectedUser,
+  theme,
+  userPrivileges,
+  setUserPrivileges,
+  updateUserPrivileges
+}) => {
+  if (!isOpen || !selectedUser) return null;
+
+  const handlePrivilegeChange = (privilegeKey, value) => {
+    setUserPrivileges(prev => ({
+      ...prev,
+      [privilegeKey]: value
+    }));
+  };
+
+  const handleSavePrivileges = async () => {
+    try {
+      await updateUserPrivileges(selectedUser.id, userPrivileges);
+      onClose();
+    } catch (error) {
+      console.error('Error updating privileges:', error);
+    }
+  };
+
+  const privilegeOptions = {
+    properties: {
+      manage: ['create', 'read', 'update', 'delete', 'bulk_upload', 'list_directly', 'feature'],
+      limits: ['max_listings', 'max_images', 'max_featured']
+    },
+    communication: {
+      chat: ['unlimited_messages', 'initiate_chats', 'group_chats', 'file_sharing'],
+      limits: ['max_active_chats', 'daily_message_limit']
+    },
+    analytics: ['basic_reports', 'advanced_reports', 'market_trends', 'competitor_analysis']
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div className={`p-6 rounded-xl shadow-xl border max-w-2xl w-full max-h-[90vh] overflow-y-auto ${
+        theme === "dark" ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"
+      }`}>
+        <div className="flex justify-between items-center mb-6">
+          <h3 className={`text-xl font-bold ${theme === "dark" ? "text-white" : "text-gray-900"}`}>
+            Manage Privileges - {selectedUser.first_name} {selectedUser.last_name}
+          </h3>
+          <button
+            onClick={onClose}
+            className={`p-2 rounded-lg ${
+              theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-200"
+            }`}
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        <div className="space-y-6">
+          {/* Property Privileges */}
+          <div className={`p-4 rounded-lg ${
+            theme === "dark" ? "bg-gray-700" : "bg-gray-100"
+          }`}>
+            <h4 className={`font-semibold mb-3 ${theme === "dark" ? "text-white" : "text-gray-900"}`}>
+              Property Management
+            </h4>
+            <div className="grid grid-cols-2 gap-3">
+              {privilegeOptions.properties.manage.map(permission => (
+                <label key={permission} className="flex items-center space-x-2">
+                  <input
+                    type="checkbox"
+                    checked={userPrivileges?.properties?.manage?.includes(permission) || false}
+                    onChange={(e) => {
+                      const current = userPrivileges?.properties?.manage || [];
+                      const updated = e.target.checked
+                        ? [...current, permission]
+                        : current.filter(p => p !== permission);
+                      handlePrivilegeChange('properties', {
+                        ...userPrivileges?.properties,
+                        manage: updated
+                      });
+                    }}
+                    className="rounded border-gray-300 text-amber-500 focus:ring-amber-500"
+                  />
+                  <span className={`text-sm ${theme === "dark" ? "text-gray-300" : "text-gray-700"}`}>
+                    {permission.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')}
+                  </span>
+                </label>
+              ))}
+            </div>
+          </div>
+
+          {/* Communication Privileges */}
+          <div className={`p-4 rounded-lg ${
+            theme === "dark" ? "bg-gray-700" : "bg-gray-100"
+          }`}>
+            <h4 className={`font-semibold mb-3 ${theme === "dark" ? "text-white" : "text-gray-900"}`}>
+              Communication
+            </h4>
+            <div className="grid grid-cols-2 gap-3">
+              {privilegeOptions.communication.chat.map(feature => (
+                <label key={feature} className="flex items-center space-x-2">
+                  <input
+                    type="checkbox"
+                    checked={userPrivileges?.communication?.chat?.includes(feature) || false}
+                    onChange={(e) => {
+                      const current = userPrivileges?.communication?.chat || [];
+                      const updated = e.target.checked
+                        ? [...current, feature]
+                        : current.filter(f => f !== feature);
+                      handlePrivilegeChange('communication', {
+                        ...userPrivileges?.communication,
+                        chat: updated
+                      });
+                    }}
+                    className="rounded border-gray-300 text-amber-500 focus:ring-amber-500"
+                  />
+                  <span className={`text-sm ${theme === "dark" ? "text-gray-300" : "text-gray-700"}`}>
+                    {feature.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')}
+                  </span>
+                </label>
+              ))}
+            </div>
+          </div>
+
+          {/* Analytics Privileges */}
+          <div className={`p-4 rounded-lg ${
+            theme === "dark" ? "bg-gray-700" : "bg-gray-100"
+          }`}>
+            <h4 className={`font-semibold mb-3 ${theme === "dark" ? "text-white" : "text-gray-900"}`}>
+              Analytics & Reports
+            </h4>
+            <div className="grid grid-cols-2 gap-3">
+              {privilegeOptions.analytics.map(feature => (
+                <label key={feature} className="flex items-center space-x-2">
+                  <input
+                    type="checkbox"
+                    checked={userPrivileges?.analytics?.includes(feature) || false}
+                    onChange={(e) => {
+                      const current = userPrivileges?.analytics || [];
+                      const updated = e.target.checked
+                        ? [...current, feature]
+                        : current.filter(f => f !== feature);
+                      handlePrivilegeChange('analytics', updated);
+                    }}
+                    className="rounded border-gray-300 text-amber-500 focus:ring-amber-500"
+                  />
+                  <span className={`text-sm ${theme === "dark" ? "text-gray-300" : "text-gray-700"}`}>
+                    {feature.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')}
+                  </span>
+                </label>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        <div className="flex gap-3 justify-end mt-6">
+          <button
+            onClick={onClose}
+            className={`px-4 py-2 rounded-lg ${
+              theme === "dark"
+                ? "bg-gray-700 text-white hover:bg-gray-600"
+                : "bg-gray-200 text-gray-800 hover:bg-gray-300"
+            }`}
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleSavePrivileges}
+            className="px-4 py-2 bg-amber-500 text-white rounded-lg hover:bg-amber-600"
+          >
+            Save Privileges
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -781,6 +990,7 @@ const SuperAdminDashboard = () => {
     email: "",
     password: "",
     role: "admin",
+    privilege_tier: "basic",
     phone: "",
     status: "active",
     broker_type: "external",
@@ -796,6 +1006,9 @@ const SuperAdminDashboard = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isAuthorized, setIsAuthorized] = useState(false);
   const [recentActivities, setRecentActivities] = useState([]);
+  const [showPrivilegesModal, setShowPrivilegesModal] = useState(false);
+  const [userPrivileges, setUserPrivileges] = useState({});
+  const [privilegeTemplates, setPrivilegeTemplates] = useState([]);
   const calendarRef = useRef(null);
   const navigate = useNavigate();
   const [showNotifications, setShowNotifications] = useState(false);
@@ -1270,7 +1483,7 @@ const SuperAdminDashboard = () => {
 
   const { lineChartData, radarChartData } = getChartData();
 
- useEffect(() => {
+  useEffect(() => {
     const abortController = new AbortController();
     const fetchUserData = async () => {
       try {
@@ -1334,13 +1547,13 @@ const SuperAdminDashboard = () => {
         } else {
           console.log("❌ API check failed, redirecting to login");
           localStorage.removeItem("token");
-          navigate("/login-register"); // FIXED: Changed from "/login" to "/login-register"
+          navigate("/login-register");
         }
       } catch (error) {
         if (error.name === "AbortError") return;
         console.error("💥 Error fetching user data:", error);
         localStorage.removeItem("token");
-        navigate("/login-register"); // FIXED: Changed from "/login" to "/login-register"
+        navigate("/login-register");
       }
     };
 
@@ -1440,7 +1653,7 @@ const SuperAdminDashboard = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [user?.id]); // Added 'user?.id' to dependency array
+  }, [user?.id]);
 
   useEffect(() => {
     if (isAuthorized && user) {
@@ -1460,12 +1673,53 @@ const SuperAdminDashboard = () => {
     };
   }, []);
 
+  // Privilege management functions
+  const updateUserPrivileges = async (userId, privileges) => {
+    try {
+      const token = localStorage.getItem("token");
+      const response = await fetch(`http://localhost:5000/api/users/${userId}/privileges`, {
+        method: "PUT",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ privileges }),
+      });
+
+      if (response.ok) {
+        alert("Privileges updated successfully!");
+        fetchData(); // Refresh user data
+      } else {
+        alert("Failed to update privileges");
+      }
+    } catch (error) {
+      console.error("Error updating privileges:", error);
+      alert("Error updating privileges");
+    }
+  };
+
+  const fetchPrivilegeTemplates = async () => {
+    try {
+      const token = localStorage.getItem("token");
+      const response = await fetch("http://localhost:5000/api/privilege-templates", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      
+      if (response.ok) {
+        const templates = await response.json();
+        setPrivilegeTemplates(templates);
+      }
+    } catch (error) {
+      console.error("Error fetching privilege templates:", error);
+    }
+  };
+
   const createUser = async () => {
     if (newUser.password.length < 8) {
       alert("Password must be at least 8 characters long");
       return;
     }
-    if (newUser.role === "broker" && !newUser.broker_type) {
+    if (newUser.role.includes('broker') && !newUser.broker_type) {
       alert("Broker type is required for brokers");
       return;
     }
@@ -1485,10 +1739,11 @@ const SuperAdminDashboard = () => {
         email: newUser.email,
         password: newUser.password,
         role: newUser.role,
+        privilege_tier: newUser.privilege_tier,
         phone: newUser.phone,
       };
 
-      if (newUser.role === "broker") {
+      if (newUser.role.includes('broker')) {
         payload.broker_type = newUser.broker_type;
       }
 
@@ -1597,6 +1852,7 @@ const SuperAdminDashboard = () => {
       email: "",
       password: "",
       role: "admin",
+      privilege_tier: "basic",
       phone: "",
       status: "active",
       broker_type: "external",
@@ -1611,8 +1867,9 @@ const SuperAdminDashboard = () => {
       const payload = {
         userId: userToUpdate.id,
         newRole: userToUpdate.role,
+        privilege_tier: userToUpdate.privilege_tier,
       };
-      if (userToUpdate.role === "broker") {
+      if (userToUpdate.role.includes('broker')) {
         payload.broker_type = userToUpdate.broker_type;
       }
       const roleResponse = await fetch("http://localhost:5000/api/auth/role", {
@@ -1814,6 +2071,22 @@ const SuperAdminDashboard = () => {
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
     return userDate > sevenDaysAgo;
   }).length;
+
+  // Role colors mapping with new roles
+  const roleColors = {
+    super_admin: "bg-red-500",
+    admin: "bg-purple-500",
+    support_admin: "bg-indigo-500",
+    support_lead: "bg-blue-500",
+    support_agent: "bg-cyan-500",
+    internal_broker: "bg-amber-500",
+    external_broker: "bg-orange-500",
+    buyer: "bg-green-500",
+    seller: "bg-yellow-500",
+    landlord: "bg-teal-500",
+    renter: "bg-pink-500",
+    user: "bg-gray-500",
+  };
 
   const renderContent = () => {
     if (isLoading) {
@@ -2208,7 +2481,7 @@ const SuperAdminDashboard = () => {
                     placeholder="Search users..."
                     className={`w-full pl-10 pr-4 py-3 border rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent transition-all duration-300 ${
                       theme === "dark"
-                        ? "bg-gray-700 textwhite border-gray-600 placeholder-gray-400"
+                        ? "bg-gray-700 text-white border-gray-600 placeholder-gray-400"
                         : "bg-white text-black border-gray-300 placeholder-gray-500"
                     }`}
                     value={searchTerm}
@@ -2246,8 +2519,11 @@ const SuperAdminDashboard = () => {
                         "Username",
                         "Email",
                         "Role",
+                        "Privilege Tier",
                         "Broker Type",
                         "Status",
+                        "Verified",
+                        "Message Count",
                         "Joined",
                         "Actions",
                       ].map((header) => (
@@ -2267,19 +2543,7 @@ const SuperAdminDashboard = () => {
                       const initials = `${userItem.first_name?.[0] || ""}${
                         userItem.last_name?.[0] || ""
                       }`.toUpperCase();
-                      const roleColors = {
-                        super_admin: "bg-red-500",
-                        admin: "bg-purple-500",
-                        support_lead: "bg-indigo-500",
-                        support_agent: "bg-blue-500",
-                        broker: "bg-amber-500",
-                        buyer: "bg-green-500",
-                        seller: "bg-yellow-500",
-                        renter: "bg-pink-500",
-                        user: "bg-gray-500",
-                      };
-                      const colorClass =
-                        roleColors[userItem.role] || "bg-gray-500";
+                      const colorClass = roleColors[userItem.role] || "bg-gray-500";
 
                       return (
                         <tr
@@ -2374,7 +2638,21 @@ const SuperAdminDashboard = () => {
                               theme === "dark" ? "text-white" : "text-black"
                             }`}
                           >
-                            {userItem.role === "broker"
+                            <span className={`px-3 py-1 rounded-full text-xs font-medium capitalize ${
+                              userItem.privilege_tier === 'premium' ? 'bg-purple-100 text-purple-800' :
+                              userItem.privilege_tier === 'standard' ? 'bg-blue-100 text-blue-800' :
+                              userItem.privilege_tier === 'enterprise' ? 'bg-green-100 text-green-800' :
+                              'bg-gray-100 text-gray-800'
+                            }`}>
+                              {userItem.privilege_tier || 'basic'}
+                            </span>
+                          </td>
+                          <td
+                            className={`px-6 py-4 ${
+                              theme === "dark" ? "text-white" : "text-black"
+                            }`}
+                          >
+                            {userItem.role.includes('broker')
                               ? userItem.broker_type || "N/A"
                               : "N/A"}
                           </td>
@@ -2394,6 +2672,24 @@ const SuperAdminDashboard = () => {
                             >
                               {userItem.status}
                             </span>
+                          </td>
+                          <td
+                            className={`px-6 py-4 ${
+                              theme === "dark" ? "text-white" : "text-black"
+                            }`}
+                          >
+                            <span className={`px-3 py-1 rounded-full text-xs font-medium ${
+                              userItem.verified ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-800"
+                            }`}>
+                              {userItem.verified ? "Yes" : "No"}
+                            </span>
+                          </td>
+                          <td
+                            className={`px-6 py-4 ${
+                              theme === "dark" ? "text-white" : "text-black"
+                            }`}
+                          >
+                            {userItem.message_count || 0}
                           </td>
                           <td
                             className={`px-6 py-4 ${
@@ -2456,6 +2752,17 @@ const SuperAdminDashboard = () => {
                                     }
                                   >
                                     <Edit size={16} />
+                                  </button>
+                                  <button
+                                    className="p-2 rounded-lg bg-purple-100 text-purple-600 hover:bg-purple-200 transition-all duration-300 transform hover:scale-110"
+                                    title="Manage Privileges"
+                                    onClick={() => {
+                                      setSelectedUser(userItem);
+                                      setUserPrivileges(userItem.feature_flags || {});
+                                      setShowPrivilegesModal(true);
+                                    }}
+                                  >
+                                    <Key size={16} />
                                   </button>
                                   {userItem.role !== "super_admin" && (
                                     <button
@@ -2804,7 +3111,8 @@ const SuperAdminDashboard = () => {
                       <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center backdrop-blur-sm">
                         {unreadCount}
                       </span>
-                    )}
+                    )
+                    }
                   </button>
                   {showNotifications && (
                     <div
@@ -2948,6 +3256,15 @@ const SuperAdminDashboard = () => {
         theme={theme}
         updateUser={updateUser}
         isSuperAdmin={true}
+      />
+      <UserPrivilegesModal
+        isOpen={showPrivilegesModal}
+        onClose={() => setShowPrivilegesModal(false)}
+        selectedUser={selectedUser}
+        theme={theme}
+        userPrivileges={userPrivileges}
+        setUserPrivileges={setUserPrivileges}
+        updateUserPrivileges={updateUserPrivileges}
       />
       <ConfirmationModal
         isOpen={showActionModal && actionType !== "edit"}

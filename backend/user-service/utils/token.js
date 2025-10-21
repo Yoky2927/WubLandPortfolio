@@ -1,4 +1,6 @@
+// utils/token.js
 import jwt from "jsonwebtoken";
+import privilegeService from '../services/privilege.service.js';
 
 export const generateToken = (user, res, expiresIn = '7d') => {
     console.log('User object passed to generateToken:', user);
@@ -14,11 +16,13 @@ export const generateToken = (user, res, expiresIn = '7d') => {
         };
         console.log('Generated Password Change Token Payload:', payload);
     } else {
-        // Regular user token
+        // Regular user token - DON'T call privilegeService here to avoid circular dependency
         payload = { 
             userId: user.id, 
             username: user.username,
-            role: user.role // ✅ CRITICAL!
+            role: user.role,
+            broker_type: user.broker_type,
+            privilege_tier: user.privilege_tier || 'basic'
         };
         console.log('Generated Regular Token Payload:', payload);
     }
@@ -28,7 +32,7 @@ export const generateToken = (user, res, expiresIn = '7d') => {
     // Only set cookie if response object is provided
     if (res) {
         res.cookie('jwt', token, {
-            maxAge: expiresIn === '1h' ? 60 * 60 * 1000 : 7 * 24 * 60 * 60 * 1000, // 1 hour or 7 days
+            maxAge: expiresIn === '1h' ? 60 * 60 * 1000 : 7 * 24 * 60 * 60 * 1000,
             httpOnly: true,
             sameSite: 'strict',
             secure: process.env.NODE_ENV !== 'development'

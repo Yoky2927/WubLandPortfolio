@@ -1,3 +1,4 @@
+// communication-service/models/user.model.js
 import db from "../../shared/db.js";
 import 'dotenv/config';
 
@@ -12,8 +13,12 @@ const User = {
                 throw new Error("excludeId is required");
             }
 
+            // Use safe query without is_premium column
             const [rows] = await db.execute(
-                'SELECT id, CONCAT(first_name, " ", last_name) AS full_name, email, profile_picture AS profile_pic, role, broker_type, is_premium, last_message_time FROM users WHERE id != ?',
+                `SELECT id, CONCAT(first_name, " ", last_name) AS full_name, email, 
+                        profile_picture AS profile_pic, role, broker_type, 
+                        privilege_tier, last_message_time 
+                 FROM users WHERE id != ?`,
                 [excludeId]
             );
             
@@ -28,11 +33,23 @@ const User = {
     findById: async (id) => {
         try {
             console.log("🔍 User.findById called with id:", id);
+            
+            // Use safe query without is_premium column
             const [rows] = await db.execute(
-                'SELECT id, CONCAT(first_name, " ", last_name) AS full_name, email, profile_picture AS profile_pic, role, broker_type, is_premium FROM users WHERE id = ?',
+                `SELECT id, CONCAT(first_name, " ", last_name) AS full_name, email, 
+                        profile_picture AS profile_pic, role, broker_type, 
+                        privilege_tier
+                 FROM users WHERE id = ?`,
                 [id]
             );
-            return rows[0];
+            
+            const user = rows[0];
+            if (user) {
+                // Calculate is_premium based on privilege_tier
+                user.is_premium = ['premium', 'enterprise'].includes(user.privilege_tier);
+            }
+            
+            return user;
         } catch (error) {
             console.error("❌ Error in User.findById:", error.message);
             throw error;

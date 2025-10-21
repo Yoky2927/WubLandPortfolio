@@ -1,3 +1,4 @@
+// communication-service/models/chatMessage.model.js
 import db from "../../shared/db.js";
 import 'dotenv/config';
 

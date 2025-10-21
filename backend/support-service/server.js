@@ -16,6 +16,8 @@ import faqRoutes from "./routes/FAQ.routes.js";
 import flagRoutes from "./routes/flag.routes.js";
 import activityRoutes from "./routes/activity.routes.js";
 import reviewRoutes from "./routes/review.routes.js";
+import brokerRoutes from "./routes/broker.routes.js";
+
 
 dotenv.config();
 
@@ -99,6 +101,7 @@ app.use("/api/support/faqs", faqRoutes);
 app.use("/api/support/flagged-content", authenticateToken, requireSupportAgent, flagRoutes);
 app.use("/api/support/activity", authenticateToken, requireSupportAgent, activityRoutes);
 app.use("/api/support/reviews", authenticateToken, requireSupportAgent, reviewRoutes);
+app.use("/api/support/brokers", authenticateToken, brokerRoutes);
 
 // Error handling middleware (must be last)
 app.use(notFound);

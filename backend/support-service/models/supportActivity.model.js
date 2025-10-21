@@ -1,7 +1,6 @@
 import db from "../../shared/db.js";
 
 export const SupportActivity = {
-  // Create activity log
   create: async (agentUsername, activityType, targetId, targetType, details = null) => {
     const [result] = await db.query(
       `INSERT INTO support_agent_activities (agent_username, activity_type, target_id, target_type, details, timestamp)
@@ -11,7 +10,6 @@ export const SupportActivity = {
     return result.insertId;
   },
 
-  // Get recent activities
   findRecent: async (limit = 10) => {
     const [activities] = await db.query(`
       SELECT * FROM support_agent_activities 
@@ -21,7 +19,6 @@ export const SupportActivity = {
     return activities;
   },
 
-  // Get activities by agent
   findByAgent: async (agentUsername, limit = 20) => {
     const [activities] = await db.query(`
       SELECT * FROM support_agent_activities 
@@ -29,6 +26,16 @@ export const SupportActivity = {
       ORDER BY timestamp DESC 
       LIMIT ?
     `, [agentUsername, limit]);
+    return activities;
+  },
+
+  // Add method to get activities by target
+  findByTarget: async (targetType, targetId) => {
+    const [activities] = await db.query(`
+      SELECT * FROM support_agent_activities 
+      WHERE target_type = ? AND target_id = ?
+      ORDER BY timestamp DESC
+    `, [targetType, targetId]);
     return activities;
   }
 };

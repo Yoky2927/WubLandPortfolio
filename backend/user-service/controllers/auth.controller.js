@@ -77,6 +77,7 @@ export const signup = async (req, res) => {
     if (password.length < 8)
       return res.status(400).json({ message: "Password must be 8+ chars" });
 
+    // Check if user already exists (even unverified ones)
     const existingUser = await User.findByEmail(email);
     if (existingUser)
       return res.status(400).json({ message: "Email already exists" });
@@ -101,19 +102,22 @@ export const signup = async (req, res) => {
       }
     }
 
+    // 🚨 FIXED: Proper broker type handling
     if (role === "broker") {
-      if (!broker_type || !["internal", "external"].includes(broker_type)) {
-        return res
-          .status(400)
-          .json({
-            message: "Invalid broker type. Must be 'internal' or 'external'",
-          });
-      }
-      finalBrokerType = broker_type;
-    } else {
-      if (role === "broker") {
-        // This conditional seems redundant based on the first one but kept for structure
+      // For public signup (no req.user), default to 'external'
+      if (!req.user) {
         finalBrokerType = "external";
+      } 
+      // For admin creation, validate the provided broker_type
+      else {
+        if (!broker_type || !["internal", "external"].includes(broker_type)) {
+          return res
+            .status(400)
+            .json({
+              message: "Invalid broker type. Must be 'internal' or 'external'",
+            });
+        }
+        finalBrokerType = broker_type;
       }
     }
 
@@ -123,12 +127,8 @@ export const signup = async (req, res) => {
 
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    let newUserId = null;
-
+    // 🚨 CRITICAL CHANGE: For public signup, don't create user in DB yet
     if (!req.user) {
-      // 🚨 CRITICAL CHANGE FOR PUBLIC SIGNUP 🚨
-      // User is only created in DB *after* email is successfully sent.
-
       // 1. Prepare Verification Token
       const emailVerificationToken = crypto.randomBytes(32).toString("hex");
       const expiryDate = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
@@ -136,16 +136,9 @@ export const signup = async (req, res) => {
         .toISOString()
         .slice(0, 19)
         .replace("T", " ");
-      const isEmailVerified = 0; // Public signup is unverified
 
-      // 2. ATTEMPT TO SEND EMAIL (Must pass, or code jumps to outer catch block)
-      await EmailService.sendVerificationEmail(
-        { email, fullName: `${firstName} ${lastName}` },
-        emailVerificationToken
-      );
-
-      // 3. IF EMAIL SUCCEEDS, THEN CREATE USER IN DB
-      const newUserResult = await User.create(
+      // 2. Create a temporary pending registration record instead of actual user
+      await createPendingRegistration(
         firstName,
         lastName,
         username,
@@ -153,25 +146,28 @@ export const signup = async (req, res) => {
         hashedPassword,
         role,
         finalBrokerType,
-        isEmailVerified,
         emailVerificationToken,
         emailVerificationExpires
       );
-      newUserId = newUserResult.insertId;
+
+      // 3. Send verification email
+      await EmailService.sendVerificationEmail(
+        { email, fullName: `${firstName} ${lastName}` },
+        emailVerificationToken
+      );
 
       // 4. Final Response for Public Signup
       return res.status(201).json({
         success: true,
         message:
-          "Registration successful. Please check your email to verify your account.",
+          "Registration initiated. Please check your email to verify your account and complete registration.",
         requiresVerification: true,
       });
     } else {
       // --- ADMIN CREATION LOGIC (No changes needed, auto-verified) ---
-
       const isEmailVerified = 1;
 
-      // Create user (passing verification details to the updated model function)
+      // Create user immediately for admin-created users
       const newUserResult = await User.create(
         firstName,
         lastName,
@@ -184,7 +180,7 @@ export const signup = async (req, res) => {
         null, // No token needed for admin-created, verified user
         null // No expiry needed for admin-created, verified user
       );
-      newUserId = newUserResult.insertId;
+      const newUserId = newUserResult.insertId;
 
       const createdUser = await User.findById(newUserId);
 
@@ -199,10 +195,20 @@ export const signup = async (req, res) => {
     }
   } catch (error) {
     // This catch block handles:
-    // 1. Database errors (e.g., duplicate key)
-    // 2. Validation errors (caught via early returns)
-    // 3. EmailService errors (if the sendVerificationEmail call above fails)
+    // 1. Database errors
+    // 2. Validation errors
+    // 3. EmailService errors
     console.error("signup error details:", error);
+    
+    // If email fails, delete any pending registration that might have been created
+    if (!req.user) {
+      try {
+        await deletePendingRegistration(email);
+      } catch (deleteError) {
+        console.error("Error cleaning up pending registration:", deleteError);
+      }
+    }
+    
     res
       .status(500)
       .json({ message: "Internal Server Error", details: error.message });
@@ -239,18 +245,17 @@ export const login = async (req, res) => {
       });
     }
 
-    // 🚨 ADD THE STRICTER VERIFICATION CHECK HERE 🚨
     // Check email verification (STRICTER VERSION)
     if (!user.is_email_verified && !user.verified) {
       return res.status(403).json({
         message:
           "Please verify your email before logging in. Check your inbox for the verification link.",
         requiresVerification: true,
-        email: user.email, // Include email so frontend can offer resend option
+        email: user.email,
       });
     }
 
-    // Check password (EXISTING CODE CONTINUES...)
+    // Check password
     const isValid = await bcrypt.compare(password, user.password);
     if (!isValid) {
       // Handle failed login attempt
@@ -326,8 +331,17 @@ export const login = async (req, res) => {
       });
     }
 
-    // Generate regular token for successful login
-    const token = generateToken(user, res);
+    // Generate regular token for successful login - FIXED: Don't pass the entire user object
+    const token = generateToken({
+      id: user.id,
+      username: user.username,
+      role: user.role,
+      broker_type: user.broker_type,
+      privilege_tier: user.privilege_tier
+    }, res);
+
+    // Update last login time
+    await User.updateLastLogin(user.id);
 
     res.json({
       success: true,
@@ -343,15 +357,34 @@ export const login = async (req, res) => {
         broker_type: user.broker_type,
         profile_picture: user.profile_picture,
         is_email_verified: user.is_email_verified || user.verified,
+        privilege_tier: user.privilege_tier,
+        // Add privilege info separately to avoid circular dependency
+        privileges: await getPrivilegeInfo(user)
       },
     });
   } catch (error) {
     console.error("login error:", error.message);
+    console.error("login error stack:", error.stack);
     res.status(500).json({ message: "Internal Server Error" });
   }
 };
 
-// NEW: Email verification endpoint
+// Helper function to get privilege info without circular dependency
+async function getPrivilegeInfo(user) {
+  try {
+    const privilegeService = await import('../services/privilege.service.js');
+    return privilegeService.default.getBasicPrivilegeInfo(user);
+  } catch (error) {
+    console.error("Error getting privilege info:", error);
+    return {
+      can_list_directly: ['internal_broker', 'external_broker', 'admin', 'super_admin'].includes(user.role),
+      can_make_requests: ['seller', 'landlord'].includes(user.role),
+      features: []
+    };
+  }
+}
+
+// NEW: Updated Email verification endpoint
 export const verifyEmail = async (req, res) => {
   try {
     const { token } = req.query;
@@ -363,36 +396,51 @@ export const verifyEmail = async (req, res) => {
       });
     }
 
-    const user = await User.findByVerificationToken(token);
-    if (!user) {
+    // 🚨 CRITICAL CHANGE: Find in pending registrations instead of users
+    const pendingRegistration = await getPendingRegistrationByToken(token);
+    if (!pendingRegistration) {
       return res.status(400).json({
         success: false,
         message: "Invalid or expired verification token",
       });
     }
 
-    // Verify the email
-    await User.verifyEmail(user.id);
+    // 🚨 CRITICAL CHANGE: Create the actual user account now
+    const newUserResult = await User.create(
+      pendingRegistration.first_name,
+      pendingRegistration.last_name,
+      pendingRegistration.username,
+      pendingRegistration.email,
+      pendingRegistration.password,
+      pendingRegistration.role,
+      pendingRegistration.broker_type,
+      1, // is_email_verified = 1 (verified)
+      null, // Clear token
+      null  // Clear expiry
+    );
 
-    // 🚨 CRITICAL FIX: Generate session token and log the user in automatically
-    const updatedUser = await User.findById(user.id);
-    const authToken = generateToken(updatedUser, res);
+    // Delete the pending registration
+    await deletePendingRegistration(pendingRegistration.email);
+
+    // Generate session token and log the user in automatically
+    const newUser = await User.findById(newUserResult.insertId);
+    const authToken = generateToken(newUser, res);
 
     res.json({
       success: true,
       message:
-        "Email verified successfully! You have been automatically logged in.",
+        "Email verified successfully! Your account has been created and you have been automatically logged in.",
       token: authToken,
       user: {
-        id: updatedUser.id,
-        first_name: updatedUser.first_name,
-        last_name: updatedUser.last_name,
-        fullName: `${updatedUser.first_name} ${updatedUser.last_name}`,
-        username: updatedUser.username,
-        email: updatedUser.email,
-        role: updatedUser.role,
-        broker_type: updatedUser.broker_type,
-        profile_picture: updatedUser.profile_picture,
+        id: newUser.id,
+        first_name: newUser.first_name,
+        last_name: newUser.last_name,
+        fullName: `${newUser.first_name} ${newUser.last_name}`,
+        username: newUser.username,
+        email: newUser.email,
+        role: newUser.role,
+        broker_type: newUser.broker_type,
+        profile_picture: newUser.profile_picture,
         is_email_verified: true,
       },
     });
@@ -405,7 +453,7 @@ export const verifyEmail = async (req, res) => {
   }
 };
 
-// NEW: Web verification endpoint for direct browser access
+// NEW: Updated Web verification endpoint
 export const verifyEmailWeb = async (req, res) => {
   try {
     const { token } = req.query;
@@ -416,19 +464,34 @@ export const verifyEmailWeb = async (req, res) => {
       );
     }
 
-    const user = await User.findByVerificationToken(token);
-    if (!user) {
+    // 🚨 CRITICAL CHANGE: Find in pending registrations instead of users
+    const pendingRegistration = await getPendingRegistrationByToken(token);
+    if (!pendingRegistration) {
       return res.redirect(
         `${process.env.CLIENT_URL}/verification-failed?reason=invalid_or_expired`
       );
     }
 
-    // Verify the email
-    await User.verifyEmail(user.id);
+    // 🚨 CRITICAL CHANGE: Create the actual user account now
+    const newUserResult = await User.create(
+      pendingRegistration.first_name,
+      pendingRegistration.last_name,
+      pendingRegistration.username,
+      pendingRegistration.email,
+      pendingRegistration.password,
+      pendingRegistration.role,
+      pendingRegistration.broker_type,
+      1, // is_email_verified = 1 (verified)
+      null, // Clear token
+      null  // Clear expiry
+    );
+
+    // Delete the pending registration
+    await deletePendingRegistration(pendingRegistration.email);
 
     // Generate session token
-    const updatedUser = await User.findById(user.id);
-    generateToken(updatedUser, res);
+    const newUser = await User.findById(newUserResult.insertId);
+    generateToken(newUser, res);
 
     // Redirect to success page or dashboard
     return res.redirect(`${process.env.CLIENT_URL}/dashboard?verified=true`);
@@ -939,3 +1002,68 @@ export const adminCreateUser = async (req, res) => {
       .json({ message: "Internal Server Error", details: error.message });
   }
 };
+
+// Helper function to create pending registration
+async function createPendingRegistration(
+  firstName,
+  lastName,
+  username,
+  email,
+  hashedPassword,
+  role,
+  broker_type,
+  emailVerificationToken,
+  emailVerificationExpires
+) {
+  try {
+    // Create a pending_registrations table or use a temporary storage
+    // For now, we'll store in a separate table
+    await db.query(
+      `INSERT INTO pending_registrations 
+       (first_name, last_name, username, email, password, role, broker_type, 
+        email_verification_token, email_verification_expires, created_at) 
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
+      [
+        firstName,
+        lastName,
+        username,
+        email,
+        hashedPassword,
+        role,
+        broker_type,
+        emailVerificationToken,
+        emailVerificationExpires,
+      ]
+    );
+    console.log("✅ Pending registration created for:", email);
+  } catch (error) {
+    console.error("Error creating pending registration:", error);
+    throw error;
+  }
+}
+
+// Helper function to delete pending registration
+async function deletePendingRegistration(email) {
+  try {
+    await db.query("DELETE FROM pending_registrations WHERE email = ?", [email]);
+    console.log("✅ Pending registration deleted for:", email);
+  } catch (error) {
+    console.error("Error deleting pending registration:", error);
+  }
+}
+
+// Helper function to get pending registration by token
+async function getPendingRegistrationByToken(token) {
+  try {
+    const [rows] = await db.query(
+      `SELECT * FROM pending_registrations 
+       WHERE email_verification_token = ? 
+       AND email_verification_expires > NOW()`,
+      [token]
+    );
+    return rows[0];
+  } catch (error) {
+    console.error("Error getting pending registration:", error);
+    return null;
+  }
+}

@@ -53,7 +53,7 @@ export const SystemSettingsProvider = ({ children }) => {
       const token = localStorage.getItem('token');
       
       // First check if analysis service is running
-      const healthResponse = await fetch('http://localhost:5004/api/system/health', {
+      const healthResponse = await fetch('http://localhost:5004/health', {
         headers: { 
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'

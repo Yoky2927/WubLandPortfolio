@@ -13,12 +13,20 @@ const User = {
                 throw new Error("excludeId is required");
             }
 
-            // Use safe query without is_premium column
+            // Get users who are not the current user
             const [rows] = await db.execute(
-                `SELECT id, CONCAT(first_name, " ", last_name) AS full_name, email, 
-                        profile_picture AS profile_pic, role, broker_type, 
-                        privilege_tier, last_message_time 
-                 FROM users WHERE id != ?`,
+                `SELECT 
+                    id, 
+                    CONCAT(first_name, " ", last_name) AS full_name, 
+                    email, 
+                    profile_picture AS profile_pic, 
+                    role, 
+                    privilege_tier, 
+                    last_message_time,
+                    created_at
+                 FROM users 
+                 WHERE id != ? AND status = 'active'
+                 ORDER BY first_name, last_name`,
                 [excludeId]
             );
             
@@ -34,18 +42,23 @@ const User = {
         try {
             console.log("🔍 User.findById called with id:", id);
             
-            // Use safe query without is_premium column
             const [rows] = await db.execute(
-                `SELECT id, CONCAT(first_name, " ", last_name) AS full_name, email, 
-                        profile_picture AS profile_pic, role, broker_type, 
-                        privilege_tier
-                 FROM users WHERE id = ?`,
+                `SELECT 
+                    id, 
+                    CONCAT(first_name, " ", last_name) AS full_name, 
+                    email, 
+                    profile_picture AS profile_pic, 
+                    role, 
+                    privilege_tier,
+                    last_message_time
+                 FROM users 
+                 WHERE id = ? AND status = 'active'`,
                 [id]
             );
             
             const user = rows[0];
             if (user) {
-                // Calculate is_premium based on privilege_tier
+                // Calculate is_premium based on privilege_tier for backward compatibility
                 user.is_premium = ['premium', 'enterprise'].includes(user.privilege_tier);
             }
             

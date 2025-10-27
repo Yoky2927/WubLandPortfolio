@@ -3,15 +3,18 @@ import React from 'react';
 import { Outlet } from 'react-router-dom';
 import { SystemSettingsProvider } from './contexts/SystemSettingsContext';
 import { ToastProvider } from './contexts/ToastContext';
+import { NavigationProvider } from './contexts/NavigationContext';
 import './index.css';
 
 function App() {
   return (
     <ToastProvider>
       <SystemSettingsProvider>
-        <div className="App">
+        <NavigationProvider>
+         <div className="App">
           <Outlet />
         </div>
+        </NavigationProvider>
       </SystemSettingsProvider>
     </ToastProvider>
   );

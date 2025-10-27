@@ -7,44 +7,50 @@ import App from "./App.jsx";
 import DocumentValidator from "./pages/shared/DocumentValidator.jsx";
 import LoginRegister from "./pages/public/LoginRegister.jsx";
 import Home from "./pages/public/Home.jsx";
+import Properties from "./pages/public/Properties.jsx";
 import DebugAuth from "./pages/public/DebugAuth.jsx";
 
 // Import dashboard pages
-import AdminDashboard from './pages/admin/AdminDashboard.jsx';
-import SupportAgentsDashboard from './pages/support/SupportAgentsDashboard.jsx';
-import SuperAdminDashboard from './pages/admin/SuperAdminDashboard.jsx';
-import MaintenancePage from './components/MaintenancePage';
+import AdminDashboard from "./pages/admin/AdminDashboard.jsx";
+import SupportAgentsDashboard from "./pages/support/SupportAgentsDashboard.jsx";
+import SuperAdminDashboard from "./pages/admin/SuperAdminDashboard.jsx";
+import MaintenancePage from "./components/MaintenancePage";
 
 // User Dashboard Component
 const UserDashboard = () => {
-  const token = localStorage.getItem('token');
-  let userInfo = { first_name: 'User', last_name: '', role: 'user' };
-  
+  const token = localStorage.getItem("token");
+  let userInfo = { first_name: "User", last_name: "", role: "user" };
+
   if (token) {
     try {
-      const payload = JSON.parse(atob(token.split('.')[1]));
+      const payload = JSON.parse(atob(token.split(".")[1]));
       userInfo = {
-        first_name: payload.first_name || 'User',
-        last_name: payload.last_name || '',
-        role: payload.role || 'user'
+        first_name: payload.first_name || "User",
+        last_name: payload.last_name || "",
+        role: payload.role || "user",
       };
     } catch (error) {
       console.error("Error decoding token:", error);
     }
   }
-  
+
   return (
     <div className="min-h-screen bg-gray-100 p-6">
       <h1 className="text-3xl font-bold">
         Welcome, {userInfo.first_name} {userInfo.last_name}!
       </h1>
-      <p className="text-lg mb-4">Your role is: <strong>{userInfo.role}</strong></p>
-      <p>This is your user dashboard. Specific features for your role will be available here.</p>
-      
-      <button 
+      <p className="text-lg mb-4">
+        Your role is: <strong>{userInfo.role}</strong>
+      </p>
+      <p>
+        This is your user dashboard. Specific features for your role will be
+        available here.
+      </p>
+
+      <button
         onClick={() => {
-          localStorage.removeItem('token');
-          window.location.href = '/';
+          localStorage.removeItem("token");
+          window.location.href = "/";
         }}
         className="mt-6 bg-amber-500 text-white px-4 py-2 rounded hover:bg-amber-600"
       >
@@ -56,10 +62,10 @@ const UserDashboard = () => {
 
 // IMPROVED Protected Route - Check token and extract role
 const ProtectedRoute = ({ children, requiredRole = null }) => {
-  const token = localStorage.getItem('token');
-  
+  const token = localStorage.getItem("token");
+
   console.log("🔐 ProtectedRoute - Token exists:", !!token);
-  
+
   if (!token) {
     console.log("🔐 No token, redirecting to login");
     return <Navigate to="/login-register" replace />;
@@ -68,19 +74,21 @@ const ProtectedRoute = ({ children, requiredRole = null }) => {
   // Decode token to get user info
   let userRole = null;
   try {
-    const payload = JSON.parse(atob(token.split('.')[1]));
+    const payload = JSON.parse(atob(token.split(".")[1]));
     userRole = payload.role;
     console.log("🔐 ProtectedRoute - User role from token:", userRole);
     console.log("🔐 ProtectedRoute - Full token payload:", payload);
   } catch (error) {
     console.error("❌ Error decoding token:", error);
-    localStorage.removeItem('token');
+    localStorage.removeItem("token");
     return <Navigate to="/login-register" replace />;
   }
 
   // Check if user has required role (if specified)
   if (requiredRole && userRole !== requiredRole) {
-    console.log(`🔐 Access DENIED - Required: ${requiredRole}, User has: ${userRole}`);
+    console.log(
+      `🔐 Access DENIED - Required: ${requiredRole}, User has: ${userRole}`
+    );
     return <Navigate to="/unauthorized" replace />;
   }
 
@@ -90,29 +98,29 @@ const ProtectedRoute = ({ children, requiredRole = null }) => {
 
 // Role-Based Route - Automatically redirects to correct dashboard
 const RoleBasedRoute = ({ children }) => {
-  const token = localStorage.getItem('token');
-  
+  const token = localStorage.getItem("token");
+
   if (!token) {
     return <Navigate to="/login-register" replace />;
   }
 
   try {
-    const payload = JSON.parse(atob(token.split('.')[1]));
+    const payload = JSON.parse(atob(token.split(".")[1]));
     const userRole = payload.role;
-    
+
     console.log("🔄 RoleBasedRoute - User role:", userRole);
-    
+
     // Redirect based on role
     switch (userRole) {
-      case 'super_admin':
+      case "super_admin":
         console.log("🔄 Redirecting to Super Admin Dashboard");
         return <Navigate to="/super-admin-dashboard" replace />;
-      case 'admin':
+      case "admin":
         console.log("🔄 Redirecting to Admin Dashboard");
         return <Navigate to="/admin-dashboard" replace />;
-      case 'support_agent':
-      case 'support_lead':
-      case 'support_admin':
+      case "support_agent":
+      case "support_lead":
+      case "support_admin":
         console.log("🔄 Redirecting to Support Dashboard");
         return <Navigate to="/support-dashboard" replace />;
       default:
@@ -121,25 +129,27 @@ const RoleBasedRoute = ({ children }) => {
     }
   } catch (error) {
     console.error("❌ Error decoding token in RoleBasedRoute:", error);
-    localStorage.removeItem('token');
+    localStorage.removeItem("token");
     return <Navigate to="/login-register" replace />;
   }
 };
 
 // Maintenance Wrapper Component
 const MaintenanceWrapper = ({ children }) => {
-  const maintenanceSettings = JSON.parse(localStorage.getItem('maintenanceSettings') || '{"enabled":false}');
-  
+  const maintenanceSettings = JSON.parse(
+    localStorage.getItem("maintenanceSettings") || '{"enabled":false}'
+  );
+
   // Get user role from token
   const getUserRole = () => {
-    const token = localStorage.getItem('token');
-    if (!token) return 'user';
-    
+    const token = localStorage.getItem("token");
+    if (!token) return "user";
+
     try {
-      const payload = JSON.parse(atob(token.split('.')[1]));
-      return payload.role || 'user';
+      const payload = JSON.parse(atob(token.split(".")[1]));
+      return payload.role || "user";
     } catch (error) {
-      return 'user';
+      return "user";
     }
   };
 
@@ -147,37 +157,42 @@ const MaintenanceWrapper = ({ children }) => {
 
   // Check if user can bypass maintenance
   const canUserBypassMaintenance = (role) => {
-    return role === 'super_admin' || role === 'admin';
+    return role === "super_admin" || role === "admin";
   };
 
   // If maintenance is active and user cannot bypass, show maintenance page
-  if (maintenanceSettings.enabled && !canUserBypassMaintenance(currentUserRole)) {
+  if (
+    maintenanceSettings.enabled &&
+    !canUserBypassMaintenance(currentUserRole)
+  ) {
     return <MaintenancePage theme="light" />;
   }
-  
+
   return children;
 };
 
 // Public Route with Maintenance Check
 const PublicRoute = ({ children }) => {
-  const maintenanceSettings = JSON.parse(localStorage.getItem('maintenanceSettings') || '{"enabled":false}');
-  
+  const maintenanceSettings = JSON.parse(
+    localStorage.getItem("maintenanceSettings") || '{"enabled":false}'
+  );
+
   // For public routes, only show maintenance page if user is logged in but not admin
-  const token = localStorage.getItem('token');
+  const token = localStorage.getItem("token");
   if (token && maintenanceSettings.enabled) {
     try {
-      const payload = JSON.parse(atob(token.split('.')[1]));
-      const userRole = payload.role || 'user';
-      
+      const payload = JSON.parse(atob(token.split(".")[1]));
+      const userRole = payload.role || "user";
+
       // Only show maintenance page to non-admin users
-      if (userRole !== 'super_admin' && userRole !== 'admin') {
+      if (userRole !== "super_admin" && userRole !== "admin") {
         return <MaintenancePage theme="light" />;
       }
     } catch (error) {
       // If token is invalid, allow access to public routes
     }
   }
-  
+
   return children;
 };
 
@@ -185,25 +200,29 @@ const PublicRoute = ({ children }) => {
 const UnauthorizedPage = () => (
   <div className="min-h-screen flex items-center justify-center bg-gray-100">
     <div className="text-center">
-      <h1 className="text-2xl font-bold text-red-600 mb-4">Unauthorized Access</h1>
-      <p className="text-gray-700 mb-4">You don't have permission to access this page.</p>
+      <h1 className="text-2xl font-bold text-red-600 mb-4">
+        Unauthorized Access
+      </h1>
+      <p className="text-gray-700 mb-4">
+        You don't have permission to access this page.
+      </p>
       <div className="space-x-4">
-        <button 
-          onClick={() => window.location.href = '/'}
+        <button
+          onClick={() => (window.location.href = "/")}
           className="bg-amber-500 text-white px-4 py-2 rounded hover:bg-amber-600"
         >
           Go Home
         </button>
-        <button 
-          onClick={() => window.location.href = '/debug-auth'}
+        <button
+          onClick={() => (window.location.href = "/debug-auth")}
           className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
         >
           Debug Auth
         </button>
-        <button 
+        <button
           onClick={() => {
-            localStorage.removeItem('token');
-            window.location.href = '/login-register';
+            localStorage.removeItem("token");
+            window.location.href = "/login-register";
           }}
           className="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600"
         >
@@ -222,21 +241,38 @@ function Router() {
         <SystemSettingsProvider>
           <Routes>
             {/* Public Routes with Maintenance Check */}
-            <Route path="/" element={
-              <PublicRoute>
-                <App />
-              </PublicRoute>
-            }>
-              <Route index element={
+            <Route
+              path="/"
+              element={
                 <PublicRoute>
-                  <Home />
+                  <App />
                 </PublicRoute>
-              } />
-              <Route path="login-register" element={
-                <PublicRoute>
-                  <LoginRegister />
-                </PublicRoute>
-              } />
+              }
+            >
+              <Route
+                index
+                element={
+                  <PublicRoute>
+                    <Home />
+                  </PublicRoute>
+                }
+              />
+              <Route
+                path="/properties"
+                element={
+                  <PublicRoute>
+                    <Properties />
+                  </PublicRoute>
+                }
+              />
+              <Route
+                path="login-register"
+                element={
+                  <PublicRoute>
+                    <LoginRegister />
+                  </PublicRoute>
+                }
+              />
             </Route>
 
             {/* Debug Route - Always accessible */}
@@ -246,51 +282,69 @@ function Router() {
             <Route path="/dashboard" element={<RoleBasedRoute />} />
 
             {/* Shared Routes with Maintenance Check */}
-            <Route path="/document-validator" element={
-              <MaintenanceWrapper>
-                <DocumentValidator />
-              </MaintenanceWrapper>
-            } />
+            <Route
+              path="/document-validator"
+              element={
+                <MaintenanceWrapper>
+                  <DocumentValidator />
+                </MaintenanceWrapper>
+              }
+            />
 
             {/* Dashboard Routes - ROLE-SPECIFIC PROTECTION + MAINTENANCE CHECK */}
-            <Route path="/super-admin-dashboard" element={
-              <ProtectedRoute requiredRole="super_admin">
-                <MaintenanceWrapper>
-                  <SuperAdminDashboard />
-                </MaintenanceWrapper>
-              </ProtectedRoute>
-            } />
+            <Route
+              path="/super-admin-dashboard"
+              element={
+                <ProtectedRoute requiredRole="super_admin">
+                  <MaintenanceWrapper>
+                    <SuperAdminDashboard />
+                  </MaintenanceWrapper>
+                </ProtectedRoute>
+              }
+            />
 
-            <Route path="/admin-dashboard" element={
-              <ProtectedRoute requiredRole="admin">
-                <MaintenanceWrapper>
-                  <AdminDashboard />
-                </MaintenanceWrapper>
-              </ProtectedRoute>
-            } />
+            <Route
+              path="/admin-dashboard"
+              element={
+                <ProtectedRoute requiredRole="admin">
+                  <MaintenanceWrapper>
+                    <AdminDashboard />
+                  </MaintenanceWrapper>
+                </ProtectedRoute>
+              }
+            />
 
-            <Route path="/support-dashboard" element={
-              <ProtectedRoute requiredRole="support_agent">
-                <MaintenanceWrapper>
-                  <SupportAgentsDashboard />
-                </MaintenanceWrapper>
-              </ProtectedRoute>
-            } />
+            <Route
+              path="/support-dashboard"
+              element={
+                <ProtectedRoute requiredRole="support_agent">
+                  <MaintenanceWrapper>
+                    <SupportAgentsDashboard />
+                  </MaintenanceWrapper>
+                </ProtectedRoute>
+              }
+            />
 
-            <Route path="/user-dashboard" element={
-              <ProtectedRoute>
-                <MaintenanceWrapper>
-                  <UserDashboard />
-                </MaintenanceWrapper>
-              </ProtectedRoute>
-            } />
-            
+            <Route
+              path="/user-dashboard"
+              element={
+                <ProtectedRoute>
+                  <MaintenanceWrapper>
+                    <UserDashboard />
+                  </MaintenanceWrapper>
+                </ProtectedRoute>
+              }
+            />
+
             {/* Error Routes - Always accessible */}
             <Route path="/unauthorized" element={<UnauthorizedPage />} />
-            
+
             {/* Maintenance Test Route - Direct access to maintenance page */}
-            <Route path="/maintenance-test" element={<MaintenancePage theme="light" />} />
-            
+            <Route
+              path="/maintenance-test"
+              element={<MaintenancePage theme="light" />}
+            />
+
             {/* Catch all route */}
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>

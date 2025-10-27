@@ -51,7 +51,7 @@
   /* Main card component with hover effects */
   .Cards {
     @apply shadow-xl overflow-hidden relative transition-all duration-500 hover:shadow-2xl hover:-translate-y-1;
-    @apply w-full max-w-xs mx-auto h-auto min-h-[450px] md:min-h-[500px] transition-transform duration-300 hover:scale-[1.02];
+    @apply w-full max-w-xs mx-auto h-auto min-h-[350px] md:min-h-[400px] transition-transform duration-300 hover:scale-[1.02];
     min-width: 280px;
   }
 

@@ -1,4 +1,4 @@
-# 🏠 WubLand Portfolio - Backend System
+# 🏠 WubLand Portfolio
 
 ## 👋 Welcome Team Members!
 

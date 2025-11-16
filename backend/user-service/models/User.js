@@ -1,4 +1,5 @@
 const { pool } = require('../shared/db');
+const bcrypt = require('bcrypt');
 
 class User {
     static async create({ email, password, role }) {

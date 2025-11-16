@@ -1,4 +1,4 @@
-const { pool } = require('../shared/db');
+const { pool } = require('../../shared/db');
 const bcrypt = require('bcrypt');
 
 class User {

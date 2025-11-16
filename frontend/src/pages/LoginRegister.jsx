@@ -1,11 +1,13 @@
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import FloatingElements from "../components/FloatingElements";
 import ThemeToggle from "../components/ThemeToggle.jsx";
 import { useState, useEffect } from 'react';
 import TermsModal from "../components/TermsModel.jsx";
 import Loader from "../components/Loader";
+import { userAPI } from '../utils/api';
 
 const LoginRegister = () => {
+    const navigate = useNavigate();
     const [isSignUpMode, setIsSignUpMode] = useState(false);
     const [theme, setTheme] = useState(() => localStorage.getItem('theme') || 'light');
     const [activeInput, setActiveInput] = useState(null);
@@ -21,12 +23,103 @@ const LoginRegister = () => {
     });
     const [showTermsModal, setShowTermsModal] = useState(false);
     const [acceptedTerms, setAcceptedTerms] = useState(false);
+    const [authError, setAuthError] = useState('');
+    const [authSuccess, setAuthSuccess] = useState('');
 
 // Add this function to handle terms acceptance
     const handleAcceptTerms = () => {
         setAcceptedTerms(true);
         setShowTermsModal(false);
         setFormData(prev => ({ ...prev, acceptedTerms: true }));
+    };
+
+    // Handle Login
+    const handleLogin = async (e) => {
+        e.preventDefault();
+        setAuthError('');
+        setAuthSuccess('');
+        setIsLoading(true);
+
+        try {
+            // Get email from username/email field
+            const email = formData.email || formData.username;
+            if (!email || !formData.password) {
+                setAuthError('Please enter email and password');
+                return;
+            }
+
+            const response = await userAPI.login(email, formData.password);
+            
+            if (response.data.token) {
+                setAuthSuccess('Login successful! Redirecting...');
+                // Redirect based on user role
+                setTimeout(() => {
+                    const user = JSON.parse(localStorage.getItem('user') || '{}');
+                    if (user.role === 'admin' || user.role === 'broker') {
+                        navigate('d/admin/dashboard');
+                    } else {
+                        navigate('/');
+                    }
+                }, 1000);
+            }
+        } catch (error) {
+            setAuthError(error.response?.data?.error || 'Login failed. Please check your credentials.');
+            console.error('Login error:', error);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    // Handle Register
+    const handleRegister = async (e) => {
+        e.preventDefault();
+        setAuthError('');
+        setAuthSuccess('');
+
+        // Validation
+        if (!formData.email || !formData.password || !formData.retypePassword) {
+            setAuthError('Please fill in all required fields');
+            return;
+        }
+
+        if (formData.password !== formData.retypePassword) {
+            setAuthError('Passwords do not match');
+            return;
+        }
+
+        if (!acceptedTerms) {
+            setAuthError('Please accept the terms and conditions');
+            return;
+        }
+
+        // Map account type to role
+        const roleMap = {
+            'Broker': 'broker',
+            'Seller': 'user',
+            'Buyer': 'user',
+            'Renter': 'user'
+        };
+        const role = roleMap[formData.accountType] || 'user';
+
+        setIsLoading(true);
+
+        try {
+            await userAPI.register(formData.email, formData.password, role);
+            setAuthSuccess('Registration successful! Please login.');
+            setTimeout(() => {
+                setIsSignUpMode(false);
+                setFormData({
+                    ...formData,
+                    email: formData.email,
+                    password: ''
+                });
+            }, 2000);
+        } catch (error) {
+            setAuthError(error.response?.data?.error || 'Registration failed. Please try again.');
+            console.error('Registration error:', error);
+        } finally {
+            setIsLoading(false);
+        }
     };
 
     useEffect(() => {
@@ -164,6 +257,7 @@ const LoginRegister = () => {
                 >
                     {/* Sign In Form */}
                     <form
+                        onSubmit={handleLogin}
                         className={`flex flex-col items-center justify-center px-6 sm:px-10 py-8 transition-all duration-300 ${
                             isSignUpMode ? 'opacity-0 pointer-events-none' : 'opacity-100'
                         }`}
@@ -174,7 +268,27 @@ const LoginRegister = () => {
                             Sign in
                         </h2>
 
-                        {/* Username */}
+                        {/* Error/Success Messages */}
+                        {authError && (
+                            <div className={`w-full max-w-xs sm:max-w-md p-3 mb-4 rounded-lg ${
+                                theme === 'dark' ? 'bg-red-900/30 border border-red-700' : 'bg-red-100 border border-red-300'
+                            }`}>
+                                <p className={`text-sm ${theme === 'dark' ? 'text-red-400' : 'text-red-700'}`}>
+                                    {authError}
+                                </p>
+                            </div>
+                        )}
+                        {authSuccess && (
+                            <div className={`w-full max-w-xs sm:max-w-md p-3 mb-4 rounded-lg ${
+                                theme === 'dark' ? 'bg-green-900/30 border border-green-700' : 'bg-green-100 border border-green-300'
+                            }`}>
+                                <p className={`text-sm ${theme === 'dark' ? 'text-green-400' : 'text-green-700'}`}>
+                                    {authSuccess}
+                                </p>
+                            </div>
+                        )}
+
+                        {/* Email/Username */}
                         <div
                             className={`w-full max-w-xs sm:max-w-md my-3 h-12 grid grid-cols-[15%_85%] px-3 transition-all duration-300 ${
                                 activeInput === 'retypePassword'
@@ -204,8 +318,12 @@ const LoginRegister = () => {
                                 </svg>
                             </div>
                             <input
-                                type="text"
-                                placeholder="Username"
+                                type="email"
+                                name="email"
+                                placeholder="Email"
+                                value={formData.email}
+                                onChange={handleInputChange}
+                                required
                                 className={`bg-transparent outline-none border-none text-sm font-semibold placeholder-gray-500 transition-colors duration-300 ${
                                     theme === 'light'
                                         ? 'text-gray-700'
@@ -245,7 +363,11 @@ const LoginRegister = () => {
                             </div>
                             <input
                                 type="password"
+                                name="password"
                                 placeholder="Password"
+                                value={formData.password}
+                                onChange={handleInputChange}
+                                required
                                 className={`bg-transparent outline-none border-none text-sm font-semibold placeholder-gray-500 transition-colors duration-300 ${
                                     theme === 'light'
                                         ? 'text-gray-700'
@@ -257,9 +379,10 @@ const LoginRegister = () => {
                         {/* Login Button */}
                         <button
                             type="submit"
-                            className="w-32 sm:w-36 bg-amber-500 h-12  text-white font-semibold uppercase my-4 cursor-pointer transition-all duration-300 hover:bg-amber-600 hover:scale-105 hover:shadow-lg"
+                            disabled={isLoading}
+                            className="w-32 sm:w-36 bg-amber-500 h-12 text-white font-semibold uppercase my-4 cursor-pointer transition-all duration-300 hover:bg-amber-600 hover:scale-105 hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
                         >
-                            Login
+                            {isLoading ? 'Loading...' : 'Login'}
                         </button>
 
                         {/* Socials */}
@@ -301,14 +424,37 @@ const LoginRegister = () => {
                     </form>
 
                     {/* Sign Up Form */}
-                    <form className={`absolute -top-10 left-0 w-full flex flex-col items-center justify-center px-6 sm:px-10 py-8 transition-all duration-300 ${
-                        isSignUpMode ? 'opacity-100 z-2 pointer-events-auto' : 'opacity-0 z-1 pointer-events-none'
-                    }`}>
+                    <form 
+                        onSubmit={handleRegister}
+                        className={`absolute -top-10 left-0 w-full flex flex-col items-center justify-center px-6 sm:px-10 py-8 transition-all duration-300 ${
+                            isSignUpMode ? 'opacity-100 z-2 pointer-events-auto' : 'opacity-0 z-1 pointer-events-none'
+                        }`}
+                    >
                         <h2 className={`text-2xl sm:text-3xl font-bold mb-4 transition-colors duration-300 ${
                             theme === 'light' ? 'text-amber-500' : 'text-white'
                         }`}>
                             Sign up
                         </h2>
+
+                        {/* Error/Success Messages */}
+                        {authError && (
+                            <div className={`w-full max-w-xs sm:max-w-md p-3 mb-4 rounded-lg ${
+                                theme === 'dark' ? 'bg-red-900/30 border border-red-700' : 'bg-red-100 border border-red-300'
+                            }`}>
+                                <p className={`text-sm ${theme === 'dark' ? 'text-red-400' : 'text-red-700'}`}>
+                                    {authError}
+                                </p>
+                            </div>
+                        )}
+                        {authSuccess && (
+                            <div className={`w-full max-w-xs sm:max-w-md p-3 mb-4 rounded-lg ${
+                                theme === 'dark' ? 'bg-green-900/30 border border-green-700' : 'bg-green-100 border border-green-300'
+                            }`}>
+                                <p className={`text-sm ${theme === 'dark' ? 'text-green-400' : 'text-green-700'}`}>
+                                    {authSuccess}
+                                </p>
+                            </div>
+                        )}
 
                         <div className="w-full max-w-xs sm:max-w-md grid grid-cols-2 gap-3">
                             {/* First Name */}

@@ -80,6 +80,7 @@ function Home() {
                                     <li><a href="#" className={`nav-link`}>Help</a></li>
                                     <li><Link to="/auth" onClick={handleSignInClick} className="nav-link active:cursor-wait">Sign In</Link></li>
                                     <li><button onClick={() => scrollToSection('AboutUs')} className="nav-link">About Us</button></li>
+                                    <li><Link to="/admin/dashboard" className="nav-link text-amber-400 hover:text-amber-500">👤 Admin (Demo)</Link></li>
                                 </ul>
                             </nav>
                         </div>

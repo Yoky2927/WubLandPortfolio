@@ -9,6 +9,7 @@ import LoginRegister from "./pages/public/LoginRegister.jsx";
 import Home from "./pages/public/Home.jsx";
 import Properties from "./pages/public/Properties.jsx";
 import DebugAuth from "./pages/public/DebugAuth.jsx";
+import SellerLeaser from "./pages/public/SellerLeaser.jsx"; // ADD THIS IMPORT
 
 // Import dashboard pages
 import AdminDashboard from "./pages/admin/AdminDashboard.jsx";
@@ -19,6 +20,7 @@ import MaintenancePage from "./components/MaintenancePage";
 // User Dashboard Component
 const UserDashboard = () => {
   const token = localStorage.getItem("token");
+  const navigate = useNavigate();
   let userInfo = { first_name: "User", last_name: "", role: "user" };
 
   if (token) {
@@ -32,6 +34,18 @@ const UserDashboard = () => {
     } catch (error) {
       console.error("Error decoding token:", error);
     }
+  }
+
+  // Redirect sellers and leasers to the seller-leaser page
+  useEffect(() => {
+    if (userInfo.role === 'seller' || userInfo.role === 'leaser') {
+      navigate('/seller-leaser', { replace: true });
+    }
+  }, [userInfo.role, navigate]);
+
+  // Only show this for buyers, renters, and generic users
+  if (userInfo.role === 'seller' || userInfo.role === 'leaser') {
+    return null; // They'll be redirected
   }
 
   return (
@@ -50,6 +64,7 @@ const UserDashboard = () => {
       <button
         onClick={() => {
           localStorage.removeItem("token");
+          localStorage.removeItem("user");
           window.location.href = "/";
         }}
         className="mt-6 bg-amber-500 text-white px-4 py-2 rounded hover:bg-amber-600"
@@ -270,6 +285,15 @@ function Router() {
                 element={
                   <PublicRoute>
                     <LoginRegister />
+                  </PublicRoute>
+                }
+              />
+              {/* ADD SELLER-LEASER ROUTE HERE */}
+              <Route
+                path="seller-leaser"
+                element={
+                  <PublicRoute>
+                    <SellerLeaser />
                   </PublicRoute>
                 }
               />

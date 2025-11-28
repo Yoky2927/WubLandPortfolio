@@ -783,6 +783,29 @@ export const systemConfigurations = [
   },
 ];
 
+// Ensure brokers are seeded with `is_available: true`
+const brokers = [
+  {
+    name: 'John Doe',
+    specialization: 'Residential',
+    location: 'New York',
+    broker_type: 'internal',
+    is_available: true,
+  },
+  {
+    name: 'Jane Smith',
+    specialization: 'Commercial',
+    location: 'Los Angeles',
+    broker_type: 'external',
+    is_available: true,
+  },
+];
+
+// Insert brokers into the database
+brokers.forEach(async (broker) => {
+  await Broker.upsertBrokerProfile(broker);
+});
+
 export default {
   users,
   todos,

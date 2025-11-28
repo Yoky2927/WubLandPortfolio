@@ -1,6 +1,8 @@
 // frontend/src/data/sampleProperties.js
+import { sampleBrokers } from './sampleBroker.js';
+
 export const sampleProperties = [
-  // Premium Listings (from BestChoiceSection cardData)
+  // Premium Listings
   {
     id: 1,
     image: "/imgs/1.png",
@@ -41,22 +43,14 @@ export const sampleProperties = [
       "Laundry Room",
     ],
     coordinates: [9.0054, 38.7636],
-    listedDate: 0, // Listed today, October 27, 2025
+    listedDate: 0,
     views: 342,
     saves: 28,
     mlsNumber: "ET123456",
     source: "Ethiopian MLS",
     estPayment: 150000,
     premium: true,
-    broker: {
-      name: "Alemayehu Bekele",
-      company: "Ethio Realty Partners",
-      photo: "/api/placeholder/60/60",
-      phone: "+251 91 234 5678",
-      email: "alex.bekele@ethiorealty.com",
-      experience: "8 years",
-      languages: ["Amharic", "English", "Oromo"],
-    },
+    broker: sampleBrokers[0], // Beza Hilemariam
     priceHistory: [
       {
         date: "2025-10-27",
@@ -161,18 +155,14 @@ export const sampleProperties = [
     images: ["/imgs/OIP2.png"],
     features: ["Balcony", "Modern Kitchen", "Security", "Parking", "Storage"],
     coordinates: [12.6030, 37.4521],
-    listedDate: 0, // Listed today, October 27, 2025
+    listedDate: 0,
     views: 156,
     saves: 12,
     mlsNumber: "ET789012",
     source: "Gondar MLS",
     estPayment: 20000,
     premium: true,
-    broker: {
-      name: "Sara Mohammed",
-      company: "Gondar Properties",
-      photo: "/api/placeholder/60/60",
-    },
+    broker: sampleBrokers[1], // Elias Kebede
     priceHistory: [
       {
         date: "2025-10-27",
@@ -215,18 +205,14 @@ export const sampleProperties = [
     images: ["/imgs/OIP3.png"],
     features: ["Garden", "Fireplace", "Traditional Design", "Spacious Rooms"],
     coordinates: [13.4967, 39.4753],
-    listedDate: 0, // Listed today, October 27, 2025
+    listedDate: 0,
     views: 89,
     saves: 7,
     mlsNumber: "ET345678",
     source: "Tigray MLS",
     estPayment: 180000,
     premium: true,
-    broker: {
-      name: "Michael Tekle",
-      company: "Mekelle Real Estate",
-      photo: "/api/placeholder/60/60",
-    },
+    broker: sampleBrokers[1], // Elias Kebede
     priceHistory: [
       {
         date: "2025-10-27",
@@ -261,18 +247,14 @@ export const sampleProperties = [
     images: ["/imgs/OIP4.png"],
     features: ["City Views", "Premium Finishes", "Concierge", "Rooftop Access"],
     coordinates: [9.0012, 38.7701],
-    listedDate: 0, // Listed today, October 27, 2025
+    listedDate: 0,
     views: 234,
     saves: 19,
     mlsNumber: "ET901234",
     source: "Addis MLS",
     estPayment: 250000,
     premium: true,
-    broker: {
-      name: "Elena Girma",
-      company: "Premium Properties",
-      photo: "/api/placeholder/60/60",
-    },
+    broker: sampleBrokers[0], // Beza Hilemariam
     priceHistory: [
       {
         date: "2025-10-27",
@@ -285,6 +267,7 @@ export const sampleProperties = [
     nearbySchools: [],
     floorPlans: [],
   },
+  // ... keep the rest of your properties, just update the broker assignments
   {
     id: 5,
     image: "/imgs/OIP5.png",
@@ -307,18 +290,14 @@ export const sampleProperties = [
     images: ["/imgs/OIP5.png"],
     features: ["Lake View", "Private Beach", "Outdoor Living", "Boat Dock"],
     coordinates: [11.5973, 37.3908],
-    listedDate: 0, // Listed today, October 27, 2025
+    listedDate: 0,
     views: 178,
     saves: 15,
     mlsNumber: "ET567890",
     source: "Bahirdar MLS",
     estPayment: 200000,
     premium: true,
-    broker: {
-      name: "Daniel Yohannes",
-      company: "Lakeview Realty",
-      photo: "/api/placeholder/60/60",
-    },
+    broker: sampleBrokers[1], // Elias Kebede
     priceHistory: [
       {
         date: "2025-10-27",
@@ -353,18 +332,14 @@ export const sampleProperties = [
     images: ["/imgs/Normal32.png"],
     features: ["Open Concept", "Modern Design", "City Center", "Public Transport"],
     coordinates: [8.5410, 39.2689],
-    listedDate: 0, // Listed today, October 27, 2025
+    listedDate: 0,
     views: 67,
     saves: 5,
     mlsNumber: "ET112233",
     source: "Adama MLS",
     estPayment: 18000,
     premium: true,
-    broker: {
-      name: "Liya Assefa",
-      company: "Adama Properties",
-      photo: "/api/placeholder/60/60",
-    },
+    broker: sampleBrokers[0], // Beza Hilemariam
     priceHistory: [
       {
         date: "2025-10-27",
@@ -377,7 +352,7 @@ export const sampleProperties = [
     nearbySchools: [],
     floorPlans: [],
   },
-  // Non-Premium Listings (from original sampleProperties)
+  // Non-Premium Listings
   {
     id: 7,
     title: "Modern Villa in Bole",
@@ -403,18 +378,14 @@ export const sampleProperties = [
     ],
     features: ["Swimming Pool", "Garden", "Smart Home", "Security System", "Hardwood Floors"],
     coordinates: [8.9961, 38.7678],
-    listedDate: 2, // Listed 2 days ago, October 25, 2025
+    listedDate: 2,
     views: 342,
     saves: 28,
     mlsNumber: "ET123457",
     source: "Ethiopian MLS",
     estPayment: 120000,
     premium: false,
-    broker: {
-      name: "Alemayehu Bekele",
-      company: "Ethio Realty Partners",
-      photo: "/api/placeholder/80/80?text=Broker",
-    },
+    broker: sampleBrokers[0], // Beza Hilemariam
     priceHistory: [
       { date: "2025-10-25", event: "Listed for sale", price: 25000000, change: "" },
       { date: "2025-06-15", event: "Price reduced", price: 26000000, change: "-ETB 1M" },
@@ -478,18 +449,14 @@ export const sampleProperties = [
     ],
     features: ["Balcony", "Modern Kitchen", "24/7 Security", "Gym Access"],
     coordinates: [9.0105, 38.7539],
-    listedDate: 5, // Listed 5 days ago, October 22, 2025
+    listedDate: 5,
     views: 156,
     saves: 12,
     mlsNumber: "ET789013",
     source: "Ethiopian MLS",
     estPayment: 40000,
     premium: false,
-    broker: {
-      name: "Selam Tesfaye",
-      company: "Addis Realty Group",
-      photo: "/api/placeholder/80/80?text=Broker",
-    },
+    broker: sampleBrokers[1], // Elias Kebede
     priceHistory: [
       { date: "2025-10-22", event: "Listed for sale", price: 8500000, change: "" },
       { date: "2025-07-20", event: "Price reduced", price: 9000000, change: "-ETB 500K" },
@@ -518,5 +485,6 @@ export const sampleProperties = [
       },
     ],
   },
-  // Add more non-premium properties as needed (e.g., IDs 9-12)
 ];
+
+export default sampleProperties;

@@ -10,6 +10,7 @@ import privilegeRoutes from "./routes/privilege.routes.js";
 import path from 'path';
 import { fileURLToPath } from 'url';
 import db from "../shared/db.js"; // ADD THIS IMPORT
+import brokerRoutes from './routes/brokers.routes.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -51,6 +52,7 @@ app.post("/api/test-upload", (req, res) => {
 
 app.use("/api/auth", authRoutes);
 app.use("/api/users", userRoutes);
+app.use('/api/brokers', brokerRoutes);
 app.use("/api/profile", authRoutes);
 app.get("/ping", (req, res) => {
   res.send("pong");
@@ -111,6 +113,16 @@ app.get('/api/debug/db-connection', async (req, res) => {
 // Health check
 app.get('/health', (req, res) => {
   res.status(200).json({ status: 'healthy', service: 'user-service' });
+});
+
+// Add error handling for incomplete form submissions
+app.post('/api/auth/upload-profile', (req, res) => {
+  if (!req.files || !req.files.profilePicture) {
+    return res.status(400).json({ error: 'No file uploaded' });
+  }
+
+  const profilePicture = req.files.profilePicture;
+  // Handle file upload logic here
 });
 
 const PORT = process.env.PORT || 5000;

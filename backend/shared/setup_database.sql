@@ -761,6 +761,157 @@ CREATE TABLE IF NOT EXISTS pending_registrations (
     INDEX idx_expires (email_verification_expires)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+
+
+-- Broker profiles table for additional broker-specific information
+CREATE TABLE IF NOT EXISTS broker_profiles (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NOT NULL,
+    broker_type ENUM('internal', 'external') NOT NULL,
+    
+    -- Professional information
+    license_number VARCHAR(100),
+    license_expiry DATE,
+    years_experience INT DEFAULT 0,
+    specialization JSON DEFAULT '[]', -- ["residential", "commercial", "luxury", "rental"]
+    
+    -- Broker statistics
+    total_completed_deals INT DEFAULT 0,
+    total_sales DECIMAL(15,2) DEFAULT 0.00,
+    average_rating DECIMAL(3,2) DEFAULT 0.00,
+    review_count INT DEFAULT 0,
+    
+    -- Commission and fees
+    commission_rate DECIMAL(5,2) DEFAULT 2.5, -- Default 2.5%
+    service_fee DECIMAL(5,2) DEFAULT 0.00,
+    
+    -- Availability
+    is_available BOOLEAN DEFAULT TRUE,
+    max_clients INT DEFAULT 10,
+    current_active_clients INT DEFAULT 0,
+    
+    -- Languages spoken
+    languages JSON DEFAULT '["amharic", "english"]',
+    
+    -- Service areas (sub-cities/woredas)
+    service_areas JSON DEFAULT '[]',
+    
+    -- Verification status
+    is_verified BOOLEAN DEFAULT FALSE,
+    verified_at TIMESTAMP NULL,
+    
+    -- Broker bio and description
+    bio_amharic TEXT,
+    bio_english TEXT,
+    
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    UNIQUE KEY unique_broker_user (user_id),
+    INDEX idx_broker_type (broker_type),
+    INDEX idx_is_available (is_available),
+    INDEX idx_average_rating (average_rating)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Broker reviews and ratings table
+CREATE TABLE IF NOT EXISTS broker_reviews (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    broker_id INT NOT NULL,
+    client_id INT NOT NULL,
+    property_id INT NULL, -- Link to specific property transaction
+    
+    -- Rating components (1-5 stars)
+    overall_rating INT NOT NULL CHECK (overall_rating BETWEEN 1 AND 5),
+    communication_rating INT CHECK (communication_rating BETWEEN 1 AND 5),
+    professionalism_rating INT CHECK (professionalism_rating BETWEEN 1 AND 5),
+    knowledge_rating INT CHECK (knowledge_rating BETWEEN 1 AND 5),
+    
+    -- Review content
+    title_amharic VARCHAR(255),
+    title_english VARCHAR(255),
+    comment_amharic TEXT,
+    comment_english TEXT,
+    
+    -- Transaction details
+    transaction_type ENUM('sale', 'rental') NOT NULL,
+    transaction_date DATE,
+    transaction_amount DECIMAL(15,2),
+    
+    -- Review status
+    is_approved BOOLEAN DEFAULT FALSE,
+    is_verified BOOLEAN DEFAULT FALSE, -- Verified actual client
+    
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    
+    FOREIGN KEY (broker_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (client_id) REFERENCES users(id) ON DELETE CASCADE,
+    INDEX idx_broker_rating (broker_id, overall_rating),
+    INDEX idx_created_at (created_at),
+    INDEX idx_is_approved (is_approved)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Broker availability schedule
+CREATE TABLE IF NOT EXISTS broker_availability (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    broker_id INT NOT NULL,
+    day_of_week ENUM('monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday') NOT NULL,
+    start_time TIME NOT NULL,
+    end_time TIME NOT NULL,
+    is_available BOOLEAN DEFAULT TRUE,
+    
+    FOREIGN KEY (broker_id) REFERENCES users(id) ON DELETE CASCADE,
+    UNIQUE KEY unique_broker_schedule (broker_id, day_of_week),
+    INDEX idx_broker_availability (broker_id, is_available)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+
+
+-- Create properties table if it doesn't exist
+CREATE TABLE IF NOT EXISTS properties (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    title VARCHAR(255) NOT NULL,
+    price DECIMAL(15,2) NOT NULL,
+    address TEXT,
+    city VARCHAR(100),
+    region VARCHAR(100),
+    beds INT,
+    baths INT,
+    sqft INT,
+    garage INT,
+    property_type VARCHAR(100),
+    property_status VARCHAR(50),
+    price_per_sqft DECIMAL(10,2),
+    year_built INT,
+    lot_size INT,
+    description TEXT,
+    images JSON,
+    features JSON,
+    coordinates JSON,
+    listed_date DATE,
+    views INT DEFAULT 0,
+    saves INT DEFAULT 0,
+    mls_number VARCHAR(100),
+    source VARCHAR(100),
+    est_payment DECIMAL(10,2),
+    premium BOOLEAN DEFAULT FALSE,
+    broker_id INT,
+    price_history JSON,
+    tax_history JSON,
+    nearby_schools JSON,
+    floor_plans JSON,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    
+    FOREIGN KEY (broker_id) REFERENCES users(id) ON DELETE SET NULL,
+    INDEX idx_city (city),
+    INDEX idx_property_type (property_type),
+    INDEX idx_property_status (property_status),
+    INDEX idx_price (price),
+    INDEX idx_broker_id (broker_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 -- =============================================
 -- INITIAL DATA POPULATION
 -- =============================================

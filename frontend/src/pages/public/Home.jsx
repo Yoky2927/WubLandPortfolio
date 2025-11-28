@@ -21,61 +21,65 @@ function Home() {
   // Redirect logged-in users to their dashboard
   // In the useEffect for redirecting logged-in users:
   useEffect(() => {
-  const token = localStorage.getItem("token");
-  const userData = JSON.parse(localStorage.getItem("user") || "{}");
-  
-  console.log("🏠 Home.jsx - Auth Check:", {
-    hasToken: !!token,
-    userRole: userData.role,
-    userData: userData,
-    currentPath: window.location.pathname
-  });
+    const token = localStorage.getItem("token");
+    const userData = JSON.parse(localStorage.getItem("user") || "{}");
 
-  // If we have EITHER a token OR user data with role, we're logged in
-  if (token || userData.role) {
-    let userRole = userData.role;
-    
-    // If we have token but no user role, decode the token to get role
-    if (token && !userRole) {
-      try {
-        const payload = JSON.parse(atob(token.split('.')[1]));
-        userRole = payload.role;
-        console.log("🏠 Home.jsx - Got role from token:", userRole);
-      } catch (error) {
-        console.error("❌ Home.jsx - Error decoding token:", error);
+    console.log("🏠 Home.jsx - Auth Check:", {
+      hasToken: !!token,
+      userRole: userData.role,
+      userData: userData,
+      currentPath: window.location.pathname,
+    });
+
+    // If we have EITHER a token OR user data with role, we're logged in
+    if (token || userData.role) {
+      let userRole = userData.role;
+
+      // If we have token but no user role, decode the token to get role
+      if (token && !userRole) {
+        try {
+          const payload = JSON.parse(atob(token.split(".")[1]));
+          userRole = payload.role;
+          console.log("🏠 Home.jsx - Got role from token:", userRole);
+        } catch (error) {
+          console.error("❌ Home.jsx - Error decoding token:", error);
+        }
       }
-    }
 
-    if (userRole) {
-      const roleRedirects = {
-        super_admin: "/super-admin-dashboard",
-        admin: "/admin-dashboard",
-        support_agent: "/support-dashboard",
-        support_lead: "/support-dashboard", 
-        support_admin: "/support-dashboard",
-        broker: "/user-dashboard",
-        buyer: "/user-dashboard",
-        seller: "/user-dashboard",
-        renter: "/user-dashboard",
-        user: "/user-dashboard",
-      };
+      if (userRole) {
+        const roleRedirects = {
+          super_admin: "/super-admin-dashboard",
+          admin: "/admin-dashboard",
+          support_agent: "/support-dashboard",
+          support_lead: "/support-dashboard",
+          support_admin: "/support-dashboard",
+          broker: "/user-dashboard",
+          buyer: "/user-dashboard",
+          seller: "/seller-leaser", // ← CHANGED: Redirect sellers to seller-leaser
+          renter: "/seller-leaser", // ← CHANGED: Redirect renters to seller-leaser
+          user: "/user-dashboard",
+        };
 
-      const redirectPath = roleRedirects[userRole];
-      console.log("🏠 Home.jsx - Redirect Decision:", {
-        role: userRole,
-        redirectPath: redirectPath,
-        currentPath: window.location.pathname
-      });
+        const redirectPath = roleRedirects[userRole];
+        console.log("🏠 Home.jsx - Redirect Decision:", {
+          role: userRole,
+          redirectPath: redirectPath,
+          currentPath: window.location.pathname,
+        });
 
-      if (redirectPath && window.location.pathname === '/') {
-        console.log(`🔄 Home.jsx - Redirecting ${userRole} to: ${redirectPath}`);
-        navigate(redirectPath, { replace: true });
+        if (redirectPath && window.location.pathname === "/") {
+          console.log(
+            `🔄 Home.jsx - Redirecting ${userRole} to: ${redirectPath}`
+          );
+          navigate(redirectPath, { replace: true });
+        }
       }
+    } else {
+      console.log(
+        "🏠 Home.jsx - No token or user role found, staying on home page"
+      );
     }
-  } else {
-    console.log("🏠 Home.jsx - No token or user role found, staying on home page");
-  }
-}, [navigate]);
+  }, [navigate]);
 
   const handleSignInClick = (e) => {
     e.preventDefault();
@@ -169,15 +173,24 @@ function Home() {
   };
 
   const handleLogout = () => {
-    localStorage.removeItem("token");
-    localStorage.removeItem("user");
-    setUser(null);
-    setIsLoading(true);
-    setTimeout(() => {
-      setIsLoading(false);
-      window.location.reload();
-    }, 2000);
-  };
+  // Clear all localStorage items
+  localStorage.removeItem("token");
+  localStorage.removeItem("user");
+  
+  // Clear state immediately
+  setUser(null);
+  setIsLoggedIn(false);
+  
+  // Show loading briefly
+  setIsLoading(true);
+  
+  // Redirect to home page after a short delay
+  setTimeout(() => {
+    setIsLoading(false);
+    navigate("/", { replace: true });
+    window.location.reload(); // Force a full page reload to clear any cached state
+  }, 1000);
+};
 
   return (
     <div className="relative min-h-screen overflow-x-hidden">
@@ -339,12 +352,16 @@ function Home() {
                       </a>
                     </li>
                     <li>
-                      <a
-                        href="#"
+                      <button
+                        onClick={() =>
+                          navigate("/seller-leaser", {
+                            state: { userType: "seller" },
+                          })
+                        }
                         className="nav-bottom-link text-sm sm:text-base md:text-lg duration-300"
                       >
                         Sell
-                      </a>
+                      </button>
                     </li>
                     <li>
                       <a
@@ -534,7 +551,14 @@ function Home() {
                 </p>
               </div>
               <div className="absolute bottom-6 left-0 right-0 flex justify-center">
-                <button className={`Button2 px-6 py-2 text-sm md:text-base`}>
+                <button
+                  onClick={() =>
+                    navigate("/seller-leaser", {
+                      state: { userType: "seller" },
+                    })
+                  }
+                  className={`Button2 px-6 py-2 text-sm md:text-base`}
+                >
                   See Your Options
                 </button>
               </div>
@@ -572,7 +596,14 @@ function Home() {
                 </p>
               </div>
               <div className="absolute bottom-6 left-0 right-0 flex justify-center">
-                <button className={`Button2 px-6 py-2 text-sm md:text-base`}>
+                <button
+                  onClick={() =>
+                    navigate("/seller-leaser", {
+                      state: { userType: "leaser" },
+                    })
+                  }
+                  className={`Button2 px-6 py-2 text-sm md:text-base`}
+                >
                   Find Rentals
                 </button>
               </div>

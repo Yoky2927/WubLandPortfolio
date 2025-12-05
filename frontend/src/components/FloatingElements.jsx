@@ -22,7 +22,48 @@ const FloatingElements = ({ theme, reduced }) => {
 
     return (
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
-            {/* Floating stars (dusty white circles) in dark mode */}
+            {/* AMBER FLOATING ELEMENTS - MORE VISIBLE */}
+            {theme === 'dark' && (
+                <div className="absolute inset-0">
+                    {/* Larger amber circles */}
+                    {[1, 2, 3, 4].map((i) => (
+                        <div
+                            key={`amber-circle-${i}`}
+                            className="absolute rounded-full animate-float-slow"
+                            style={{
+                                left: `${15 * i}%`,
+                                top: `${20 * i}%`,
+                                width: `${reduced ? 60 + i * 20 : 80 + i * 30}px`,
+                                height: `${reduced ? 60 + i * 20 : 80 + i * 30}px`,
+                                background: 'radial-gradient(circle, rgba(251, 191, 36, 0.3) 0%, rgba(251, 191, 36, 0.1) 70%)',
+                                filter: 'blur(15px)',
+                                animationDelay: `${i * 1.5}s`,
+                                zIndex: 0
+                            }}
+                        />
+                    ))}
+                    
+                    {/* Medium amber circles */}
+                    {[1, 2, 3].map((i) => (
+                        <div
+                            key={`amber-medium-${i}`}
+                            className="absolute rounded-full animate-float"
+                            style={{
+                                right: `${10 + i * 15}%`,
+                                top: `${15 + i * 25}%`,
+                                width: `${reduced ? 40 : 60}px`,
+                                height: `${reduced ? 40 : 60}px`,
+                                background: 'radial-gradient(circle, rgba(245, 158, 11, 0.4) 0%, rgba(245, 158, 11, 0.15) 70%)',
+                                filter: 'blur(12px)',
+                                animationDelay: `${i * 2}s`,
+                                zIndex: 0
+                            }}
+                        />
+                    ))}
+                </div>
+            )}
+
+            {/* Existing stars (dusty white circles) in dark mode */}
             {theme === 'dark' && positions.filter(pos => pos.type === 'star').map((pos, i) => (
                 <div
                     key={`star-${i}`}
@@ -54,13 +95,14 @@ const FloatingElements = ({ theme, reduced }) => {
                             top: `${pos.y}%`,
                             width: `${size}px`,
                             height: `${size}px`,
-                            opacity: theme === 'dark' ? 0.5 : 0.7,
+                            opacity: theme === 'dark' ? 0.3 : 0.7, // Reduced opacity for rectangles
                             animation: `float-slow ${pos.duration}s ease-in-out infinite`,
                             animationDelay: `${pos.delay}s`,
                             transform: `rotate(${pos.rotation}deg)`,
                             filter: theme === 'dark'
                                 ? 'brightness(1.2)'
-                                : 'brightness(0.9)'
+                                : 'brightness(0.9)',
+                            zIndex: 1
                         }}
                         alt="Floating decoration"
                     />
@@ -77,11 +119,12 @@ const FloatingElements = ({ theme, reduced }) => {
                         left: index === 0 ? '5%' : '85%',
                         top: index === 0 ? '15%' : '70%',
                         width: '80px',
-                        opacity: theme === 'dark' ? 0.4 : 0.6,
+                        opacity: theme === 'dark' ? 0.2 : 0.6, // Reduced opacity
                         filter: theme === 'dark'
                             ? 'brightness(1.5)'
                             : 'brightness(0.9)',
-                        transform: 'rotate(45deg)'
+                        transform: 'rotate(45deg)',
+                        zIndex: 1
                     }}
                     alt="Large floating decoration"
                 />
@@ -94,7 +137,6 @@ const FloatingElements = ({ theme, reduced }) => {
                 const twinkleDelay = Math.random() * 5;
                 const twinkleDuration = 2 + Math.random() * 3;
 
-
                 return (
                     <svg
                         key={`star-svg-${i}`}
@@ -104,9 +146,9 @@ const FloatingElements = ({ theme, reduced }) => {
                             top: `${starY}%`,
                             width: `${12 + (i % 3 * 6)}px`, // Varied sizes
                             height: `${12 + (i % 3 * 6)}px`,
-                            opacity: theme === 'dark' ? 0.8 : 0.2,
+                            opacity: theme === 'dark' ? 0.6 : 0.2, // Reduced opacity
                             filter: theme === 'dark'
-                                ? 'drop-shadow(0 2px 4px rgba(255, 255, 255, 0.5))'
+                                ? 'drop-shadow(0 2px 4px rgba(255, 255, 255, 0.3))' // Reduced glow
                                 : 'drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3))',
                             animationDelay: `${twinkleDelay}s`,
                             animationDuration: `${twinkleDuration}s`,
@@ -136,7 +178,7 @@ const FloatingElements = ({ theme, reduced }) => {
                             top: `${starY}%`,
                             width: '2px',
                             height: '2px',
-                            opacity: theme === 'dark' ? 0.6 : 0.1,
+                            opacity: theme === 'dark' ? 0.4 : 0.1, // Reduced opacity
                             animationDelay: `${twinkleDelay}s`,
                             animationDuration: `${twinkleDuration}s`,
                             filter: 'blur(0.5px)',

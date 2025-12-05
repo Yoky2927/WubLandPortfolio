@@ -4,11 +4,12 @@ import {
   Heart, Share2, Download, Home, Building, TrendingUp,
   Layers, ZoomIn, ExternalLink, Star, Clock,
   Users, Shield, Wifi, Coffee, Dumbbell,
-  ChevronLeft, ChevronRight, Play, Pause, Eye, Phone, Mail
+  ChevronLeft, ChevronRight, Play, Pause, Eye, Phone, Mail,
+  ArrowRight, Search, Compass, FileText, ChevronDown, ChevronUp
 } from "lucide-react";
 import { useTheme } from "../contexts/ThemeContext";
 
-// Contact Agent Popup Component
+// Contact Agent Popup Component with improved theme consistency
 const ContactAgentPopup = ({ agent, property, isOpen, onClose }) => {
   const { theme } = useTheme();
   const [formData, setFormData] = useState({
@@ -39,10 +40,12 @@ const ContactAgentPopup = ({ agent, property, isOpen, onClose }) => {
   };
 
   return (
-    <div className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-[100] bg-black/70 backdrop-blur-md flex items-center justify-center p-4">
       <div 
-        className={`max-w-md w-full rounded-2xl shadow-2xl ${
-          theme === "dark" ? "bg-gray-900" : "bg-white"
+        className={`max-w-md w-full rounded-2xl shadow-2xl border ${
+          theme === "dark" 
+            ? "bg-gray-900 border-gray-700" 
+            : "bg-white border-gray-200"
         }`}
         onClick={(e) => e.stopPropagation()}
       >
@@ -51,12 +54,18 @@ const ContactAgentPopup = ({ agent, property, isOpen, onClose }) => {
           theme === "dark" ? "border-gray-700" : "border-gray-200"
         }`}>
           <div className="flex justify-between items-center">
-            <h3 className={`text-xl font-semibold ${theme === "dark" ? "text-white" : "text-gray-900"}`}>
+            <h3 className={`text-xl font-semibold ${
+              theme === "dark" ? "text-white" : "text-gray-900"
+            }`}>
               Contact Agent
             </h3>
             <button 
               onClick={onClose} 
-              className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
+              className={`p-2 rounded-lg transition-colors ${
+                theme === "dark" 
+                  ? "hover:bg-gray-800 text-gray-400 hover:text-white" 
+                  : "hover:bg-gray-100 text-gray-600 hover:text-gray-700"
+              }`}
             >
               <X size={20} />
             </button>
@@ -65,17 +74,27 @@ const ContactAgentPopup = ({ agent, property, isOpen, onClose }) => {
 
         <div className="p-6">
           {/* Agent Info */}
-          <div className="flex items-center space-x-4 mb-6 p-4 bg-gray-50 dark:bg-gray-800 rounded-xl">
+          <div className={`flex items-center space-x-4 mb-6 p-4 rounded-xl ${
+            theme === "dark" 
+              ? "bg-gray-800 border border-gray-700" 
+              : "bg-gray-50 border border-gray-200"
+          }`}>
             <img 
               src={agent?.photo || "/api/placeholder/60/60"} 
               alt={agent?.name} 
-              className="w-14 h-14 rounded-full border-2 border-white shadow-sm"
+              className="w-14 h-14 rounded-full border-2 border-amber-500 shadow-sm"
             />
             <div>
-              <h4 className={`font-semibold text-lg ${theme === "dark" ? "text-white" : "text-gray-900"}`}>
+              <h4 className={`font-semibold text-lg ${
+                theme === "dark" ? "text-white" : "text-gray-900"
+              }`}>
                 {agent?.name}
               </h4>
-              <p className="text-sm text-gray-600 dark:text-gray-400">{agent?.company}</p>
+              <p className={`text-sm ${
+                theme === "dark" ? "text-gray-400" : "text-gray-600"
+              }`}>
+                {agent?.company}
+              </p>
             </div>
           </div>
 
@@ -83,68 +102,94 @@ const ContactAgentPopup = ({ agent, property, isOpen, onClose }) => {
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-3">
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                <label className={`block text-sm font-medium mb-2 ${
+                  theme === "dark" ? "text-gray-300" : "text-gray-700"
+                }`}>
                   Full Name
                 </label>
                 <input
                   type="text"
                   value={formData.name}
                   onChange={(e) => setFormData({...formData, name: e.target.value})}
-                  className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-amber-500 focus:border-amber-500 transition-all placeholder-gray-500 dark:placeholder-gray-400"
+                  className={`w-full px-4 py-3 border rounded-xl transition-all placeholder-gray-500 ${
+                    theme === "dark"
+                      ? "bg-gray-800 border-gray-600 text-white focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
+                      : "bg-white border-gray-300 text-gray-900 focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
+                  }`}
                   placeholder="Enter your full name"
                   required
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                <label className={`block text-sm font-medium mb-2 ${
+                  theme === "dark" ? "text-gray-300" : "text-gray-700"
+                }`}>
                   Phone Number
                 </label>
                 <input
                   type="tel"
                   value={formData.phone}
                   onChange={(e) => setFormData({...formData, phone: e.target.value})}
-                  className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-amber-500 focus:border-amber-500 transition-all placeholder-gray-500 dark:placeholder-gray-400"
+                  className={`w-full px-4 py-3 border rounded-xl transition-all placeholder-gray-500 ${
+                    theme === "dark"
+                      ? "bg-gray-800 border-gray-600 text-white focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
+                      : "bg-white border-gray-300 text-gray-900 focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
+                  }`}
                   placeholder="Your phone number"
                   required
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                <label className={`block text-sm font-medium mb-2 ${
+                  theme === "dark" ? "text-gray-300" : "text-gray-700"
+                }`}>
                   Email Address
                 </label>
                 <input
                   type="email"
                   value={formData.email}
                   onChange={(e) => setFormData({...formData, email: e.target.value})}
-                  className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-amber-500 focus:border-amber-500 transition-all placeholder-gray-500 dark:placeholder-gray-400"
+                  className={`w-full px-4 py-3 border rounded-xl transition-all placeholder-gray-500 ${
+                    theme === "dark"
+                      ? "bg-gray-800 border-gray-600 text-white focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
+                      : "bg-white border-gray-300 text-gray-900 focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
+                  }`}
                   placeholder="your.email@example.com"
                   required
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                <label className={`block text-sm font-medium mb-2 ${
+                  theme === "dark" ? "text-gray-300" : "text-gray-700"
+                }`}>
                   Message
                 </label>
                 <textarea
                   value={formData.message}
                   onChange={(e) => setFormData({...formData, message: e.target.value})}
                   rows="3"
-                  className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-amber-500 focus:border-amber-500 resize-none transition-all placeholder-gray-500 dark:placeholder-gray-400"
+                  className={`w-full px-4 py-3 border rounded-xl resize-none transition-all placeholder-gray-500 ${
+                    theme === "dark"
+                      ? "bg-gray-800 border-gray-600 text-white focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
+                      : "bg-white border-gray-300 text-gray-900 focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
+                  }`}
                   required
                 />
               </div>
             </div>
 
-            <div className="text-xs text-gray-500 dark:text-gray-400 text-center">
+            <div className={`text-xs text-center ${
+              theme === "dark" ? "text-gray-400" : "text-gray-500"
+            }`}>
               <p>By contacting the agent, you agree to receive communications about this property.</p>
             </div>
 
             <button 
               type="submit"
-              className="w-full bg-amber-500 hover:bg-amber-600 text-white font-semibold py-4 rounded-xl transition-all duration-200 shadow-lg hover:shadow-xl active:scale-95"
+              className="w-full bg-amber-500 hover:bg-amber-600 text-white font-semibold py-4 rounded-xl transition-all duration-300 shadow-lg hover:shadow-xl active:scale-95"
             >
               Send Message
             </button>
@@ -155,7 +200,7 @@ const ContactAgentPopup = ({ agent, property, isOpen, onClose }) => {
   );
 };
 
-// Request Tour Popup Component
+// Request Tour Popup Component with improved theme consistency
 const RequestTourPopup = ({ property, isOpen, onClose }) => {
   const { theme } = useTheme();
   const [selectedTimes, setSelectedTimes] = useState([]);
@@ -206,10 +251,12 @@ const RequestTourPopup = ({ property, isOpen, onClose }) => {
   const getPrevDay = (date) => new Date(date.getTime() - 24 * 60 * 60 * 1000);
 
   return (
-    <div className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-[100] bg-black/70 backdrop-blur-md flex items-center justify-center p-4">
       <div 
-        className={`max-w-md w-full rounded-2xl shadow-2xl ${
-          theme === "dark" ? "bg-gray-900" : "bg-white"
+        className={`max-w-md w-full rounded-2xl shadow-2xl border ${
+          theme === "dark" 
+            ? "bg-gray-900 border-gray-700" 
+            : "bg-white border-gray-200"
         }`}
         onClick={(e) => e.stopPropagation()}
       >
@@ -218,42 +265,68 @@ const RequestTourPopup = ({ property, isOpen, onClose }) => {
           theme === "dark" ? "border-gray-700" : "border-gray-200"
         }`}>
           <div className="flex justify-between items-center">
-            <h3 className={`text-xl font-semibold ${theme === "dark" ? "text-white" : "text-gray-900"}`}>
+            <h3 className={`text-xl font-semibold ${
+              theme === "dark" ? "text-white" : "text-gray-900"
+            }`}>
               Schedule Tour
             </h3>
             <button 
               onClick={onClose} 
-              className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
+              className={`p-2 rounded-lg transition-colors ${
+                theme === "dark" 
+                  ? "hover:bg-gray-800 text-gray-400 hover:text-white" 
+                  : "hover:bg-gray-100 text-gray-500 hover:text-gray-700"
+              }`}
             >
               <X size={20} />
             </button>
           </div>
-          <p className={`text-sm mt-2 ${theme === "dark" ? "text-gray-400" : "text-gray-600"}`}>
+          <p className={`text-sm mt-2 ${
+            theme === "dark" ? "text-gray-400" : "text-gray-600"
+          }`}>
             {property?.address}, {property?.city}
           </p>
         </div>
 
         <form onSubmit={handleSubmit} className="p-6">
           <div className="mb-6">
-            <div className="flex items-center text-sm text-gray-600 dark:text-gray-400 mb-4 p-3 bg-amber-50 dark:bg-amber-900/20 rounded-lg">
+            <div className={`flex items-center text-sm mb-4 p-3 rounded-lg ${
+              theme === "dark" 
+                ? "bg-amber-900/30 border border-amber-800/50 text-amber-300" 
+                : "bg-amber-50 border border-amber-200 text-amber-800"
+            }`}>
               <Calendar size={16} className="mr-2 text-amber-500" />
               Select 1-3 preferred times for your tour
             </div>
             
             {/* Date Navigation */}
-            <div className="flex justify-between items-center mb-4 p-4 bg-gray-50 dark:bg-gray-800 rounded-xl">
+            <div className={`flex justify-between items-center mb-4 p-4 rounded-xl ${
+              theme === "dark" ? "bg-gray-800 border border-gray-700" : "bg-gray-50 border border-gray-200"
+            }`}>
               <button 
                 type="button" 
                 onClick={() => setSelectedDate(getPrevDay(selectedDate))}
-                className="px-4 py-2 text-sm text-gray-600 dark:text-gray-400 hover:text-amber-600 dark:hover:text-amber-400 transition-colors"
+                className={`px-4 py-2 text-sm transition-colors ${
+                  theme === "dark" 
+                    ? "text-gray-400 hover:text-amber-400" 
+                    : "text-gray-600 hover:text-amber-600"
+                }`}
               >
                 ← Previous
               </button>
-              <span className="font-semibold text-gray-900 dark:text-white">{formatDate(selectedDate)}</span>
+              <span className={`font-semibold ${
+                theme === "dark" ? "text-white" : "text-gray-900"
+              }`}>
+                {formatDate(selectedDate)}
+              </span>
               <button 
                 type="button" 
                 onClick={() => setSelectedDate(getNextDay(selectedDate))}
-                className="px-4 py-2 text-sm text-gray-600 dark:text-gray-400 hover:text-amber-600 dark:hover:text-amber-400 transition-colors"
+                className={`px-4 py-2 text-sm transition-colors ${
+                  theme === "dark" 
+                    ? "text-gray-400 hover:text-amber-400" 
+                    : "text-gray-600 hover:text-amber-600"
+                }`}
               >
                 Next →
               </button>
@@ -266,10 +339,12 @@ const RequestTourPopup = ({ property, isOpen, onClose }) => {
                   key={time}
                   type="button"
                   onClick={() => toggleTime(time)}
-                  className={`p-4 border rounded-xl text-sm font-medium transition-all duration-200 ${
+                  className={`p-4 border rounded-xl text-sm font-medium transition-all duration-300 ${
                     selectedTimes.includes(time)
                       ? "bg-amber-500 text-white border-amber-500 shadow-lg"
-                      : "border-gray-300 dark:border-gray-600 hover:border-amber-400 hover:bg-amber-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300"
+                      : theme === "dark"
+                        ? "border-gray-600 hover:border-amber-400 hover:bg-gray-800 text-gray-300"
+                        : "border-gray-300 hover:border-amber-400 hover:bg-gray-50 text-gray-700"
                   }`}
                 >
                   {time}
@@ -279,11 +354,15 @@ const RequestTourPopup = ({ property, isOpen, onClose }) => {
 
             {/* Selected Times Summary */}
             {selectedTimes.length > 0 && (
-              <div className="mt-4 p-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl">
-                <p className="text-sm font-medium text-amber-800 dark:text-amber-200">
+              <div className={`mt-4 p-4 border rounded-xl ${
+                theme === "dark" 
+                  ? "bg-amber-900/20 border-amber-800/50 text-amber-300" 
+                  : "bg-amber-50 border-amber-200 text-amber-800"
+              }`}>
+                <p className="text-sm font-medium">
                   Selected {selectedTimes.length} time{selectedTimes.length > 1 ? 's' : ''}
                 </p>
-                <p className="text-sm text-amber-700 dark:text-amber-300 mt-1">
+                <p className="text-sm opacity-90 mt-1">
                   {selectedTimes.join(', ')}
                 </p>
               </div>
@@ -293,9 +372,11 @@ const RequestTourPopup = ({ property, isOpen, onClose }) => {
           <button 
             type="submit"
             disabled={selectedTimes.length === 0}
-            className={`w-full font-semibold py-4 rounded-xl transition-all duration-200 ${
+            className={`w-full font-semibold py-4 rounded-xl transition-all duration-300 ${
               selectedTimes.length === 0
-                ? 'bg-gray-300 dark:bg-gray-700 text-gray-500 dark:text-gray-400 cursor-not-allowed'
+                ? theme === "dark"
+                  ? 'bg-gray-800 text-gray-400 cursor-not-allowed'
+                  : 'bg-gray-200 text-gray-400 cursor-not-allowed'
                 : 'bg-amber-500 hover:bg-amber-600 text-white shadow-lg hover:shadow-xl active:scale-95'
             }`}
           >
@@ -307,47 +388,44 @@ const RequestTourPopup = ({ property, isOpen, onClose }) => {
   );
 };
 
-// Modern Property Stats Component
-const PropertyStats = ({ beds, baths, sqft, garage, estPayment, theme, formatCurrency }) => (
-  <div className={`p-6 border-b ${theme === "dark" ? "border-gray-700" : "border-gray-200"}`}>
-    <div className="grid grid-cols-4 gap-4">
-      {[
-        { icon: Bed, label: "Beds", value: beds, color: "text-amber-500" },
-        { icon: Bath, label: "Baths", value: baths, color: "text-amber-500" },
-        { icon: Ruler, label: "Sq Ft", value: sqft?.toLocaleString(), color: "text-amber-500" },
-        { icon: Car, label: "Garage", value: garage || '-', color: "text-amber-500" }
-      ].map((stat, i) => (
-        <div key={i} className="text-center group">
-          <div className="flex items-center justify-center mb-2">
-            <stat.icon size={20} className={`${stat.color} group-hover:scale-110 transition-transform`} />
-          </div>
-          <div className={`text-lg font-bold ${theme === "dark" ? "text-white" : "text-gray-900"}`}>
-            {stat.value}
-          </div>
-          <div className="text-xs text-gray-500 dark:text-gray-400 font-medium">{stat.label}</div>
-        </div>
-      ))}
-    </div>
-    {estPayment && (
-      <div className={`mt-4 p-4 text-center border rounded-xl ${
-        theme === "dark" ? "bg-gray-800 border-gray-600" : "bg-amber-50 border-amber-200"
-      }`}>
-        <span className={`text-sm font-semibold ${theme === "dark" ? "text-amber-300" : "text-amber-700"}`}>
-          Estimated payment: <strong className="text-base">{formatCurrency(estPayment)}/mo</strong>
-        </span>
+// Navigation Buttons Component with Homepage Logo
+const NavigationButtons = ({ theme, onClose, onNavigateToProperties, property }) => {
+  return (
+    <div className="flex items-center justify-between w-full">
+      {/* Logo matching homepage */}
+      <div className="flex items-center py-10 ">
+        <img
+          src="/vectors/LogoY.svg"
+          alt="WubLand Logo"
+          className="absolute h-52 w-52 left-[40%] -top-5 " // Match the homepage logo size
+        />
       </div>
-    )}
-  </div>
-);
+      
+      <div className="flex items-center space-x-4">
+        {/* Close Button */}
+        <button 
+          onClick={onClose} 
+          className={`p-2 rounded-lg transition-colors ${
+            theme === "dark" 
+              ? "hover:bg-gray-800 text-white" 
+              : "hover:bg-gray-100 text-gray-600"
+          }`}
+        >
+          <X size={20} />
+        </button>
+      </div>
+    </div>
+  );
+};
 
-// Modern Image Gallery
+// Modern Image Gallery with improved visibility
 const ImageGallery = ({
   images, selectedImageIndex, theme, address, progress,
   handlePrevImage, handleNextImage, handleThumbnailClick, toggleAutoPlay, isPlaying
 }) => (
-  <div className="relative bg-black group">
+  <div className="relative bg-black group rounded-t-2xl overflow-hidden">
     {images.length === 0 ? (
-      <div className="h-96 flex items-center justify-center bg-gray-900">
+      <div className="h-96 flex items-center justify-center bg-gradient-to-br from-gray-900 to-black">
         <div className="text-center text-white">
           <Layers size={48} className="mx-auto mb-3 opacity-50" />
           <p className="text-lg font-semibold">No Images Available</p>
@@ -360,23 +438,31 @@ const ImageGallery = ({
           <img
             src={images[selectedImageIndex]}
             alt={`${address} - ${selectedImageIndex + 1}`}
-            className="w-full h-full object-cover transition-transform duration-500"
+            className="w-full h-full object-cover transition-transform duration-500 group-"
           />
           
-          {/* Counter */}
-          <div className="absolute top-4 left-4 bg-black/70 text-white px-3 py-1 rounded-full text-sm font-semibold backdrop-blur-sm">
-            {selectedImageIndex + 1} / {images.length}
-          </div>
+          {/* Gradient Overlay */}
+          <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent"></div>
           
-          {/* Play/Pause */}
-          {images.length > 1 && (
-            <button
-              onClick={toggleAutoPlay}
-              className="absolute top-4 right-4 bg-black/70 text-white p-2 rounded-full hover:bg-black/90 transition-all duration-300 backdrop-blur-sm hover:scale-110"
-            >
-              {isPlaying ? <Pause size={18} /> : <Play size={18} />}
-            </button>
-          )}
+          {/* Controls */}
+          <div className="absolute top-4 left-4 right-4 flex items-center justify-between">
+            <div className="bg-black/70 text-white px-3 py-1.5 rounded-full text-sm font-semibold backdrop-blur-sm flex items-center space-x-2">
+              <Camera size={16} />
+              <span>{selectedImageIndex + 1} / {images.length}</span>
+            </div>
+            
+            {/* Play/Pause */}
+            {images.length > 1 && (
+              <button
+                onClick={toggleAutoPlay}
+                className={`bg-black/70 text-white p-2.5 rounded-full transition-all duration-300 backdrop-blur-sm hover:scale-110 ${
+                  isPlaying ? 'hover:bg-red-500/20' : 'hover:bg-green-500/20'
+                }`}
+              >
+                {isPlaying ? <Pause size={18} /> : <Play size={18} />}
+              </button>
+            )}
+          </div>
           
           {/* Arrows */}
           {images.length > 1 && (
@@ -395,19 +481,19 @@ const ImageGallery = ({
               </button>
             </>
           )}
-        </div>
-
-        {/* Progress Bar */}
-        {images.length > 1 && (
-          <div className="absolute bottom-20 left-0 right-0 px-4">
-            <div className="h-1 bg-gray-600 rounded-full overflow-hidden">
-              <div 
-                className="h-full bg-amber-500 transition-all duration-100 rounded-full" 
-                style={{ width: `${progress}%` }} 
-              />
+          
+          {/* Progress Bar */}
+          {images.length > 1 && (
+            <div className="absolute bottom-20 left-0 right-0 px-4">
+              <div className="h-1 bg-gray-600/50 rounded-full overflow-hidden">
+                <div 
+                  className="h-full bg-gradient-to-r from-amber-400 to-amber-600 transition-all duration-100 rounded-full" 
+                  style={{ width: `${progress}%` }} 
+                />
+              </div>
             </div>
-          </div>
-        )}
+          )}
+        </div>
 
         {/* Thumbnails */}
         {images.length > 1 && (
@@ -434,29 +520,98 @@ const ImageGallery = ({
   </div>
 );
 
-// Modern Broker Info Component
+// Property Stats Component with consistent styling
+const PropertyStats = ({ beds, baths, sqft, garage, estPayment, theme, formatCurrency }) => (
+  <div className={`p-6 border-y ${
+    theme === "dark" ? "border-gray-700" : "border-gray-200"
+  }`}>
+    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      {[
+        { icon: Bed, label: "Beds", value: beds, color: "text-amber-500" },
+        { icon: Bath, label: "Baths", value: baths, color: "text-amber-500" },
+        { icon: Ruler, label: "Sq Ft", value: sqft?.toLocaleString(), color: "text-amber-500" },
+        { icon: Car, label: "Garage", value: garage || '-', color: "text-amber-500" }
+      ].map((stat, i) => (
+        <div key={i} className={`text-center p-3 rounded-xl transition-all duration-300  ${
+          theme === "dark" ? "bg-gray-800 hover:bg-gray-700" : "bg-gray-50 hover:bg-gray-100"
+        }`}>
+          <div className="flex items-center justify-center mb-2">
+            <stat.icon size={20} className={`${stat.color}`} />
+          </div>
+          <div className={`text-lg font-bold ${
+            theme === "dark" ? "text-white" : "text-gray-900"
+          }`}>
+            {stat.value}
+          </div>
+          <div className={`text-xs ${
+            theme === "dark" ? "text-gray-400" : "text-gray-600"
+          }`}>
+            {stat.label}
+          </div>
+        </div>
+      ))}
+    </div>
+    {estPayment && (
+      <div className={`mt-4 p-4 text-center border rounded-xl ${
+        theme === "dark" 
+          ? "bg-gradient-to-r from-gray-800 to-gray-900 border-gray-700" 
+          : "bg-gradient-to-r from-amber-50 to-amber-100 border-amber-200"
+      }`}>
+        <span className={`text-sm font-semibold ${
+          theme === "dark" ? "text-amber-300" : "text-amber-700"
+        }`}>
+          Estimated payment: <strong className="text-base">{formatCurrency(estPayment)}/mo</strong>
+        </span>
+      </div>
+    )}
+  </div>
+);
+
+// Broker Info Component with consistent theming
 const BrokerInfo = ({ broker, mlsNumber, source, listedDate, theme, onContactAgent, onRequestTour }) => broker && (
-  <div className={`w-full md:w-80 border-t md:border-t-0 md:border-l p-6 ${theme === "dark" ? "border-gray-700 bg-gray-800" : "border-gray-200 bg-gray-50"}`}>
-    <h3 className={`text-lg font-semibold mb-6 ${theme === "dark" ? "text-white" : "text-gray-900"}`}>
+  <div className={`sticky top-6 w-full md:w-80 border-t md:border-t-0 md:border-l p-6 ${
+    theme === "dark" 
+      ? "border-gray-700 bg-gradient-to-b from-gray-900 to-gray-800" 
+      : "border-gray-200 bg-gradient-to-b from-white to-gray-50"
+  }`}>
+    <h3 className={`text-lg font-semibold mb-6 ${
+      theme === "dark" ? "text-white" : "text-gray-900"
+    }`}>
       Contact Agent
     </h3>
     <div className="space-y-6">
       {/* Broker Card */}
-      <div className={`p-4 border rounded-xl ${theme === "dark" ? "border-gray-600" : "border-gray-200"}`}>
+      <div className={`p-4 border rounded-xl transition-all duration-300 hover:shadow-lg ${
+        theme === "dark" 
+          ? "bg-gray-800 border-gray-600 hover:border-amber-500" 
+          : "bg-white border-gray-200 hover:border-amber-400"
+      }`}>
         <div className="flex items-center space-x-4">
-          <img 
-            src={broker.photo || "/api/placeholder/80/80"} 
-            alt={broker.name} 
-            className="w-14 h-14 rounded-full object-cover border-2 border-amber-500 shadow-sm"
-          />
+          <div className="relative">
+            <img 
+              src={broker.photo || "/api/placeholder/80/80"} 
+              alt={broker.name} 
+              className="w-14 h-14 rounded-full object-cover border-2 border-amber-500 shadow-lg"
+            />
+            <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-green-500 rounded-full border-2 border-white"></div>
+          </div>
           <div>
-            <h4 className={`font-semibold ${theme === "dark" ? "text-white" : "text-gray-900"}`}>
+            <h4 className={`font-semibold ${
+              theme === "dark" ? "text-white" : "text-gray-900"
+            }`}>
               {broker.name}
             </h4>
-            <p className="text-sm text-gray-600 dark:text-gray-400">{broker.company}</p>
-            <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
-              Licensed Real Estate Agent
+            <p className={`text-sm ${
+              theme === "dark" ? "text-gray-400" : "text-gray-600"
+            }`}>
+              {broker.company}
             </p>
+            <div className="flex items-center mt-1">
+              {[...Array(5)].map((_, i) => (
+                <Star key={i} size={12} className="text-amber-500 fill-amber-500" />
+              ))}
+              <span className="text-xs ml-2 text-amber-600 dark:text-amber-400">4.8/5</span>
+            </div>
           </div>
         </div>
       </div>
@@ -465,32 +620,79 @@ const BrokerInfo = ({ broker, mlsNumber, source, listedDate, theme, onContactAge
       <div className="space-y-3">
         <button 
           onClick={onContactAgent}
-          className="w-full bg-amber-500 hover:bg-amber-600 text-white font-semibold py-3 rounded-xl transition-all duration-200 shadow-lg hover:shadow-xl active:scale-95"
+          className="w-full bg-gradient-to-r from-amber-500 text-white  to-amber-600 hover:from-amber-600 hover:to-amber-700 font-semibold py-3.5 rounded-xl transition-all duration-300 shadow-lg hover:shadow-xl active:scale-95 flex items-center justify-center space-x-2"
         >
-          Contact Agent
+          <Phone size={18} />
+          <span className="text-white">Contact Agent</span>
         </button>
         <button 
           onClick={onRequestTour}
-          className="w-full border-2 border-amber-500 text-amber-500 hover:bg-amber-500 hover:text-white font-semibold py-3 rounded-xl transition-all duration-200 hover:shadow-lg active:scale-95"
+          className="w-full border-2 border-amber-500  hover:bg-amber-500 hover:text-white text-amber-500 font-semibold py-3.5 rounded-xl transition-all duration-300 hover:shadow-lg active:scale-95 flex items-center justify-center space-x-2"
         >
-          Schedule Tour
+          <Calendar size={18} />
+          <span className="hover:text-white text-amber-500">Schedule Tour</span>
+        </button>
+      </div>
+
+      {/* Enhanced Property Page Button */}
+      <div className={`p-4 border rounded-xl ${
+        theme === "dark" 
+          ? "bg-gradient-to-r from-gray-800 to-gray-900 border-gray-700" 
+          : "bg-gradient-to-r from-amber-50 to-amber-100 border-amber-200"
+      }`}>
+        <div className="flex items-center justify-between mb-3">
+          <div>
+            <h5 className={`font-semibold ${
+              theme === "dark" ? "text-white" : "text-gray-900"
+            }`}>
+              Want More Details?
+            </h5>
+            <p className={`text-sm mt-1 ${
+              theme === "dark" ? "text-gray-400" : "text-gray-600"
+            }`}>
+              View full property page
+            </p>
+          </div>
+          <div className="w-10 h-10 rounded-lg bg-amber-500 flex items-center justify-center">
+            <ExternalLink size={20} className="text-white" />
+          </div>
+        </div>
+        <button className={`w-full py-3 rounded-lg transition-all duration-300 flex items-center justify-center space-x-2 ${
+          theme === "dark"
+            ? "bg-gray-700 hover:bg-gray-600 text-white"
+            : "bg-white hover:bg-gray-100 text-gray-900 border border-gray-300"
+        } hover:shadow-md`}>
+          <Compass size={16} />
+          <span className={`font-medium ${
+          theme === "dark"
+            ? " text-white"
+            : "  text-gray-900 "
+        }`}>View Property Page</span>
+          <ArrowRight size={16} />
         </button>
       </div>
 
       {/* Listing Details */}
-      <div className={`p-4 border rounded-xl ${theme === "dark" ? "border-gray-600" : "border-gray-200"}`}>
-        <h5 className="font-semibold mb-3 text-amber-600 dark:text-amber-400">Listing Details</h5>
+      <div className={`p-4 border rounded-xl ${
+        theme === "dark" 
+          ? "bg-gray-800 border-gray-600" 
+          : "bg-white border-gray-200"
+      }`}>
+        <h5 className="font-semibold mb-3 text-amber-600 dark:text-amber-400 flex items-center">
+          <FileText size={16} className="mr-2" />
+          Listing Details
+        </h5>
         <div className="space-y-3 text-sm">
           <div className="flex justify-between items-center py-2 border-b border-gray-200 dark:border-gray-600">
-            <span className="text-gray-600 dark:text-gray-400">MLS Number</span>
+            <span className={theme === "dark" ? "text-gray-400" : "text-gray-600"}>MLS Number</span>
             <span className="font-mono font-semibold">{mlsNumber}</span>
           </div>
           <div className="flex justify-between items-center py-2 border-b border-gray-200 dark:border-gray-600">
-            <span className="text-gray-600 dark:text-gray-400">Source</span>
+            <span className={theme === "dark" ? "text-gray-400" : "text-gray-600"}>Source</span>
             <span className="font-semibold">{source}</span>
           </div>
           <div className="flex justify-between items-center py-2">
-            <span className="text-gray-600 dark:text-gray-400">Listed</span>
+            <span className={theme === "dark" ? "text-gray-400" : "text-gray-600"}>Listed</span>
             <span className="font-semibold">{listedDate} days ago</span>
           </div>
         </div>
@@ -499,19 +701,63 @@ const BrokerInfo = ({ broker, mlsNumber, source, listedDate, theme, onContactAge
   </div>
 );
 
-// Modern Features Section
+// Tabs Component with improved styling
+const TabsSection = ({ activeTab, setActiveTab, theme }) => {
+  const tabs = [
+    { id: "overview", label: "Overview", icon: Home },
+    { id: "features", label: "Features", icon: Star },
+    { id: "price", label: "Price & Tax", icon: TrendingUp },
+    { id: "schools", label: "Schools", icon: School },
+    { id: "floorplans", label: "Floor Plans", icon: Building }
+  ];
+
+  return (
+    <div className={`border-b ${
+      theme === "dark" ? "border-gray-700" : "border-gray-200"
+    }`}>
+      <nav className="flex space-x-1 px-6 overflow-x-auto ">
+        {tabs.map(tab => (
+          <button
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id)}
+            className={`flex items-center space-x-2 py-3 px-4  border-b-2 font-medium whitespace-nowrap transition-all duration-300 ${
+              activeTab === tab.id 
+                ? "border-amber-500 text-amber-500 text-lg" 
+                : theme === "dark"
+                  ? "border-transparent text-gray-400 hover:text-gray-300 hover:border-gray-500"
+                  : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+            }`}
+          >
+            <tab.icon size={16} />
+            <span className="text-lg text-gray-700">{tab.label}</span>
+          </button>
+        ))}
+      </nav>
+    </div>
+  );
+};
+
+// Features Section with improved visibility
 const FeaturesSection = ({ features, theme }) => (
   <div>
-    <h3 className={`text-lg font-semibold mb-6 ${theme === "dark" ? "text-white" : "text-gray-900"}`}>
+    <h3 className={`text-lg font-semibold mb-6 ${
+      theme === "dark" ? "text-white" : "text-gray-900"
+    }`}>
       Features & Amenities
     </h3>
     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
       {features.map((feature, i) => (
-        <div key={i} className={`flex items-center space-x-3 p-3 border rounded-xl ${
-          theme === "dark" ? "border-gray-700" : "border-gray-200"
-        } hover:border-amber-300 transition-colors group`}>
-          <div className="w-2 h-2 bg-amber-500 rounded-full group-hover:scale-125 transition-transform"></div>
-          <span className={`font-medium ${theme === "dark" ? "text-white" : "text-gray-900"}`}>
+        <div key={i} className={`flex items-center space-x-3 p-3 border rounded-xl transition-all duration-300 hover:scale-[1.02] ${
+          theme === "dark" 
+            ? "bg-gray-800 border-gray-700 hover:border-amber-500" 
+            : "bg-white border-gray-200 hover:border-amber-400"
+        }`}>
+          <div className={`w-2 h-2 rounded-full ${
+            theme === "dark" ? "bg-amber-500" : "bg-amber-400"
+          }`}></div>
+          <span className={`font-medium ${
+            theme === "dark" ? "text-white" : "text-gray-900"
+          }`}>
             {feature}
           </span>
         </div>
@@ -520,54 +766,294 @@ const FeaturesSection = ({ features, theme }) => (
   </div>
 );
 
-// Modern Facts Section
+// Facts Section with consistent theming
 const FactsSection = ({ propertyType, yearBuilt, lotSize, pricePerSqft, theme, formatCurrency }) => (
   <div className={`p-6 border rounded-xl ${
-    theme === "dark" ? "border-gray-700" : "border-gray-200"
+    theme === "dark" 
+      ? "bg-gradient-to-r from-gray-800 to-gray-900 border-gray-700" 
+      : "bg-gradient-to-r from-gray-50 to-white border-gray-200"
   }`}>
     <h4 className="font-semibold mb-4 text-amber-600 dark:text-amber-400">Property Details</h4>
     <div className="space-y-4">
-      <div className="flex justify-between items-center">
-        <span className="text-gray-600 dark:text-gray-400 font-medium">Property Type</span>
-        <span className="font-semibold text-gray-900 dark:text-white">{propertyType}</span>
+      {[
+        { label: "Property Type", value: propertyType },
+        { label: "Year Built", value: yearBuilt },
+        { label: "Lot Size", value: `${lotSize} sqft` },
+        { label: "Price per sqft", value: formatCurrency(pricePerSqft), highlight: true }
+      ].map((item, i) => (
+        <div key={i} className="flex justify-between items-center py-2 border-b last:border-b-0 border-gray-200 dark:border-gray-600">
+          <span className={theme === "dark" ? "text-gray-400" : "text-gray-600"}>{item.label}</span>
+          <span className={`font-semibold ${
+            item.highlight ? 'text-amber-600 dark:text-amber-400' : theme === "dark" ? "text-white" : "text-gray-900"
+          }`}>
+            {item.value}
+          </span>
+        </div>
+      ))}
+    </div>
+  </div>
+);
+
+// Stats Section with improved visibility
+const StatsSection = ({ listedDate, views, saves, theme }) => (
+  <div className="flex flex-wrap gap-3">
+    <span className={`flex items-center space-x-2 px-4 py-2.5 rounded-lg transition-all duration-300  ${
+      theme === "dark" 
+        ? "bg-gray-800 text-amber-300 hover:bg-gray-700" 
+        : "bg-amber-100 text-amber-700 hover:bg-amber-200"
+    }`}>
+      <Clock size={16} />
+      <span className="font-medium text-gray-700">{listedDate} days listed</span>
+    </span>
+    <span className={`flex items-center space-x-2 px-4 py-2.5 rounded-lg transition-all duration-300  ${
+      theme === "dark" 
+        ? "bg-gray-800 text-amber-300 hover:bg-gray-700" 
+        : "bg-amber-100 text-amber-700 hover:bg-amber-200"
+    }`}>
+      <Eye size={16} />
+      <span className="font-medium text-gray-700">{views} views</span>
+    </span>
+    <span className={`flex items-center space-x-2 px-4 py-2.5 rounded-lg transition-all duration-300  ${
+      theme === "dark" 
+        ? "bg-gray-800 text-amber-300 hover:bg-gray-700" 
+        : "bg-amber-100 text-amber-700 hover:bg-amber-200"
+    }`}>
+      <Heart size={16} />
+      <span className="font-medium text-gray-700">{saves} saves</span>
+    </span>
+  </div>
+);
+
+// Price History Section with proper text colors
+const PriceHistorySection = ({ priceHistory, theme, formatDate, formatCurrency }) => (
+  <div>
+    <h3 className={`text-lg font-semibold mb-4 ${
+      theme === "dark" ? "text-white" : "text-gray-900"
+    }`}>
+      Price History
+    </h3>
+    <div className={`border rounded-xl overflow-hidden ${
+      theme === "dark" ? "border-gray-700" : "border-gray-200"
+    }`}>
+      <div className={`grid grid-cols-3 py-3 px-4 border-b ${
+        theme === "dark" ? "bg-gray-800 border-gray-700" : "bg-gray-50 border-gray-200"
+      }`}>
+        <span className={`font-medium text-sm ${
+          theme === "dark" ? "text-gray-300" : "text-gray-700"
+        }`}>Date</span>
+        <span className={`font-medium text-sm ${
+          theme === "dark" ? "text-gray-300" : "text-gray-700"
+        }`}>Event</span>
+        <span className={`font-medium text-sm ${
+          theme === "dark" ? "text-gray-300" : "text-gray-700"
+        }`}>Price</span>
       </div>
-      <div className="flex justify-between items-center">
-        <span className="text-gray-600 dark:text-gray-400 font-medium">Year Built</span>
-        <span className="font-semibold text-gray-900 dark:text-white">{yearBuilt}</span>
-      </div>
-      <div className="flex justify-between items-center">
-        <span className="text-gray-600 dark:text-gray-400 font-medium">Lot Size</span>
-        <span className="font-semibold text-gray-900 dark:text-white">{lotSize} sqft</span>
-      </div>
-      <div className="flex justify-between items-center">
-        <span className="text-gray-600 dark:text-gray-400 font-medium">Price per sqft</span>
-        <span className="font-semibold text-amber-600 dark:text-amber-400">{formatCurrency(pricePerSqft)}</span>
+      <div className="divide-y divide-gray-200 dark:divide-gray-700">
+        {priceHistory.map((item, i) => (
+          <div key={i} className="grid grid-cols-3 py-3 px-4 hover:bg-gray-50  transition-colors">
+            <span className={`text-sm ${
+              theme === "dark" ? "text-gray-300" : "text-gray-700"
+            }`}>{formatDate(item.date)}</span>
+            <span className={`text-sm ${
+              theme === "dark" ? "text-gray-300" : "text-gray-700"
+            }`}>{item.event}</span>
+            <span className={`text-sm font-semibold ${
+              item.change ? 'text-green-600 dark:text-green-400' : theme === "dark" ? "text-white" : "text-gray-900"
+            }`}>
+              {formatCurrency(item.price)}
+            </span>
+          </div>
+        ))}
       </div>
     </div>
   </div>
 );
 
-// Modern Stats Section
-const StatsSection = ({ listedDate, views, saves, theme }) => (
-  <div className="flex items-center space-x-4 text-sm">
-    <span className={`flex items-center space-x-2 px-3 py-2 rounded-lg ${
-      theme === "dark" ? "bg-gray-800 text-amber-300" : "bg-amber-100 text-amber-700"
+// Tax History Section with proper text colors
+const TaxHistorySection = ({ taxHistory, theme, formatCurrency }) => (
+  <div>
+    <h3 className={`text-lg font-semibold mb-4 ${
+      theme === "dark" ? "text-white" : "text-gray-900"
     }`}>
-      <Clock size={14} />
-      <span className="font-medium">{listedDate} days</span>
-    </span>
-    <span className={`flex items-center space-x-2 px-3 py-2 rounded-lg ${
-      theme === "dark" ? "bg-gray-800 text-amber-300" : "bg-amber-100 text-amber-700"
+      Tax History
+    </h3>
+    <div className={`border rounded-xl overflow-hidden ${
+      theme === "dark" ? "border-gray-700" : "border-gray-200"
     }`}>
-      <Eye size={14} />
-      <span className="font-medium">{views} views</span>
-    </span>
-    <span className={`flex items-center space-x-2 px-3 py-2 rounded-lg ${
-      theme === "dark" ? "bg-gray-800 text-amber-300" : "bg-amber-100 text-amber-700"
+      <div className={`grid grid-cols-4 py-3 px-4 border-b ${
+        theme === "dark" ? "bg-gray-800 border-gray-700" : "bg-gray-50 border-gray-200"
+      }`}>
+        <span className={`font-medium text-sm ${
+          theme === "dark" ? "text-gray-300" : "text-gray-700"
+        }`}>Year</span>
+        <span className={`font-medium text-sm ${
+          theme === "dark" ? "text-gray-300" : "text-gray-700"
+        }`}>Assessment</span>
+        <span className={`font-medium text-sm ${
+          theme === "dark" ? "text-gray-300" : "text-gray-700"
+        }`}>Tax</span>
+        <span className={`font-medium text-sm ${
+          theme === "dark" ? "text-gray-300" : "text-gray-700"
+        }`}>Change</span>
+      </div>
+      <div className="divide-y divide-gray-200 dark:divide-gray-700">
+        {taxHistory.map((item, i) => (
+          <div key={i} className="grid grid-cols-4 py-3 px-4 hover:bg-gray-50  transition-colors">
+            <span className={`text-sm ${
+              theme === "dark" ? "text-gray-300" : "text-gray-700"
+            }`}>{item.year}</span>
+            <span className={`text-sm font-semibold ${
+              theme === "dark" ? "text-white" : "text-gray-900"
+            }`}>{formatCurrency(item.assessment)}</span>
+            <span className={`text-sm ${
+              theme === "dark" ? "text-gray-300" : "text-gray-700"
+            }`}>{formatCurrency(item.tax)}</span>
+            <span className={`text-sm ${
+              item.change?.startsWith('+') ? 'text-green-600 dark:text-green-400' : 
+              item.change?.startsWith('-') ? 'text-red-600 dark:text-red-400' : 
+              theme === "dark" ? "text-gray-300" : "text-gray-700"
+            }`}>
+              {item.change || '-'}
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  </div>
+);
+
+// Schools Section with proper text colors
+const SchoolsSection = ({ nearbySchools, theme }) => (
+  <div>
+    <h3 className={`text-lg font-semibold mb-4 ${
+      theme === "dark" ? "text-white" : "text-gray-900"
     }`}>
-      <Heart size={14} />
-      <span className="font-medium">{saves} saves</span>
-    </span>
+      Nearby Schools
+    </h3>
+    <div className="space-y-4">
+      {nearbySchools.map((school, i) => (
+        <div key={i} className={`p-4 border rounded-xl ${
+          theme === "dark" ? "border-gray-700 bg-gray-800" : "border-gray-200 bg-white"
+        }`}>
+          <div className="flex justify-between items-start mb-2">
+            <div>
+              <h4 className={`font-semibold ${
+                theme === "dark" ? "text-white" : "text-gray-900"
+              }`}>
+                {school.name}
+              </h4>
+              <p className={`text-sm ${
+                theme === "dark" ? "text-gray-400" : "text-gray-600"
+              }`}>
+                {school.grades} • {school.type} • {school.distance} miles away
+              </p>
+            </div>
+            <div className="flex items-center space-x-2">
+              <div className="flex">
+                {[...Array(5)].map((_, j) => (
+                  <Star key={j} size={14} className={`${
+                    j < Math.floor(school.rating / 2) 
+                      ? 'text-amber-500 fill-amber-500' 
+                      : theme === "dark" ? 'text-gray-600' : 'text-gray-300'
+                  }`} />
+                ))}
+              </div>
+              <span className={`text-sm font-semibold ${
+                theme === "dark" ? "text-white" : "text-gray-900"
+              }`}>{school.rating}/10</span>
+            </div>
+          </div>
+          {school.description && (
+            <p className={`text-sm mt-2 ${
+              theme === "dark" ? "text-gray-300" : "text-gray-700"
+            }`}>
+              {school.description}
+            </p>
+          )}
+        </div>
+      ))}
+    </div>
+  </div>
+);
+
+// Floor Plans Section with proper text colors
+const FloorPlansSection = ({ floorPlans, selectedFloorPlan, setSelectedFloorPlan, theme }) => (
+  <div className="space-y-6">
+    <h3 className={`text-lg font-semibold mb-6 ${
+      theme === "dark" ? "text-white" : "text-gray-900"
+    }`}>
+      Floor Plans
+    </h3>
+    {floorPlans.length ? (
+      <>
+        <div className="flex space-x-3 overflow-x-auto pb-4">
+          {floorPlans.map((plan, i) => (
+            <button 
+              key={i} 
+              onClick={() => setSelectedFloorPlan(i)} 
+              className={`px-6 py-3 border font-medium whitespace-nowrap transition-all duration-300 ${
+                selectedFloorPlan === i 
+                  ? "bg-amber-500 border-amber-500 text-white shadow-lg" 
+                  : theme === "dark" 
+                    ? "border-gray-600 hover:border-gray-400 hover:bg-gray-700 text-gray-300" 
+                    : "border-gray-300 hover:border-gray-400 hover:bg-gray-50 text-gray-700"
+              }`}
+            >
+              {plan.name}
+            </button>
+          ))}
+        </div>
+        <div className={`p-6 border rounded-xl ${
+          theme === "dark" ? "border-gray-700" : "border-gray-200"
+        }`}>
+          <div className="flex justify-between items-center mb-6">
+            <div>
+              <h4 className={`text-xl font-semibold mb-2 ${
+                theme === "dark" ? "text-white" : "text-gray-900"
+              }`}>
+                {floorPlans[selectedFloorPlan].name}
+              </h4>
+              <p className={`text-sm ${
+                theme === "dark" ? "text-gray-400" : "text-gray-600"
+              }`}>
+                {floorPlans[selectedFloorPlan].sqft} sqft • 
+                {floorPlans[selectedFloorPlan].beds} beds • 
+                {floorPlans[selectedFloorPlan].baths} baths
+              </p>
+            </div>
+            <button className={`flex items-center space-x-2 px-6 py-3 border font-medium transition-all duration-300 ${
+              theme === "dark"
+                ? "border-amber-500 text-amber-500 hover:bg-amber-500 hover:text-white"
+                : "border-amber-500 text-amber-500 hover:bg-amber-500 hover:text-white"
+            } hover:shadow-lg`}>
+              <Download size={18} />
+              <span>Download</span>
+            </button>
+          </div>
+          <div className={`overflow-hidden rounded-lg ${
+            theme === "dark" ? "bg-gray-800" : "bg-gray-100"
+          }`}>
+            <img 
+              src={floorPlans[selectedFloorPlan].image} 
+              alt={floorPlans[selectedFloorPlan].name} 
+              className="w-full h-80 object-contain" 
+            />
+          </div>
+        </div>
+      </>
+    ) : (
+      <div className={`text-center py-12 rounded-xl ${
+        theme === "dark" ? "bg-gray-800" : "bg-gray-50"
+      }`}>
+        <Layers size={48} className="mx-auto mb-4 opacity-50" />
+        <p className={`text-lg font-semibold mb-2 ${
+          theme === "dark" ? "text-white" : "text-gray-900"
+        }`}>No floor plans available</p>
+        <p className={theme === "dark" ? "text-gray-400" : "text-gray-500"}>
+          Contact agent for architectural drawings
+        </p>
+      </div>
+    )}
   </div>
 );
 
@@ -582,6 +1068,7 @@ const PropertyDetailsPopup = ({ property, isOpen, onClose, onNavigateToPropertie
   const [progress, setProgress] = useState(0);
   const [showContactAgent, setShowContactAgent] = useState(false);
   const [showRequestTour, setShowRequestTour] = useState(false);
+  const [showActionButtons, setShowActionButtons] = useState(true);
   const progressIntervalRef = useRef(null);
 
   const SLIDE_DURATION = 5000;
@@ -631,8 +1118,11 @@ const PropertyDetailsPopup = ({ property, isOpen, onClose, onNavigateToPropertie
   }, [isOpen, isPlaying, selectedImageIndex, property?.images?.length]);
 
   useEffect(() => {
-    if (isOpen) document.body.style.overflow = "hidden";
-    else document.body.style.overflow = "unset";
+    if (isOpen) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "unset";
+    }
     return () => { 
       document.body.style.overflow = "unset"; 
       clearInterval(progressIntervalRef.current); 
@@ -649,72 +1139,86 @@ const PropertyDetailsPopup = ({ property, isOpen, onClose, onNavigateToPropertie
 
   return (
     <>
-      <div className="fixed inset-0 z-50 overflow-y-auto bg-black/60 backdrop-blur-sm" onClick={onClose}>
+      <div className="fixed inset-0 z-50 overflow-y-auto bg-black/70 backdrop-blur-md" onClick={onClose}>
         <div className="min-h-screen flex items-center justify-center p-4">
           <div
-            className={`relative w-full max-w-7xl rounded-2xl overflow-hidden shadow-2xl ${
-              theme === "dark" ? "bg-gray-900" : "bg-white"
+            className={`relative w-full max-w-7xl rounded-2xl overflow-hidden shadow-2xl border ${
+              theme === "dark" 
+                ? "bg-gray-900 border-gray-800" 
+                : "bg-white border-gray-200"
             }`}
             onClick={e => e.stopPropagation()}
           >
-            {/* Header */}
-            <div className={`flex items-center justify-between p-6 border-b ${
+            {/* Header with Navigation Buttons */}
+            <div className={`p-6 border-b ${
               theme === "dark" ? "border-gray-700" : "border-gray-200"
             }`}>
-              <button onClick={onClose} className={`p-2 rounded-lg transition-colors ${
-                theme === "dark" ? "hover:bg-gray-800 text-white" : "hover:bg-gray-100 text-gray-600"
-              }`}>
-                <X size={20} />
-              </button>
-              
-              {/* Centered Logo */}
-              <div className="absolute left-1/2 -translate-x-1/2 flex items-center space-x-3">
-                <div className="w-8 h-8 rounded-lg bg-gradient-to-r from-amber-400 to-amber-600 flex items-center justify-center font-bold text-white shadow-lg">
-                  W
-                </div>
-                <span className={`text-xl font-bold ${theme === "dark" ? "text-white" : "text-gray-900"}`}>
-                  WubLand
-                </span>
-              </div>
-              
-              <div className="flex items-center space-x-2">
-                <button 
-                  onClick={() => setIsFavorite(f => !f)} 
-                  className={`p-2 rounded-lg transition-colors ${
-                    isFavorite 
-                      ? "text-red-500" 
-                      : theme === "dark" ? "text-gray-400 hover:text-white" : "text-gray-500 hover:text-gray-700"
-                  }`}
-                >
-                  <Heart size={18} fill={isFavorite ? "currentColor" : "none"} />
-                </button>
-                <button className={`p-2 rounded-lg transition-colors ${
-                  theme === "dark" ? "text-gray-400 hover:text-white" : "text-gray-500 hover:text-gray-700"
-                }`}>
-                  <Share2 size={18} />
-                </button>
-              </div>
+              <NavigationButtons 
+                theme={theme} 
+                onClose={onClose} 
+                onNavigateToProperties={onNavigateToProperties} 
+                property={property}
+              />
             </div>
 
-            {/* Price & Address Section - Reduced Size */}
-            <div className={`p-6 border-b ${theme === "dark" ? "border-gray-700" : "border-gray-200"}`}>
-              <div className="flex items-center space-x-3 mb-3">
-                <div className={`px-3 py-1 text-xs font-semibold text-white ${
-                  propertyStatus === 'for sale'
-                    ? "bg-green-500"
-                    : "bg-amber-500"
-                } rounded-lg shadow-sm`}>
-                  {propertyStatus === 'for sale' ? 'FOR SALE' : 'FOR RENT'}
+            {/* Price & Address Section */}
+            <div className={`p-6 border-b ${
+              theme === "dark" ? "border-gray-700" : "border-gray-200"
+            }`}>
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <div className="flex items-center space-x-3 mb-3">
+                    <div className={`px-3 py-1 text-xs font-semibold text-white ${
+                      propertyStatus === 'for sale'
+                        ? "bg-gradient-to-r from-green-500 to-green-600"
+                        : "bg-gradient-to-r from-amber-500 to-amber-600"
+                    } rounded-lg shadow-sm`}>
+                      {propertyStatus === 'for sale' ? 'FOR SALE' : 'FOR RENT'}
+                    </div>
+                    <span className={`text-xs ${
+                      theme === "dark" ? "text-gray-400" : "text-gray-500"
+                    }`}>
+                      MLS# {mlsNumber}
+                    </span>
+                  </div>
+                  <h1 className={`text-2xl font-bold mb-2 ${
+                    theme === "dark" ? "text-white" : "text-gray-900"
+                  }`}>
+                    {formatCurrency(price)}
+                  </h1>
+                  <p className={`flex items-center text-base ${
+                    theme === "dark" ? "text-gray-300" : "text-gray-700"
+                  }`}>
+                    <MapPin size={16} className="mr-2 text-amber-500" />
+                    {address}, {city}, {region}
+                  </p>
                 </div>
-                <span className="text-xs text-gray-500">MLS# {mlsNumber}</span>
+                
+                {/* Action Buttons */}
+                {showActionButtons && (
+                  <div className="flex items-center space-x-3">
+                    <button 
+                      onClick={() => setIsFavorite(f => !f)} 
+                      className={`p-2.5 rounded-lg transition-all duration-300 hover:scale-110 ${
+                        isFavorite 
+                          ? "bg-red-500/10 text-red-500 border border-red-500/20" 
+                          : theme === "dark" 
+                            ? "bg-gray-800 text-gray-400 hover:text-white hover:bg-gray-700 border border-gray-700"
+                            : "bg-white text-gray-500 hover:text-gray-700 hover:bg-gray-100 border border-gray-300"
+                      }`}
+                    >
+                      <Heart size={18} fill={isFavorite ? "currentColor" : "none"} />
+                    </button>
+                    <button className={`p-2.5 rounded-lg transition-all duration-300 hover:scale-110 ${
+                      theme === "dark" 
+                        ? "bg-gray-800 text-gray-400 hover:text-white hover:bg-gray-700 border border-gray-700"
+                        : "bg-white text-gray-500 hover:text-gray-700 hover:bg-gray-100 border border-gray-300"
+                    }`}>
+                      <Share2 size={18} />
+                    </button>
+                  </div>
+                )}
               </div>
-              <h1 className={`text-2xl font-bold mb-2 ${theme === "dark" ? "text-white" : "text-gray-900"}`}>
-                {formatCurrency(price)}
-              </h1>
-              <p className={`flex items-center text-base ${theme === "dark" ? "text-gray-300" : "text-gray-700"}`}>
-                <MapPin size={16} className="mr-2 text-amber-500" />
-                {address}, {city}, {region}
-              </p>
             </div>
 
             <div className="flex flex-col md:flex-row">
@@ -726,7 +1230,7 @@ const PropertyDetailsPopup = ({ property, isOpen, onClose, onNavigateToPropertie
                   handleThumbnailClick={handleThumbnailClick} toggleAutoPlay={toggleAutoPlay} isPlaying={isPlaying}
                 />
                 
-                {/* Modern Property Stats */}
+                {/* Property Stats */}
                 <PropertyStats 
                   beds={beds} 
                   baths={baths} 
@@ -738,40 +1242,25 @@ const PropertyDetailsPopup = ({ property, isOpen, onClose, onNavigateToPropertie
                 />
 
                 {/* Tabs */}
-                <div className={`border-b ${theme === "dark" ? "border-gray-700" : "border-gray-200"}`}>
-                  <nav className="flex space-x-1 px-6 overflow-x-auto">
-                    {[
-                      { id: "overview", label: "Overview", icon: Home },
-                      { id: "features", label: "Features", icon: Star },
-                      { id: "price", label: "Price & Tax", icon: TrendingUp },
-                      { id: "schools", label: "Schools", icon: School },
-                      { id: "floorplans", label: "Floor Plans", icon: Building }
-                    ].map(tab => (
-                      <button
-                        key={tab.id}
-                        onClick={() => setActiveTab(tab.id)}
-                        className={`flex items-center space-x-2 py-3 px-4 border-b-2 font-medium whitespace-nowrap transition-all duration-200 ${
-                          activeTab === tab.id 
-                            ? "border-amber-500 text-amber-500" 
-                            : "border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
-                        }`}
-                      >
-                        <tab.icon size={16} />
-                        <span className="text-sm">{tab.label}</span>
-                      </button>
-                    ))}
-                  </nav>
-                </div>
+                <TabsSection 
+                  activeTab={activeTab} 
+                  setActiveTab={setActiveTab} 
+                  theme={theme} 
+                />
 
                 {/* Tab Content */}
-                <div className="p-6 space-y-6">
+                <div className="p-6 space-y-8">
                   {activeTab === "overview" && (
                     <>
                       <div>
-                        <h3 className={`text-lg font-semibold mb-4 ${theme === "dark" ? "text-white" : "text-gray-900"}`}>
+                        <h3 className={`text-lg font-semibold mb-4 ${
+                          theme === "dark" ? "text-white" : "text-gray-900"
+                        }`}>
                           Property Description
                         </h3>
-                        <p className={`text-base leading-relaxed ${theme === "dark" ? "text-gray-300" : "text-gray-700"}`}>
+                        <p className={`text-base leading-relaxed ${
+                          theme === "dark" ? "text-gray-300" : "text-gray-700"
+                        }`}>
                           {description}
                         </p>
                       </div>
@@ -797,80 +1286,39 @@ const PropertyDetailsPopup = ({ property, isOpen, onClose, onNavigateToPropertie
                   {activeTab === "features" && (
                     <FeaturesSection features={features} theme={theme} />
                   )}
+                  
                   {activeTab === "price" && (
                     <div className="space-y-8">
-                      <PriceHistorySection priceHistory={priceHistory} theme={theme} formatDate={formatDate} formatCurrency={formatCurrency} />
-                      <TaxHistorySection taxHistory={taxHistory} theme={theme} formatCurrency={formatCurrency} />
+                      <PriceHistorySection 
+                        priceHistory={priceHistory} 
+                        theme={theme} 
+                        formatDate={formatDate} 
+                        formatCurrency={formatCurrency} 
+                      />
+                      <TaxHistorySection 
+                        taxHistory={taxHistory} 
+                        theme={theme} 
+                        formatCurrency={formatCurrency} 
+                      />
                     </div>
                   )}
 
-                  {activeTab === "schools" && <SchoolsSection nearbySchools={nearbySchools} theme={theme} />}
+                  {activeTab === "schools" && (
+                    <SchoolsSection nearbySchools={nearbySchools} theme={theme} />
+                  )}
 
                   {activeTab === "floorplans" && (
-                    <div className="space-y-6">
-                      <h3 className={`text-xl font-semibold mb-6 ${theme === "dark" ? "text-white" : "text-gray-900"}`}>
-                        Floor Plans
-                      </h3>
-                      {floorPlans.length ? (
-                        <>
-                          <div className="flex space-x-3 overflow-x-auto pb-4">
-                            {floorPlans.map((plan, i) => (
-                              <button 
-                                key={i} 
-                                onClick={() => setSelectedFloorPlan(i)} 
-                                className={`px-6 py-3 border font-medium whitespace-nowrap transition-all duration-200 ${
-                                  selectedFloorPlan === i 
-                                    ? "border-amber-500 bg-amber-500 text-white shadow-lg" 
-                                    : theme === "dark" 
-                                      ? "border-gray-600 hover:border-gray-400 hover:bg-gray-700" 
-                                      : "border-gray-300 hover:border-gray-400 hover:bg-gray-50"
-                                }`}
-                              >
-                                {plan.name}
-                              </button>
-                            ))}
-                          </div>
-                          <div className={`p-6 border rounded-lg ${
-                            theme === "dark" ? "border-gray-700" : "border-gray-200"
-                          }`}>
-                            <div className="flex justify-between items-center mb-6">
-                              <div>
-                                <h4 className="text-xl font-semibold mb-2">{floorPlans[selectedFloorPlan].name}</h4>
-                                <p className="text-gray-600 dark:text-gray-400">
-                                  {floorPlans[selectedFloorPlan].sqft} sqft • 
-                                  {floorPlans[selectedFloorPlan].beds} beds • 
-                                  {floorPlans[selectedFloorPlan].baths} baths
-                                </p>
-                              </div>
-                              <button className="flex items-center space-x-2 px-6 py-3 border border-amber-500 text-amber-500 hover:bg-amber-500 hover:text-white transition-all duration-200 font-medium hover:shadow-lg">
-                                <Download size={18} />
-                                <span>Download</span>
-                              </button>
-                            </div>
-                            <div className="bg-gray-100 dark:bg-gray-800 overflow-hidden rounded-lg">
-                              <img 
-                                src={floorPlans[selectedFloorPlan].image} 
-                                alt={floorPlans[selectedFloorPlan].name} 
-                                className="w-full h-80 object-contain" 
-                              />
-                            </div>
-                          </div>
-                        </>
-                      ) : (
-                        <div className={`text-center py-12 rounded-lg ${
-                          theme === "dark" ? "bg-gray-800" : "bg-gray-50"
-                        }`}>
-                          <Layers size={48} className="mx-auto mb-4 opacity-50" />
-                          <p className="text-lg font-semibold mb-2">No floor plans available</p>
-                          <p className="text-gray-500">Contact agent for architectural drawings</p>
-                        </div>
-                      )}
-                    </div>
+                    <FloorPlansSection 
+                      floorPlans={floorPlans} 
+                      selectedFloorPlan={selectedFloorPlan} 
+                      setSelectedFloorPlan={setSelectedFloorPlan} 
+                      theme={theme} 
+                    />
                   )}
                 </div>
               </div>
 
-              {/* Right Sidebar - Fixed width and visible */}
+              {/* Right Sidebar */}
               <BrokerInfo 
                 broker={broker} 
                 mlsNumber={mlsNumber} 
@@ -885,7 +1333,7 @@ const PropertyDetailsPopup = ({ property, isOpen, onClose, onNavigateToPropertie
         </div>
       </div>
 
-      {/* Popup Modals - Now they should work */}
+      {/* Popup Modals */}
       <ContactAgentPopup 
         agent={broker}
         property={property}
@@ -901,5 +1349,13 @@ const PropertyDetailsPopup = ({ property, isOpen, onClose, onNavigateToPropertie
     </>
   );
 };
+
+// Missing Camera icon component
+const Camera = (props) => (
+  <svg {...props} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+  </svg>
+);
 
 export default PropertyDetailsPopup;

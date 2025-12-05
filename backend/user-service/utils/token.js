@@ -1,6 +1,5 @@
 // utils/token.js
 import jwt from "jsonwebtoken";
-import privilegeService from '../services/privilege.service.js';
 
 export const generateToken = (user, res, expiresIn = '7d') => {
     console.log('User object passed to generateToken:', user);
@@ -16,13 +15,13 @@ export const generateToken = (user, res, expiresIn = '7d') => {
         };
         console.log('Generated Password Change Token Payload:', payload);
     } else {
-        // Regular user token - DON'T call privilegeService here to avoid circular dependency
+        // Regular user token - REMOVE broker_type as it's not in users table
         payload = { 
             userId: user.id, 
             username: user.username,
             role: user.role,
-            broker_type: user.broker_type,
             privilege_tier: user.privilege_tier || 'basic'
+            // REMOVED: broker_type: user.broker_type,
         };
         console.log('Generated Regular Token Payload:', payload);
     }
@@ -40,4 +39,46 @@ export const generateToken = (user, res, expiresIn = '7d') => {
     }
 
     return token;
+};
+
+export const verifyToken = async (req, res, next) => {
+    const token = req.cookies?.jwt || req.headers?.authorization?.split(' ')[1];
+    
+    if (!token) {
+        return res.status(401).json({ message: 'Access denied. No token provided.' });
+    }
+
+    try {
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        
+        // Get user from database WITHOUT broker_type
+        const db = await import("../shared/db.js").then(mod => mod.default);
+        const [users] = await db.query(
+            "SELECT id, first_name, last_name, username, email, role, privilege_tier, status, profile_picture, verified FROM users WHERE id = ?",
+            [decoded.userId]
+        );
+        
+        if (users.length === 0) {
+            return res.status(401).json({ message: 'User not found.' });
+        }
+        
+        const user = users[0];
+        
+        // If we need broker_type for brokers, fetch it separately
+        if (user.role.includes('broker')) {
+            const [brokerProfiles] = await db.query(
+                "SELECT broker_type FROM broker_profiles WHERE user_id = ?",
+                [user.id]
+            );
+            if (brokerProfiles.length > 0) {
+                user.broker_type = brokerProfiles[0].broker_type;
+            }
+        }
+        
+        req.user = user;
+        next();
+    } catch (error) {
+        console.error('❌ verifyToken error:', error.message);
+        return res.status(401).json({ message: 'Invalid token.' });
+    }
 };

@@ -44,6 +44,7 @@ import EmojiPicker from "emoji-picker-react";
 import { useNavigate } from "react-router-dom";
 import { useTheme } from "../contexts/ThemeContext";
 
+// Error Boundary Component
 class ErrorBoundary extends React.Component {
   state = { hasError: false };
 
@@ -69,8 +70,8 @@ class ErrorBoundary extends React.Component {
   }
 }
 
-// Extracted MessageInputWithPrivileges component - NOW OUTSIDE ChatApp
-const MessageInputWithPrivileges = ({
+// Message Input Component
+const MessageInput = ({
   theme,
   userRole,
   messageCount,
@@ -94,26 +95,21 @@ const MessageInputWithPrivileges = ({
   getFileIcon
 }) => {
   const upgradeMessage = getUpgradeMessage();
-  
-  // Handle file input change
+
   const handleFileInputChange = (e, inputType = 'file') => {
     const file = e.target.files[0];
     if (file) {
       handleFileSelect(file);
     }
-    // Reset input value to allow selecting same file again
     e.target.value = '';
   };
 
-  // Handle text input change with proper typing detection
   const handleTextChange = (e) => {
     setText(e.target.value);
-    // Use debounced typing indicator
     handleTyping();
   };
 
-  // Handle form submission
-  const handleSubmit = (e) => {
+  const handleFormSubmit = (e) => {
     e.preventDefault();
     handleSendMessage(e);
   };
@@ -222,10 +218,7 @@ const MessageInputWithPrivileges = ({
       />
 
       {/* Message Input Form */}
-      <form
-        onSubmit={handleSubmit}
-        className="flex items-center gap-2"
-      >
+      <form onSubmit={handleFormSubmit} className="flex items-center gap-2">
         <div className="relative">
           <button
             type="button"
@@ -302,6 +295,696 @@ const MessageInputWithPrivileges = ({
   );
 };
 
+// Group Management Modal Component
+const GroupManagementModal = ({
+  theme,
+  selectedGroupForManagement,
+  groupParticipants,
+  availableUsersForGroup,
+  newParticipants,
+  isLoadingGroupDetails,
+  onlineUsers,
+  getInitialsAndColor,
+  removeUserFromGroup,
+  setNewParticipants,
+  addUsersToGroup,
+  setShowGroupManagement
+}) => {
+  return (
+    <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-[100] backdrop-blur-sm">
+      <div className={`p-6 rounded-xl ${
+        theme === "dark" ? "bg-gray-800" : "bg-white"
+      } shadow-2xl max-w-2xl w-full mx-4 max-h-[80vh] overflow-hidden flex flex-col`}>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className={`text-lg font-semibold ${
+            theme === "dark" ? "text-white" : "text-gray-900"
+          }`}>
+            Manage Group: {selectedGroupForManagement?.name}
+          </h3>
+          <button
+            onClick={() => setShowGroupManagement(false)}
+            className={`p-1 rounded-full ${
+              theme === "dark"
+                ? "hover:bg-gray-700 text-gray-400"
+                : "hover:bg-gray-200 text-gray-500"
+            }`}
+          >
+            <X size={20} />
+          </button>
+        </div>
+
+        {isLoadingGroupDetails ? (
+          <div className="flex items-center justify-center py-8">
+            <Loader2 className="w-8 h-8 animate-spin text-amber-500" />
+            <span className="ml-2">Loading group details...</span>
+          </div>
+        ) : (
+          <>
+            {/* Current Participants */}
+            <div className="mb-6">
+              <h4 className={`text-sm font-medium mb-3 ${
+                theme === "dark" ? "text-gray-300" : "text-gray-700"
+              }`}>
+                Current Participants ({groupParticipants.length})
+              </h4>
+              <div className="space-y-2 max-h-32 overflow-y-auto">
+                {groupParticipants.length === 0 ? (
+                  <div className="text-center py-4 opacity-70">
+                    <p>No participants found</p>
+                  </div>
+                ) : (
+                  groupParticipants.map((participant) => (
+                    <div
+                      key={participant.id}
+                      className={`flex items-center justify-between p-3 rounded-lg ${
+                        theme === "dark" ? "bg-gray-700" : "bg-gray-100"
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        {participant.profile_pic ? (
+                          <img
+                            src={participant.profile_pic}
+                            alt={participant.full_name}
+                            className="w-10 h-10 rounded-full object-cover"
+                          />
+                        ) : (
+                          <div
+                            className={`w-10 h-10 rounded-full flex items-center justify-center text-white text-sm font-bold ${
+                              getInitialsAndColor(participant).colorClass
+                            }`}
+                          >
+                            {getInitialsAndColor(participant).initials}
+                          </div>
+                        )}
+                        <div>
+                          <div className="text-sm font-medium">
+                            {participant.full_name}
+                            {participant.participant_role === "admin" && (
+                              <span className="ml-2 text-xs bg-amber-500 text-white px-2 py-1 rounded">
+                                Admin
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-xs opacity-70">
+                            {participant.role || participant.userType}
+                          </div>
+                        </div>
+                      </div>
+
+                      {participant.participant_role !== "admin" && (
+                        <button
+                          onClick={() => removeUserFromGroup(participant.id)}
+                          className="p-2 text-red-500 hover:bg-red-500/10 rounded transition-colors"
+                          title="Remove from group"
+                        >
+                          <X size={16} />
+                        </button>
+                      )}
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+
+            {/* Add New Participants */}
+            <div className="flex-1 overflow-y-auto">
+              <h4 className={`text-sm font-medium mb-3 ${
+                theme === "dark" ? "text-gray-300" : "text-gray-700"
+              }`}>
+                Add New Participants ({newParticipants.size} selected)
+              </h4>
+
+              {availableUsersForGroup.length > 0 ? (
+                <div className="space-y-2">
+                  {availableUsersForGroup.map((userItem) => (
+                    <div
+                      key={userItem.id}
+                      className={`flex items-center gap-3 p-3 rounded-lg cursor-pointer ${
+                        newParticipants.has(userItem.id)
+                          ? "bg-amber-500/20 border border-amber-500/30"
+                          : theme === "dark"
+                            ? "hover:bg-gray-700 border border-gray-600"
+                            : "hover:bg-gray-100 border border-gray-200"
+                      }`}
+                      onClick={() => {
+                        setNewParticipants((prev) => {
+                          const newSet = new Set(prev);
+                          if (newSet.has(userItem.id)) {
+                            newSet.delete(userItem.id);
+                          } else {
+                            newSet.add(userItem.id);
+                          }
+                          return newSet;
+                        });
+                      }}
+                    >
+                      <div className="relative">
+                        {userItem.profile_pic ? (
+                          <img
+                            src={userItem.profile_pic}
+                            alt={userItem.fullName}
+                            className="w-10 h-10 rounded-full object-cover"
+                          />
+                        ) : (
+                          <div
+                            className={`w-10 h-10 rounded-full flex items-center justify-center text-white text-sm font-bold ${
+                              getInitialsAndColor(userItem).colorClass
+                            }`}
+                          >
+                            {getInitialsAndColor(userItem).initials}
+                          </div>
+                        )}
+                        {onlineUsers.includes(userItem.id) && (
+                          <span
+                            className={`absolute bottom-0 right-0 w-2 h-2 bg-green-500 rounded-full border-2 ${
+                              theme === "dark"
+                                ? "border-gray-800"
+                                : "border-white"
+                            }`}
+                          />
+                        )}
+                      </div>
+                      <div className="flex-1">
+                        <div className="text-sm font-medium">
+                          {userItem.fullName}
+                        </div>
+                        <div className="text-xs opacity-70">
+                          {userItem.userType} •{" "}
+                          {onlineUsers.includes(userItem.id)
+                            ? "online"
+                            : "offline"}
+                        </div>
+                      </div>
+                      {newParticipants.has(userItem.id) && (
+                        <Check size={16} className="text-amber-500" />
+                      )}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-4 opacity-70">
+                  <p>No users available to add</p>
+                  <p className="text-sm">All users are already in this group</p>
+                </div>
+              )}
+            </div>
+
+            <div className="flex gap-3 justify-end pt-4 border-t border-gray-200 dark:border-gray-700 mt-4">
+              <button
+                onClick={() => setShowGroupManagement(false)}
+                className={`px-4 py-2 rounded-lg transition-colors ${
+                  theme === "dark"
+                    ? "bg-gray-700 text-white hover:bg-gray-600"
+                    : "bg-gray-200 text-gray-800 hover:bg-gray-300"
+                }`}
+              >
+                Close
+              </button>
+              <button
+                onClick={addUsersToGroup}
+                disabled={newParticipants.size === 0}
+                className="px-4 py-2 bg-amber-500 text-white rounded-lg hover:bg-amber-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                Add Selected Users
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+};
+
+// Create Group Modal Component
+const CreateGroupModal = ({
+  theme,
+  users,
+  groupName,
+  setGroupName,
+  selectedGroupUsers,
+  toggleGroupUserSelection,
+  createGroup,
+  setShowCreateGroup,
+  getInitialsAndColor
+}) => {
+  return (
+    <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-[100] backdrop-blur-sm">
+      <div className={`p-6 rounded-xl ${
+        theme === "dark" ? "bg-gray-800" : "bg-white"
+      } shadow-2xl max-w-md w-full mx-4 max-h-[80vh] overflow-hidden flex flex-col`}>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className={`text-lg font-semibold ${
+            theme === "dark" ? "text-white" : "text-gray-900"
+          }`}>
+            Create New Group
+          </h3>
+          <button
+            onClick={() => setShowCreateGroup(false)}
+            className={`p-1 rounded-full ${
+              theme === "dark"
+                ? "hover:bg-gray-700 text-gray-400"
+                : "hover:bg-gray-200 text-gray-500"
+            }`}
+          >
+            <X size={20} />
+          </button>
+        </div>
+
+        <input
+          type="text"
+          value={groupName}
+          onChange={(e) => setGroupName(e.target.value)}
+          placeholder="Enter group name..."
+          className={`w-full px-4 py-3 border rounded-lg mb-4 focus:outline-none focus:ring-2 focus:ring-amber-500 ${
+            theme === "dark"
+              ? "bg-gray-700 border-gray-600 text-white placeholder-gray-400"
+              : "bg-white border-gray-300 text-gray-900 placeholder-gray-500"
+          }`}
+        />
+
+        <div className="flex-1 overflow-y-auto mb-4">
+          <h4 className={`text-sm font-medium mb-2 ${
+            theme === "dark" ? "text-gray-300" : "text-gray-700"
+          }`}>
+            Select Users ({selectedGroupUsers.size} selected)
+          </h4>
+          <div className="space-y-2">
+            {users.map((userItem) => (
+              <div
+                key={userItem.id}
+                className={`flex items-center gap-3 p-2 rounded-lg cursor-pointer ${
+                  selectedGroupUsers.has(userItem.id)
+                    ? "bg-amber-500/20 border border-amber-500/30"
+                    : theme === "dark"
+                      ? "hover:bg-gray-700 border border-gray-600"
+                      : "hover:bg-gray-100 border border-gray-200"
+                }`}
+                onClick={() => toggleGroupUserSelection(userItem.id)}
+              >
+                <div className="relative">
+                  {userItem.profile_pic ? (
+                    <img
+                      src={userItem.profile_pic}
+                      alt={userItem.fullName}
+                      className="w-8 h-8 rounded-full object-cover"
+                    />
+                  ) : (
+                    <div
+                      className={`w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold ${
+                        getInitialsAndColor(userItem).colorClass
+                      }`}
+                    >
+                      {getInitialsAndColor(userItem).initials}
+                    </div>
+                  )}
+                </div>
+                <div className="flex-1">
+                  <div className="text-sm font-medium">
+                    {userItem.fullName}
+                  </div>
+                  <div className="text-xs opacity-70">
+                    {userItem.userType}
+                  </div>
+                </div>
+                {selectedGroupUsers.has(userItem.id) && (
+                  <Check size={16} className="text-amber-500" />
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="flex gap-3 justify-end pt-4 border-t border-gray-200 dark:border-gray-700">
+          <button
+            onClick={() => setShowCreateGroup(false)}
+            className={`px-4 py-2 rounded-lg transition-colors ${
+              theme === "dark"
+                ? "bg-gray-700 text-white hover:bg-gray-600"
+                : "bg-gray-200 text-gray-800 hover:bg-gray-300"
+            }`}
+          >
+            Cancel
+          </button>
+          <button
+            onClick={createGroup}
+            disabled={!groupName.trim() || selectedGroupUsers.size === 0}
+            className="px-4 py-2 bg-amber-500 text-white rounded-lg hover:bg-amber-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            Create Group
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Chat Menu Component
+const ChatMenu = ({
+  theme,
+  setShowCreateGroup,
+  setIsSelectMode,
+  clearSelection,
+  setShowChatMenu
+}) => {
+  return (
+    <div className={`absolute top-12 right-4 z-50 ${
+      theme === "dark" ? "bg-gray-800" : "bg-white"
+    } shadow-lg rounded-lg p-2 min-w-48 border ${
+      theme === "dark" ? "border-gray-700" : "border-gray-200"
+    }`}>
+      <button
+        onClick={() => {
+          setShowCreateGroup(true);
+          setShowChatMenu(false);
+        }}
+        className={`flex items-center gap-3 p-2 rounded-lg w-full text-left ${
+          theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-100"
+        }`}
+      >
+        <GroupIcon size={18} />
+        <span>Create Group Chat</span>
+      </button>
+      <button
+        onClick={() => {
+          setIsSelectMode(true);
+          setShowChatMenu(false);
+        }}
+        className={`flex items-center gap-3 p-2 rounded-lg w-full text-left ${
+          theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-100"
+        }`}
+      >
+        <Check size={18} />
+        <span>Select Messages</span>
+      </button>
+      <button
+        onClick={() => {
+          clearSelection();
+          setShowChatMenu(false);
+        }}
+        className={`flex items-center gap-3 p-2 rounded-lg w-full text-left ${
+          theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-100"
+        }`}
+      >
+        <X size={18} />
+        <span>Clear Selection</span>
+      </button>
+    </div>
+  );
+};
+
+// Image Editor Modal Component
+const ImageEditorModal = ({
+  theme,
+  selectedFile,
+  imageEditMode,
+  setImageEditMode,
+  imageScale,
+  setImageScale,
+  imageRotation,
+  setImageRotation,
+  annotations,
+  setAnnotations,
+  drawingColor,
+  setDrawingColor,
+  drawingWidth,
+  setDrawingWidth,
+  showTextInput,
+  setShowTextInput,
+  textInput,
+  setTextInput,
+  addTextAnnotation,
+  clearAnnotations,
+  saveEditedImage,
+  downloadFile,
+  setShowFileModal,
+  imageCanvasRef,
+  drawingCanvasRef,
+  isDrawing,
+  setIsDrawing,
+  currentAnnotation,
+  setCurrentAnnotation,
+  startDrawing,
+  draw,
+  stopDrawing
+}) => {
+  return (
+    <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
+      <div className="bg-transparent rounded-lg max-w-6xl w-full max-h-[95vh] overflow-hidden flex flex-col">
+        <div className="p-4 flex justify-between items-center border-b border-gray-700 bg-black/50 backdrop-blur-md">
+          <h3 className="font-semibold text-white">
+            {selectedFile?.name || "Image"}
+          </h3>
+          <div className="flex gap-2">
+            {!imageEditMode ? (
+              <>
+                <button
+                  onClick={() => setImageEditMode(true)}
+                  className="flex items-center gap-2 px-3 py-2 bg-amber-500 text-white rounded hover:bg-amber-600 transition-colors"
+                >
+                  <Edit size={16} /> Edit Image
+                </button>
+                <button
+                  onClick={() => {
+                    setImageScale(1);
+                    setImageRotation(0);
+                  }}
+                  className="flex items-center gap-2 px-3 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
+                >
+                  <RotateCw size={16} /> Reset
+                </button>
+              </>
+            ) : (
+              <>
+                <div className="flex items-center gap-2 bg-black/50 rounded-lg px-3 py-2">
+                  <button
+                    onClick={() =>
+                      setImageScale((prev) => Math.max(0.1, prev - 0.1))
+                    }
+                    className="p-1 hover:bg-white/20 rounded transition-colors text-white"
+                    title="Zoom Out"
+                  >
+                    <ZoomOut size={16} />
+                  </button>
+                  <span className="text-sm text-white mx-2">
+                    {Math.round(imageScale * 100)}%
+                  </span>
+                  <button
+                    onClick={() =>
+                      setImageScale((prev) => Math.min(3, prev + 0.1))
+                    }
+                    className="p-1 hover:bg-white/20 rounded transition-colors text-white"
+                    title="Zoom In"
+                  >
+                    <ZoomIn size={16} />
+                  </button>
+                </div>
+                <button
+                  onClick={() =>
+                    setImageRotation((prev) => (prev + 90) % 360)
+                  }
+                  className="flex items-center gap-2 px-3 py-2 bg-purple-500 text-white rounded hover:bg-purple-600 transition-colors"
+                  title="Rotate 90°"
+                >
+                  <RotateCw size={16} /> Rotate
+                </button>
+                <button
+                  onClick={addTextAnnotation}
+                  className="flex items-center gap-2 px-3 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
+                  title="Add Text"
+                >
+                  <Type size={16} /> Add Text
+                </button>
+                <button
+                  onClick={clearAnnotations}
+                  className="flex items-center gap-2 px-3 py-2 bg-red-500 text-white rounded hover:bg-red-600 transition-colors"
+                  title="Clear Annotations"
+                >
+                  <Trash size={16} /> Clear
+                </button>
+                <button
+                  onClick={saveEditedImage}
+                  className="flex items-center gap-2 px-3 py-2 bg-green-500 text-white rounded hover:bg-green-600 transition-colors"
+                  title="Save & Send"
+                >
+                  <Save size={16} /> Save & Send
+                </button>
+              </>
+            )}
+            <button
+              onClick={() => downloadFile(selectedFile?.url, selectedFile?.name)}
+              className="flex items-center gap-2 px-3 py-2 bg-gray-500 text-white rounded hover:bg-gray-600 transition-colors"
+              title="Download"
+            >
+              <Download size={16} /> Download
+            </button>
+            <button
+              onClick={() => {
+                setShowFileModal(false);
+                setImageEditMode(false);
+                setAnnotations([]);
+                setImageScale(1);
+                setImageRotation(0);
+              }}
+              className="p-2 hover:bg-white/20 rounded transition-colors text-white"
+              title="Close"
+            >
+              <X size={20} />
+            </button>
+          </div>
+        </div>
+
+        <div className="flex-1 p-4 overflow-auto flex justify-center items-center bg-transparent">
+          <div className="relative">
+            {selectedFile && (
+              <img
+                ref={imageCanvasRef}
+                src={selectedFile.url}
+                alt={selectedFile.name}
+                className="max-w-full max-h-[70vh] object-contain transition-transform duration-200"
+                style={{
+                  transform: `scale(${imageScale}) rotate(${imageRotation}deg)`,
+                }}
+                onLoad={() => {
+                  if (drawingCanvasRef.current && imageCanvasRef.current) {
+                    drawingCanvasRef.current.width =
+                      imageCanvasRef.current.naturalWidth;
+                    drawingCanvasRef.current.height =
+                      imageCanvasRef.current.naturalHeight;
+                  }
+                }}
+              />
+            )}
+            {imageEditMode && (
+              <canvas
+                ref={drawingCanvasRef}
+                className="absolute top-0 left-0 cursor-crosshair"
+                style={{
+                  width: imageCanvasRef.current?.naturalWidth || "100%",
+                  height: imageCanvasRef.current?.naturalHeight || "100%",
+                }}
+                onMouseDown={startDrawing}
+                onMouseMove={draw}
+                onMouseUp={stopDrawing}
+                onMouseLeave={stopDrawing}
+              />
+            )}
+          </div>
+        </div>
+
+        {imageEditMode && (
+          <div className="p-4 border-t border-gray-700 bg-black/50 backdrop-blur-md">
+            <div className="flex items-center gap-6 justify-center">
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-white">Color:</span>
+                <input
+                  type="color"
+                  value={drawingColor}
+                  onChange={(e) => setDrawingColor(e.target.value)}
+                  className="w-8 h-8 rounded cursor-pointer border border-gray-600"
+                />
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-white">Brush Size:</span>
+                <input
+                  type="range"
+                  min="1"
+                  max="20"
+                  value={drawingWidth}
+                  onChange={(e) =>
+                    setDrawingWidth(parseInt(e.target.value))
+                  }
+                  className="w-32"
+                />
+                <span className="text-sm text-white w-8">
+                  {drawingWidth}px
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-white">Zoom:</span>
+                <span className="text-sm text-white w-12">
+                  {Math.round(imageScale * 100)}%
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-white">Rotation:</span>
+                <span className="text-sm text-white w-12">
+                  {imageRotation}°
+                </span>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+// Text Input Modal Component
+const TextInputModal = ({
+  theme,
+  showTextInput,
+  textInput,
+  setTextInput,
+  handleTextSubmit,
+  setShowTextInput
+}) => {
+  if (!showTextInput) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-60 backdrop-blur-sm">
+      <div className={`p-6 rounded-xl ${
+        theme === "dark" ? "bg-gray-800" : "bg-white"
+      } shadow-2xl max-w-md w-full mx-4`}>
+        <h3 className={`text-lg font-semibold mb-4 ${
+          theme === "dark" ? "text-white" : "text-gray-900"
+        }`}>
+          Add Text to Image
+        </h3>
+        <input
+          type="text"
+          value={textInput}
+          onChange={(e) => setTextInput(e.target.value)}
+          placeholder="Enter your text here..."
+          className={`w-full px-4 py-3 border rounded-lg mb-4 focus:outline-none focus:ring-2 focus:ring-amber-500 ${
+            theme === "dark"
+              ? "bg-gray-700 border-gray-600 text-white placeholder-gray-400"
+              : "bg-white border-gray-300 text-gray-900 placeholder-gray-500"
+          }`}
+          autoFocus
+          onKeyPress={(e) => {
+            if (e.key === "Enter") {
+              handleTextSubmit();
+            }
+          }}
+        />
+        <div className="flex gap-3 justify-end">
+          <button
+            onClick={() => {
+              setShowTextInput(false);
+              setTextInput("");
+            }}
+            className={`px-4 py-2 rounded-lg transition-colors ${
+              theme === "dark"
+                ? "bg-gray-700 text-white hover:bg-gray-600"
+                : "bg-gray-200 text-gray-800 hover:bg-gray-300"
+            }`}
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleTextSubmit}
+            disabled={!textInput.trim()}
+            className="px-4 py-2 bg-amber-500 text-white rounded-lg hover:bg-amber-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            Add Text
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Main ChatApp Component
 const ChatApp = ({
   user,
   isChatMaximized = false,
@@ -309,6 +992,9 @@ const ChatApp = ({
   setSelectedUser = () => {},
 }) => {
   const { theme } = useTheme();
+  const navigate = useNavigate();
+
+  // State Management
   const [users, setUsers] = useState([]);
   const [selectedUser, setLocalSelectedUser] = useState(null);
   const [messages, setMessages] = useState([]);
@@ -342,8 +1028,6 @@ const ChatApp = ({
   const [groupName, setGroupName] = useState("");
   const [selectedGroupUsers, setSelectedGroupUsers] = useState(new Set());
   const [showChatMenu, setShowChatMenu] = useState(false);
-
-  // GROUPS STATES
   const [groups, setGroups] = useState([]);
   const [activeTab, setActiveTab] = useState("users");
   const [selectedGroup, setSelectedGroup] = useState(null);
@@ -353,11 +1037,20 @@ const ChatApp = ({
   const [availableUsersForGroup, setAvailableUsersForGroup] = useState([]);
   const [newParticipants, setNewParticipants] = useState(new Set());
   const [isLoadingGroupDetails, setIsLoadingGroupDetails] = useState(false);
-
-  // PRIVILEGE STATES
   const [userPrivileges, setUserPrivileges] = useState(null);
   const [messageCount, setMessageCount] = useState(0);
+  const [imageEditMode, setImageEditMode] = useState(false);
+  const [imageScale, setImageScale] = useState(1);
+  const [imageRotation, setImageRotation] = useState(0);
+  const [isDrawing, setIsDrawing] = useState(false);
+  const [drawingColor, setDrawingColor] = useState("#ff0000");
+  const [drawingWidth, setDrawingWidth] = useState(3);
+  const [annotations, setAnnotations] = useState([]);
+  const [currentAnnotation, setCurrentAnnotation] = useState(null);
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  const [showSidebar, setShowSidebar] = useState(!isMobile);
 
+  // Refs
   const messageEndRef = useRef(null);
   const messagesContainerRef = useRef(null);
   const fileInputRef = useRef(null);
@@ -368,47 +1061,24 @@ const ChatApp = ({
   const imageCanvasRef = useRef(null);
   const drawingCanvasRef = useRef(null);
   const chatMenuRef = useRef(null);
-  const createGroupModalRef = useRef(null);
-  const groupManagementModalRef = useRef(null);
-
   const socket = useRef(null);
-  const navigate = useNavigate();
 
+  // Constants
   const MAX_FILE_SIZE = 50 * 1024 * 1024;
-
   const amberGradient = "bg-gradient-to-r from-amber-400 via-amber-500 to-amber-600";
   const amberGradientText = "bg-gradient-to-r from-amber-400 via-amber-500 to-amber-600 bg-clip-text text-transparent";
 
-  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
-  const [showSidebar, setShowSidebar] = useState(!isMobile);
-
-  const [imageEditMode, setImageEditMode] = useState(false);
-  const [imageScale, setImageScale] = useState(1);
-  const [imageRotation, setImageRotation] = useState(0);
-  const [isDrawing, setIsDrawing] = useState(false);
-  const [drawingColor, setDrawingColor] = useState("#ff0000");
-  const [drawingWidth, setDrawingWidth] = useState(3);
-  const [annotations, setAnnotations] = useState([]);
-  const [currentAnnotation, setCurrentAnnotation] = useState(null);
-
-  // Privilege-based chat limits configuration
+  // Chat limit configuration
   const chatLimitConfig = {
-    // Premium/Enterprise users - unlimited
     premium: { free_messages: null, max_active_chats: null, requires_upgrade: false },
     enterprise: { free_messages: null, max_active_chats: null, requires_upgrade: false },
-    
-    // Admin/Broker roles - unlimited
     admin: { free_messages: null, max_active_chats: null, requires_upgrade: false },
     super_admin: { free_messages: null, max_active_chats: null, requires_upgrade: false },
     internal_broker: { free_messages: null, max_active_chats: 100, requires_upgrade: false },
     external_broker: { free_messages: null, max_active_chats: 50, requires_upgrade: false },
-    
-    // Support roles - unlimited for work
     support_admin: { free_messages: null, max_active_chats: null, requires_upgrade: false },
     support_lead: { free_messages: null, max_active_chats: null, requires_upgrade: false },
     support_agent: { free_messages: null, max_active_chats: null, requires_upgrade: false },
-    
-    // Basic users - limited
     seller: { free_messages: 10, max_active_chats: 3, requires_upgrade: true },
     buyer: { free_messages: 10, max_active_chats: 3, requires_upgrade: true },
     renter: { free_messages: 10, max_active_chats: 3, requires_upgrade: true },
@@ -416,47 +1086,91 @@ const ChatApp = ({
     user: { free_messages: 5, max_active_chats: 2, requires_upgrade: true }
   };
 
-  // File URL validation function
+  // Utility Functions
   const validateFileUrl = (url) => {
     if (!url) return null;
     
-    // If URL is already absolute, return as is
     if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('blob:')) {
       return url;
     }
     
-    // If URL is relative, make it absolute
     if (url.startsWith('/')) {
       return `http://localhost:5001${url}`;
     }
     
-    // If it's just a filename, construct proper path
     return `http://localhost:5001/uploads/${url}`;
   };
 
-  // Check if user can send messages based on privileges
+  const getInitialsAndColor = (userItem) => {
+    const name = userItem?.fullName || userItem?.full_name || "Unknown User";
+    const [firstName, lastName] = name.split(" ");
+    const initials = `${firstName?.[0] || ""}${lastName?.[0] || ""}`.toUpperCase();
+
+    const colors = {
+      admin: "bg-red-500",
+      broker: "bg-purple-500",
+      tenant: "bg-blue-500",
+      leaser: "bg-cyan-500",
+      buyer: "bg-green-500",
+      seller: "bg-yellow-500",
+      support: "bg-orange-500",
+      renter: "bg-pink-500",
+      user: "bg-teal-500",
+      support_agent: "bg-orange-500",
+      super_admin: "bg-red-600",
+      default: "bg-gray-500",
+    };
+
+    return {
+      initials,
+      colorClass: colors[userItem?.userType || userItem?.role] || colors.default,
+    };
+  };
+
+  const getFileIcon = (fileType) => {
+    switch (fileType) {
+      case "image":
+        return <Image size={20} />;
+      case "document":
+        return <FileText size={20} />;
+      case "archive":
+        return <Archive size={20} />;
+      default:
+        return <File size={20} />;
+    }
+  };
+
+  const getMessageStyle = (message) => {
+    const isOwn = message.senderId === user?.id;
+    if (isOwn) {
+      return theme === "dark"
+        ? "bg-amber-600 text-white"
+        : "bg-amber-500 text-white";
+    }
+    return theme === "dark"
+      ? "bg-gray-700 text-white"
+      : "bg-white text-gray-900 border border-gray-200";
+  };
+
   const canSendMessage = useCallback(() => {
     if (!userPrivileges) return true;
     
     const role = userRole;
     const privilegeTier = userPrivileges.privilege_tier;
     
-    // Premium/Enterprise users have unlimited messages
     if (['premium', 'enterprise'].includes(privilegeTier)) {
       return true;
     }
     
-    // Check role-based limits
     const limits = chatLimitConfig[role] || chatLimitConfig.user;
     
     if (limits.free_messages === null) {
-      return true; // Unlimited
+      return true;
     }
     
     return messageCount < limits.free_messages;
   }, [userPrivileges, userRole, messageCount]);
 
-  // Get upgrade message for limited users
   const getUpgradeMessage = useCallback(() => {
     if (!userPrivileges) return null;
     
@@ -489,12 +1203,52 @@ const ChatApp = ({
     return null;
   }, [userPrivileges, userRole, messageCount]);
 
-  // Fetch user privileges and message count
+  // Filtered Users
+  const filteredUsers = useMemo(() => {
+    let result = users;
+
+    if (selectedCategory !== "all") {
+      result = result.filter((userItem) => {
+        const userType = userItem.userType?.toLowerCase() || "user";
+
+        const roleMappings = {
+          support_agent: "support_agent",
+          super_admin: "admin",
+          broker: "broker",
+          seller: "seller",
+          renter: "renter",
+          buyer: "buyer",
+          admin: "admin",
+          user: "user",
+        };
+
+        const mappedType = roleMappings[userType] || userType;
+        return mappedType === selectedCategory.toLowerCase();
+      });
+    }
+
+    if (showOnlineOnly) {
+      result = result.filter((userItem) => onlineUsers.includes(userItem.id));
+    }
+
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase().trim();
+      result = result.filter(
+        (userItem) =>
+          userItem.fullName?.toLowerCase().includes(query) ||
+          userItem.email?.toLowerCase().includes(query) ||
+          userItem.userType?.toLowerCase().includes(query)
+      );
+    }
+
+    return result;
+  }, [users, selectedCategory, showOnlineOnly, searchQuery, onlineUsers]);
+
+  // API Functions
   const fetchUserPrivileges = async () => {
     try {
       const token = localStorage.getItem("token");
       
-      // Fetch user info to get role
       const authResponse = await axios.get(
         "http://localhost:5000/api/auth/check",
         {
@@ -509,7 +1263,6 @@ const ChatApp = ({
         privilege_tier: currentUser.privilege_tier || 'basic'
       });
 
-      // Fetch message count for today
       try {
         const messageCountResponse = await axios.get(
           "http://localhost:5001/api/messages/today-count",
@@ -524,14 +1277,12 @@ const ChatApp = ({
       }
     } catch (error) {
       console.error("Error fetching user privileges:", error);
-      // Set defaults if API fails
       setUserRole("user");
       setUserPrivileges({ role: "user", privilege_tier: "basic" });
       setMessageCount(0);
     }
   };
 
-  // Fetch groups from API
   const fetchGroups = async () => {
     try {
       const token = localStorage.getItem("token");
@@ -557,30 +1308,6 @@ const ChatApp = ({
     }
   };
 
-  // Handle user/group selection
-  const handleUserOrGroupSelect = (item, type) => {
-    if (type === "user") {
-      console.log("👤 Selecting user:", item);
-      setLocalSelectedUser(item);
-      setSelectedUser(item);
-      setSelectedGroup(null);
-      setMessages([]);
-    } else {
-      console.log("👥 Selecting group:", item);
-      setSelectedGroup(item);
-      setLocalSelectedUser(null);
-      setSelectedUser(null);
-      setMessages([]);
-      fetchGroupMessages(item.id);
-    }
-
-    if (isMobile) setShowSidebar(false);
-    setSelectedMessages(new Set());
-    setIsSelectMode(false);
-    setShowChatMenu(false);
-  };
-
-  // Fetch group messages
   const fetchGroupMessages = async (groupId) => {
     try {
       const token = localStorage.getItem("token");
@@ -592,8 +1319,6 @@ const ChatApp = ({
           headers: { Authorization: `Bearer ${token}` },
         }
       );
-
-      console.log("📨 Group messages raw response:", response.data);
 
       const formattedMessages = response.data.map((msg) => ({
         id: msg.id,
@@ -613,7 +1338,6 @@ const ChatApp = ({
         message_type: msg.message_type,
       }));
 
-      console.log("📨 Formatted messages:", formattedMessages);
       setMessages(formattedMessages);
     } catch (error) {
       console.error("❌ Error fetching group messages:", error);
@@ -621,14 +1345,12 @@ const ChatApp = ({
     }
   };
 
-  // Open group management modal
   const openGroupManagement = async (group) => {
     console.log("🔄 Opening group management for:", group);
 
     try {
       setIsLoadingGroupDetails(true);
       setSelectedGroupForManagement(group);
-      console.log("✅ Selected group set, now fetching details...");
 
       const token = localStorage.getItem("token");
       const response = await axios.get(
@@ -638,23 +1360,18 @@ const ChatApp = ({
         }
       );
 
-      console.log("✅ Group details response:", response.data);
-
       const participants = Array.isArray(response.data.participants)
         ? response.data.participants
         : [];
 
       setGroupParticipants(participants);
-      console.log("✅ Participants set:", participants);
 
       const availableUsers = users.filter(
         (user) =>
           !participants.some((participant) => participant.id === user.id)
       );
       setAvailableUsersForGroup(availableUsers);
-      console.log("✅ Available users set:", availableUsers);
 
-      console.log("🎯 Setting showGroupManagement to TRUE");
       setShowGroupManagement(true);
     } catch (error) {
       console.error("❌ Error in openGroupManagement:", error);
@@ -665,7 +1382,6 @@ const ChatApp = ({
     }
   };
 
-  // Add users to group
   const addUsersToGroup = async () => {
     if (newParticipants.size === 0) {
       toast.error("Please select at least one user to add");
@@ -688,14 +1404,8 @@ const ChatApp = ({
       );
 
       toast.success("Users added to group successfully!");
-
-      // Refresh group details
       await openGroupManagement(selectedGroupForManagement);
-
-      // Clear selection
       setNewParticipants(new Set());
-
-      // Refresh groups list to update participant count
       await fetchGroups();
     } catch (error) {
       console.error("❌ Error adding users to group:", error);
@@ -703,13 +1413,8 @@ const ChatApp = ({
     }
   };
 
-  // Remove user from group
   const removeUserFromGroup = async (userId) => {
-    if (
-      !window.confirm(
-        "Are you sure you want to remove this user from the group?"
-      )
-    ) {
+    if (!window.confirm("Are you sure you want to remove this user from the group?")) {
       return;
     }
 
@@ -729,11 +1434,7 @@ const ChatApp = ({
       );
 
       toast.success("User removed from group");
-
-      // Refresh group details
       await openGroupManagement(selectedGroupForManagement);
-
-      // Refresh groups list
       await fetchGroups();
     } catch (error) {
       console.error("❌ Error removing user from group:", error);
@@ -741,7 +1442,6 @@ const ChatApp = ({
     }
   };
 
-  // Create group
   const createGroup = async () => {
     if (!groupName.trim() || selectedGroupUsers.size === 0) {
       toast.error("Please enter a group name and select at least one user");
@@ -772,11 +1472,7 @@ const ChatApp = ({
 
       console.log("✅ Group created successfully:", response.data);
       toast.success("Group created successfully!");
-
-      // Refresh groups list
       await fetchGroups();
-
-      // Reset form and switch to groups tab
       setShowCreateGroup(false);
       setGroupName("");
       setSelectedGroupUsers(new Set());
@@ -791,7 +1487,6 @@ const ChatApp = ({
     }
   };
 
-  // Toggle group user selection
   const toggleGroupUserSelection = (userId) => {
     setSelectedGroupUsers((prev) => {
       const newSelection = new Set(prev);
@@ -804,7 +1499,7 @@ const ChatApp = ({
     });
   };
 
-  // Handle new message
+  // Event Handlers
   const handleNewMessage = useCallback(
     (newMessage) => {
       console.log("📨 New message received:", newMessage);
@@ -849,11 +1544,9 @@ const ChatApp = ({
     );
   }, []);
 
-  // Enhanced send message with privilege check
   const handleSendMessage = async (e) => {
     e.preventDefault();
     
-    // Check privilege limits
     if (!canSendMessage()) {
       const upgradeMessage = getUpgradeMessage();
       if (upgradeMessage) {
@@ -896,7 +1589,6 @@ const ChatApp = ({
       isGroup: isGroupMessage,
     };
 
-    console.log("📤 Sending optimistic message:", optimisticMessage);
     setMessages((prev) => [...prev, optimisticMessage]);
 
     const originalText = text;
@@ -912,17 +1604,27 @@ const ChatApp = ({
       const formData = new FormData();
       formData.append("text", originalText.trim());
 
-      // Get the actual file from the input if available
       let fileToSend = null;
-      if (fileInputRef.current?.files?.[0]) {
+      
+      if (originalFilePreview && originalFilePreview.startsWith('data:image')) {
+        console.log("📤 Converting base64 to file...");
+        
+        const base64Response = await fetch(originalFilePreview);
+        const blob = await base64Response.blob();
+        fileToSend = new File([blob], originalFileName || 'image.png', {
+          type: blob.type,
+          lastModified: Date.now()
+        });
+      }
+      else if (fileInputRef.current?.files?.[0]) {
         fileToSend = fileInputRef.current.files[0];
-      } else if (imageInputRef.current?.files?.[0]) {
+      }
+      else if (imageInputRef.current?.files?.[0]) {
         fileToSend = imageInputRef.current.files[0];
       }
 
       if (fileToSend) {
         formData.append("file", fileToSend);
-        console.log("📎 Attaching file:", fileToSend.name);
       }
 
       let endpoint = "";
@@ -935,12 +1637,13 @@ const ChatApp = ({
       const response = await axios.post(endpoint, formData, {
         headers: {
           Authorization: `Bearer ${token}`,
-          "Content-Type": "multipart/form-data",
         },
-        timeout: 15000,
+        timeout: 30000,
+        onUploadProgress: (progressEvent) => {
+          const progress = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+          console.log(`📤 Upload progress: ${progress}%`);
+        }
       });
-
-      console.log("✅ Message sent successfully:", response.data);
 
       const newMessage = {
         ...response.data,
@@ -957,7 +1660,6 @@ const ChatApp = ({
         prev.map((msg) => (msg.id === tempId ? newMessage : msg))
       );
 
-      // Update message count
       setMessageCount(prev => prev + 1);
 
       if (socket.current) {
@@ -982,6 +1684,11 @@ const ChatApp = ({
       toast.success("Message sent!");
     } catch (error) {
       console.error("❌ Error sending message:", error);
+      console.error("❌ Error details:", {
+        message: error.message,
+        response: error.response?.data,
+        status: error.response?.status,
+      });
 
       setMessages((prev) =>
         prev.map((msg) =>
@@ -1000,6 +1707,8 @@ const ChatApp = ({
         toast.error("Message sending timed out. Please try again.");
       } else if (error.response?.data?.error) {
         toast.error(`Send failed: ${error.response.data.error}`);
+      } else if (error.code === 'ECONNABORTED') {
+        toast.error("Upload timeout. File might be too large.");
       } else {
         toast.error("Failed to send message");
       }
@@ -1036,10 +1745,20 @@ const ChatApp = ({
     setShowEmojiPicker(false);
   };
 
-  const handleUserSelect = (userItem) => {
-    console.log("User selected:", userItem);
-    setLocalSelectedUser(userItem);
-    setSelectedUser(userItem);
+  const handleUserOrGroupSelect = (item, type) => {
+    if (type === "user") {
+      setLocalSelectedUser(item);
+      setSelectedUser(item);
+      setSelectedGroup(null);
+      setMessages([]);
+    } else {
+      setSelectedGroup(item);
+      setLocalSelectedUser(null);
+      setSelectedUser(null);
+      setMessages([]);
+      fetchGroupMessages(item.id);
+    }
+
     if (isMobile) setShowSidebar(false);
     setSelectedMessages(new Set());
     setIsSelectMode(false);
@@ -1127,6 +1846,51 @@ const ChatApp = ({
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+  };
+
+  const handleFileSelect = useCallback(
+    (file) => {
+      if (!file) return;
+
+      if (file.size > MAX_FILE_SIZE) {
+        toast.error(`File size exceeds ${MAX_FILE_SIZE / 1024 / 1024}MB`);
+        return;
+      }
+
+      const extension = file.name.split(".").pop().toLowerCase();
+      const imageExtensions = [
+        "jpg", "jpeg", "png", "gif", "webp", "svg", "jfif", "pjpeg", "pjp", "bmp", "ico", "tiff", "tif",
+      ];
+      const documentExtensions = ["pdf", "doc", "docx", "txt", "rtf"];
+      const archiveExtensions = ["zip", "rar", "7z", "tar", "gz"];
+
+      let detectedFileType = "other";
+      if (imageExtensions.includes(extension)) detectedFileType = "image";
+      else if (documentExtensions.includes(extension)) detectedFileType = "document";
+      else if (archiveExtensions.includes(extension)) detectedFileType = "archive";
+
+      setFileType(detectedFileType);
+      setFileName(file.name);
+
+      if (detectedFileType === "image") {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          setFilePreview(reader.result);
+        };
+        reader.readAsDataURL(file);
+      } else {
+        setFilePreview(null);
+      }
+    },
+    [MAX_FILE_SIZE]
+  );
+
+  const removeFile = () => {
+    setFilePreview(null);
+    setFileType(null);
+    setFileName("");
+    if (fileInputRef.current) fileInputRef.current.value = "";
+    if (imageInputRef.current) imageInputRef.current.value = "";
   };
 
   const startDrawing = (e) => {
@@ -1286,8 +2050,6 @@ const ChatApp = ({
           formData.append("file", file);
           formData.append("text", "Edited image");
 
-          console.log("💾 Saving edited image...");
-
           let endpoint = "";
           if (selectedGroup) {
             endpoint = `http://localhost:5001/api/messages/groups/${selectedGroup.id}/send`;
@@ -1303,7 +2065,6 @@ const ChatApp = ({
             timeout: 30000,
           });
 
-          console.log("✅ Edited image sent:", uploadResponse.data);
           toast.success("Edited image sent successfully!");
           setShowFileModal(false);
           setImageEditMode(false);
@@ -1333,176 +2094,18 @@ const ChatApp = ({
     }
   };
 
-  const getFileIcon = (fileType) => {
-    switch (fileType) {
-      case "image":
-        return <Image size={20} />;
-      case "document":
-        return <FileText size={20} />;
-      case "archive":
-        return <Archive size={20} />;
-      default:
-        return <File size={20} />;
-    }
-  };
-
-  const handleFileSelect = useCallback(
-    (file) => {
-      if (!file) return;
-
-      if (file.size > MAX_FILE_SIZE) {
-        toast.error(`File size exceeds ${MAX_FILE_SIZE / 1024 / 1024}MB`);
-        return;
-      }
-
-      const extension = file.name.split(".").pop().toLowerCase();
-      const imageExtensions = [
-        "jpg",
-        "jpeg",
-        "png",
-        "gif",
-        "webp",
-        "svg",
-        "jfif",
-        "pjpeg",
-        "pjp",
-        "bmp",
-        "ico",
-        "tiff",
-        "tif",
-      ];
-      const documentExtensions = ["pdf", "doc", "docx", "txt", "rtf"];
-      const archiveExtensions = ["zip", "rar", "7z", "tar", "gz"];
-
-      let detectedFileType = "other";
-      if (imageExtensions.includes(extension)) detectedFileType = "image";
-      else if (documentExtensions.includes(extension))
-        detectedFileType = "document";
-      else if (archiveExtensions.includes(extension))
-        detectedFileType = "archive";
-
-      console.log("📁 File selected:", {
-        name: file.name,
-        type: detectedFileType,
-        size: file.size,
-      });
-
-      setFileType(detectedFileType);
-      setFileName(file.name);
-
-      if (detectedFileType === "image") {
-        const reader = new FileReader();
-        reader.onloadend = () => {
-          setFilePreview(reader.result);
-          console.log("🖼️ File preview generated");
-        };
-        reader.readAsDataURL(file);
-      } else {
-        setFilePreview(null);
-      }
-    },
-    [MAX_FILE_SIZE]
-  );
-
-  const removeFile = () => {
-    setFilePreview(null);
-    setFileType(null);
-    setFileName("");
-    if (fileInputRef.current) fileInputRef.current.value = "";
-    if (imageInputRef.current) imageInputRef.current.value = "";
-  };
-
-  const filteredUsers = useMemo(() => {
-    let result = users;
-
-    if (selectedCategory !== "all") {
-      result = result.filter((userItem) => {
-        const userType = userItem.userType?.toLowerCase() || "user";
-
-        const roleMappings = {
-          support_agent: "support_agent",
-          super_admin: "admin",
-          broker: "broker",
-          seller: "seller",
-          renter: "renter",
-          buyer: "buyer",
-          admin: "admin",
-          user: "user",
-        };
-
-        const mappedType = roleMappings[userType] || userType;
-        return mappedType === selectedCategory.toLowerCase();
-      });
-    }
-
-    if (showOnlineOnly) {
-      result = result.filter((userItem) => onlineUsers.includes(userItem.id));
-    }
-
-    if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase().trim();
-      result = result.filter(
-        (userItem) =>
-          userItem.fullName?.toLowerCase().includes(query) ||
-          userItem.email?.toLowerCase().includes(query) ||
-          userItem.userType?.toLowerCase().includes(query)
-      );
-    }
-
-    return result;
-  }, [users, selectedCategory, showOnlineOnly, searchQuery, onlineUsers]);
-
-  const getInitialsAndColor = (userItem) => {
-    const name = userItem?.fullName || userItem?.full_name || "Unknown User";
-    const [firstName, lastName] = name.split(" ");
-    const initials = `${firstName?.[0] || ""}${lastName?.[0] || ""}`.toUpperCase();
-
-    const colors = {
-      admin: "bg-red-500",
-      broker: "bg-purple-500",
-      tenant: "bg-blue-500",
-      leaser: "bg-cyan-500",
-      buyer: "bg-green-500",
-      seller: "bg-yellow-500",
-      support: "bg-orange-500",
-      renter: "bg-pink-500",
-      user: "bg-teal-500",
-      support_agent: "bg-orange-500",
-      super_admin: "bg-red-600",
-      default: "bg-gray-500",
-    };
-
-    return {
-      initials,
-      colorClass: colors[userItem?.userType || userItem?.role] || colors.default,
-    };
-  };
-
-  const getMessageStyle = (message) => {
-    const isOwn = message.senderId === user?.id;
-    if (isOwn) {
-      return theme === "dark"
-        ? "bg-amber-600 text-white"
-        : "bg-amber-500 text-white";
-    }
-    return theme === "dark"
-      ? "bg-gray-700 text-white"
-      : "bg-white text-gray-900 border border-gray-200";
-  };
-
   const toggleSidebar = () => {
     setShowSidebar(!showSidebar);
   };
 
+  // Render Functions
   const renderFileMessage = (message) => {
-    // Check if file exists in different possible properties
     const rawFileUrl = message.file || message.file_url;
     const fileUrl = validateFileUrl(rawFileUrl);
     const fileType = message.file_type;
     const fileName = message.file_name || "File";
 
     if (!fileUrl) {
-      console.log("❌ No valid file URL found:", { raw: rawFileUrl, validated: fileUrl });
       return (
         <div className={`flex items-center gap-3 p-3 ${
           theme === "dark" ? "bg-red-900/20" : "bg-red-100"
@@ -1516,13 +2119,6 @@ const ChatApp = ({
       );
     }
 
-    console.log("🖼️ Rendering file message:", {
-      fileUrl,
-      fileType,
-      fileName,
-      messageId: message.id
-    });
-
     if (fileType === "image") {
       return (
         <div
@@ -1534,20 +2130,16 @@ const ChatApp = ({
             alt={fileName}
             className="max-w-48 max-h-48 rounded-lg object-cover hover:opacity-90 transition-opacity shadow-md"
             onError={(e) => {
-              console.error("❌ Image failed to load:", fileUrl);
-              // Fallback to file display when image fails
               e.target.style.display = "none";
               const fallbackElement = e.target.nextSibling;
               if (fallbackElement) {
                 fallbackElement.style.display = 'block';
               }
             }}
-            onLoad={() => console.log("✅ Image loaded successfully:", fileUrl)}
           />
-          {/* Hidden fallback that shows when image fails */}
-          <div 
+          <div
             className="hidden flex items-center gap-3 p-3 bg-gray-100 dark:bg-gray-700 rounded-lg"
-            style={{display: 'none'}}
+            style={{ display: 'none' }}
           >
             <Image size={20} />
             <div className="flex-1 min-w-0">
@@ -1555,7 +2147,6 @@ const ChatApp = ({
               <p className="text-xs opacity-70">Image failed to load</p>
             </div>
           </div>
-          {/* Only show file name if there's no text content */}
           {!message.text && (
             <p className="text-xs opacity-70 mt-1">
               {fileName}
@@ -1565,7 +2156,6 @@ const ChatApp = ({
       );
     }
 
-    // For non-image files
     return (
       <div
         className={`flex items-center gap-3 p-3 ${
@@ -1591,13 +2181,12 @@ const ChatApp = ({
     const isOwn = message.senderId === user?.id;
     const isSystem = message.message_type === 'system';
 
-    // Handle system messages (like "Group was created", "User was added")
     if (isSystem) {
       return (
         <div className="flex justify-center my-2">
           <div className={`inline-block px-4 py-2 rounded-full text-sm ${
-            theme === "dark" 
-              ? "bg-gray-700 text-gray-300" 
+            theme === "dark"
+              ? "bg-gray-700 text-gray-300"
               : "bg-gray-200 text-gray-600"
           }`}>
             {message.text}
@@ -1606,19 +2195,22 @@ const ChatApp = ({
       );
     }
 
-    // Check if this is a file-only message with file name as text
     const hasFile = message.file || message.file_url;
     const hasRealText = message.text && message.text !== message.file_name;
 
     return (
       <div
-        className={`max-w-[70%] p-3 rounded-xl ${getMessageStyle(
-          message
-        )} transition-all ${
+        className={`max-w-[70%] p-3 rounded-xl ${
+          getMessageStyle(message)
+        } transition-all ${
           selectedMessages.has(message.id) ? "ring-2 ring-amber-500" : ""
-        } ${message.status === "sending" ? "opacity-70" : ""} ${
+        } ${
+          message.status === "sending" ? "opacity-70" : ""
+        } ${
           message.error ? "ring-2 ring-red-500" : ""
-        } ${isSelectMode ? "cursor-pointer" : ""}`}
+        } ${
+          isSelectMode ? "cursor-pointer" : ""
+        }`}
         onClick={() => isSelectMode && toggleMessageSelection(message.id)}
         onContextMenu={(e) => handleRightClick(e, message.id)}
       >
@@ -1628,10 +2220,8 @@ const ChatApp = ({
           </div>
         )}
 
-        {/* Render file message */}
         {hasFile && renderFileMessage(message)}
 
-        {/* Only render text if it's actual text content, not just the file name */}
         {hasRealText && (
           <div className="relative">
             <p className="leading-relaxed break-words">
@@ -1680,279 +2270,7 @@ const ChatApp = ({
     );
   };
 
-  const ChatMenu = () => (
-    <div
-      ref={chatMenuRef}
-      className={`absolute top-12 right-4 z-50 ${
-        theme === "dark" ? "bg-gray-800" : "bg-white"
-      } shadow-lg rounded-lg p-2 min-w-48 border ${
-        theme === "dark" ? "border-gray-700" : "border-gray-200"
-      }`}
-    >
-      <button
-        onClick={() => {
-          setShowCreateGroup(true);
-          setShowChatMenu(false);
-        }}
-        className={`flex items-center gap-3 p-2 rounded-lg w-full text-left ${
-          theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-100"
-        }`}
-      >
-        <GroupIcon size={18} />
-        <span>Create Group Chat</span>
-      </button>
-      <button
-        onClick={() => {
-          setIsSelectMode(true);
-          setShowChatMenu(false);
-        }}
-        className={`flex items-center gap-3 p-2 rounded-lg w-full text-left ${
-          theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-100"
-        }`}
-      >
-        <Check size={18} />
-        <span>Select Messages</span>
-      </button>
-      <button
-        onClick={() => {
-          clearSelection();
-          setShowChatMenu(false);
-        }}
-        className={`flex items-center gap-3 p-2 rounded-lg w-full text-left ${
-          theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-100"
-        }`}
-      >
-        <X size={18} />
-        <span>Clear Selection</span>
-      </button>
-    </div>
-  );
-
-  // Group Management Modal Component
-  const GroupManagementModal = () => (
-    <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-[100] backdrop-blur-sm">
-      <div
-        ref={groupManagementModalRef}
-        className={`p-6 rounded-xl ${
-          theme === "dark" ? "bg-gray-800" : "bg-white"
-        } shadow-2xl max-w-2xl w-full mx-4 max-h-[80vh] overflow-hidden flex flex-col`}
-      >
-        <div className="flex items-center justify-between mb-4">
-          <h3
-            className={`text-lg font-semibold ${
-              theme === "dark" ? "text-white" : "text-gray-900"
-            }`}
-          >
-            Manage Group: {selectedGroupForManagement?.name}
-          </h3>
-          <button
-            onClick={() => {
-              setShowGroupManagement(false);
-              setSelectedGroupForManagement(null);
-              setGroupParticipants([]);
-              setNewParticipants(new Set());
-            }}
-            className={`p-1 rounded-full ${
-              theme === "dark"
-                ? "hover:bg-gray-700 text-gray-400"
-                : "hover:bg-gray-200 text-gray-500"
-            }`}
-          >
-            <X size={20} />
-          </button>
-        </div>
-
-        {isLoadingGroupDetails ? (
-          <div className="flex items-center justify-center py-8">
-            <Loader2 className="w-8 h-8 animate-spin text-amber-500" />
-            <span className="ml-2">Loading group details...</span>
-          </div>
-        ) : (
-          <>
-            {/* Current Participants */}
-            <div className="mb-6">
-              <h4
-                className={`text-sm font-medium mb-3 ${
-                  theme === "dark" ? "text-gray-300" : "text-gray-700"
-                }`}
-              >
-                Current Participants ({groupParticipants.length})
-              </h4>
-              <div className="space-y-2 max-h-32 overflow-y-auto">
-                {groupParticipants.length === 0 ? (
-                  <div className="text-center py-4 opacity-70">
-                    <p>No participants found</p>
-                  </div>
-                ) : (
-                  groupParticipants.map((participant) => (
-                    <div
-                      key={participant.id}
-                      className={`flex items-center justify-between p-3 rounded-lg ${
-                        theme === "dark" ? "bg-gray-700" : "bg-gray-100"
-                      }`}
-                    >
-                      <div className="flex items-center gap-3">
-                        {participant.profile_pic ? (
-                          <img
-                            src={participant.profile_pic}
-                            alt={participant.full_name}
-                            className="w-10 h-10 rounded-full object-cover"
-                          />
-                        ) : (
-                          <div
-                            className={`w-10 h-10 rounded-full flex items-center justify-center text-white text-sm font-bold ${
-                              getInitialsAndColor(participant).colorClass
-                            }`}
-                          >
-                            {getInitialsAndColor(participant).initials}
-                          </div>
-                        )}
-                        <div>
-                          <div className="text-sm font-medium">
-                            {participant.full_name}
-                            {participant.participant_role === "admin" && (
-                              <span className="ml-2 text-xs bg-amber-500 text-white px-2 py-1 rounded">
-                                Admin
-                              </span>
-                            )}
-                          </div>
-                          <div className="text-xs opacity-70">
-                            {participant.role || participant.userType}
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Remove button - only show if current user is admin and participant is not themselves */}
-                      {participant.participant_role !== "admin" && (
-                        <button
-                          onClick={() => removeUserFromGroup(participant.id)}
-                          className="p-2 text-red-500 hover:bg-red-500/10 rounded transition-colors"
-                          title="Remove from group"
-                        >
-                          <X size={16} />
-                        </button>
-                      )}
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
-
-            {/* Add New Participants */}
-            <div className="flex-1 overflow-y-auto">
-              <h4
-                className={`text-sm font-medium mb-3 ${
-                  theme === "dark" ? "text-gray-300" : "text-gray-700"
-                }`}
-              >
-                Add New Participants ({newParticipants.size} selected)
-              </h4>
-
-              {availableUsersForGroup.length > 0 ? (
-                <div className="space-y-2">
-                  {availableUsersForGroup.map((userItem) => (
-                    <div
-                      key={userItem.id}
-                      className={`flex items-center gap-3 p-3 rounded-lg cursor-pointer ${
-                        newParticipants.has(userItem.id)
-                          ? "bg-amber-500/20 border border-amber-500/30"
-                          : theme === "dark"
-                          ? "hover:bg-gray-700 border border-gray-600"
-                          : "hover:bg-gray-100 border border-gray-200"
-                      }`}
-                      onClick={() => {
-                        setNewParticipants((prev) => {
-                          const newSet = new Set(prev);
-                          if (newSet.has(userItem.id)) {
-                            newSet.delete(userItem.id);
-                          } else {
-                            newSet.add(userItem.id);
-                          }
-                          return newSet;
-                        });
-                      }}
-                    >
-                      <div className="relative">
-                        {userItem.profile_pic ? (
-                          <img
-                            src={userItem.profile_pic}
-                            alt={userItem.fullName}
-                            className="w-10 h-10 rounded-full object-cover"
-                          />
-                        ) : (
-                          <div
-                            className={`w-10 h-10 rounded-full flex items-center justify-center text-white text-sm font-bold ${
-                              getInitialsAndColor(userItem).colorClass
-                            }`}
-                          >
-                            {getInitialsAndColor(userItem).initials}
-                          </div>
-                        )}
-                        {onlineUsers.includes(userItem.id) && (
-                          <span
-                            className={`absolute bottom-0 right-0 w-2 h-2 bg-green-500 rounded-full border-2 ${
-                              theme === "dark"
-                                ? "border-gray-800"
-                                : "border-white"
-                            }`}
-                          />
-                        )}
-                      </div>
-                      <div className="flex-1">
-                        <div className="text-sm font-medium">
-                          {userItem.fullName}
-                        </div>
-                        <div className="text-xs opacity-70">
-                          {userItem.userType} •{" "}
-                          {onlineUsers.includes(userItem.id)
-                            ? "online"
-                            : "offline"}
-                        </div>
-                      </div>
-                      {newParticipants.has(userItem.id) && (
-                        <Check size={16} className="text-amber-500" />
-                      )}
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-center py-4 opacity-70">
-                  <p>No users available to add</p>
-                  <p className="text-sm">All users are already in this group</p>
-                </div>
-              )}
-            </div>
-
-            <div className="flex gap-3 justify-end pt-4 border-t border-gray-200 dark:border-gray-700 mt-4">
-              <button
-                onClick={() => {
-                  setShowGroupManagement(false);
-                  setSelectedGroupForManagement(null);
-                  setGroupParticipants([]);
-                  setNewParticipants(new Set());
-                }}
-                className={`px-4 py-2 rounded-lg transition-colors ${
-                  theme === "dark"
-                    ? "bg-gray-700 text-white hover:bg-gray-600"
-                    : "bg-gray-200 text-gray-800 hover:bg-gray-300"
-                }`}
-              >
-                Close
-              </button>
-              <button
-                onClick={addUsersToGroup}
-                disabled={newParticipants.size === 0}
-                className="px-4 py-2 bg-amber-500 text-white rounded-lg hover:bg-amber-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              >
-                Add Selected Users
-              </button>
-            </div>
-          </>
-        )}
-      </div>
-    </div>
-  );
-
+  // Effects
   useEffect(() => {
     const handleResize = () => {
       const mobile = window.innerWidth < 768;
@@ -1970,10 +2288,7 @@ const ChatApp = ({
 
   useEffect(() => {
     const handleClickOutside = (event) => {
-      if (
-        contextMenuRef.current &&
-        !contextMenuRef.current.contains(event.target)
-      ) {
+      if (contextMenuRef.current && !contextMenuRef.current.contains(event.target)) {
         setShowContextMenu(false);
       }
       if (showFilters && !event.target.closest(".filters-container")) {
@@ -1982,26 +2297,11 @@ const ChatApp = ({
       if (chatMenuRef.current && !chatMenuRef.current.contains(event.target)) {
         setShowChatMenu(false);
       }
-      if (
-        showCreateGroup &&
-        createGroupModalRef.current &&
-        !createGroupModalRef.current.contains(event.target)
-      ) {
-        setShowCreateGroup(false);
-      }
-      if (
-        showGroupManagement &&
-        groupManagementModalRef.current &&
-        !groupManagementModalRef.current.contains(event.target)
-      ) {
-        setShowGroupManagement(false);
-        setSelectedGroupForManagement(null);
-      }
     };
 
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [showFilters, showChatMenu, showCreateGroup, showGroupManagement]);
+  }, [showFilters, showChatMenu]);
 
   useEffect(() => {
     const handleDragOver = (e) => {
@@ -2048,7 +2348,6 @@ const ChatApp = ({
           return;
         }
 
-        // Fetch user privileges first
         await fetchUserPrivileges();
 
         const usersResponse = await axios.get(
@@ -2114,7 +2413,6 @@ const ChatApp = ({
           setIsTyping(null);
         });
 
-        // Fetch groups after users are loaded
         await fetchGroups();
       } catch (error) {
         console.error("💥 INITIALIZATION ERROR:", error);
@@ -2144,16 +2442,12 @@ const ChatApp = ({
 
       try {
         const token = localStorage.getItem("token");
-        console.log(`📨 Fetching messages for user: ${selectedUser.id}`);
-
         const response = await axios.get(
           `http://localhost:5001/api/messages/${selectedUser.id}`,
           {
             headers: { Authorization: `Bearer ${token}` },
           }
         );
-
-        console.log("📨 Messages fetched:", response.data);
 
         const formattedMessages = response.data.map((msg) => ({
           ...msg,
@@ -2178,23 +2472,6 @@ const ChatApp = ({
 
     fetchMessages();
   }, [selectedUser]);
-
-  // Debug useEffect for messages
-  useEffect(() => {
-    console.log("📨 Current messages state:", messages);
-    messages.forEach((msg, index) => {
-      if (msg.file || msg.file_url) {
-        console.log(`📁 Message ${index} file data:`, {
-          id: msg.id,
-          file: msg.file,
-          file_url: msg.file_url,
-          file_type: msg.file_type,
-          file_name: msg.file_name,
-          text: msg.text
-        });
-      }
-    });
-  }, [messages]);
 
   useEffect(() => {
     if (messageEndRef.current) {
@@ -2225,141 +2502,88 @@ const ChatApp = ({
 
   return (
     <ErrorBoundary>
-      <div
-        className={`flex h-[600px] relative ${
-          theme === "dark"
-            ? "bg-gray-900 text-white"
-            : "bg-gray-50 text-gray-900"
-        }`}
-      >
-        {/* Create Group Modal */}
+      <div className={`flex h-[875px] relative ${
+        theme === "dark"
+          ? "bg-gray-900 text-white"
+          : "bg-gray-50 text-gray-900"
+      }`}>
+        {/* Modals */}
         {showCreateGroup && (
-          <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-[100] backdrop-blur-sm">
-            <div
-              ref={createGroupModalRef}
-              className={`p-6 rounded-xl ${
-                theme === "dark" ? "bg-gray-800" : "bg-white"
-              } shadow-2xl max-w-md w-full mx-4 max-h-[80vh] overflow-hidden flex flex-col`}
-            >
-              <div className="flex items-center justify-between mb-4">
-                <h3
-                  className={`text-lg font-semibold ${
-                    theme === "dark" ? "text-white" : "text-gray-900"
-                  }`}
-                >
-                  Create New Group
-                </h3>
-                <button
-                  onClick={() => {
-                    setShowCreateGroup(false);
-                    setGroupName("");
-                    setSelectedGroupUsers(new Set());
-                  }}
-                  className={`p-1 rounded-full ${
-                    theme === "dark"
-                      ? "hover:bg-gray-700 text-gray-400"
-                      : "hover:bg-gray-200 text-gray-500"
-                  }`}
-                >
-                  <X size={20} />
-                </button>
-              </div>
-
-              <input
-                type="text"
-                value={groupName}
-                onChange={(e) => setGroupName(e.target.value)}
-                placeholder="Enter group name..."
-                className={`w-full px-4 py-3 border rounded-lg mb-4 focus:outline-none focus:ring-2 focus:ring-amber-500 ${
-                  theme === "dark"
-                    ? "bg-gray-700 border-gray-600 text-white placeholder-gray-400"
-                    : "bg-white border-gray-300 text-gray-900 placeholder-gray-500"
-                }`}
-              />
-
-              <div className="flex-1 overflow-y-auto mb-4">
-                <h4
-                  className={`text-sm font-medium mb-2 ${
-                    theme === "dark" ? "text-gray-300" : "text-gray-700"
-                  }`}
-                >
-                  Select Users ({selectedGroupUsers.size} selected)
-                </h4>
-                <div className="space-y-2">
-                  {users.map((userItem) => (
-                    <div
-                      key={userItem.id}
-                      className={`flex items-center gap-3 p-2 rounded-lg cursor-pointer ${
-                        selectedGroupUsers.has(userItem.id)
-                          ? "bg-amber-500/20 border border-amber-500/30"
-                          : theme === "dark"
-                          ? "hover:bg-gray-700 border border-gray-600"
-                          : "hover:bg-gray-100 border border-gray-200"
-                      }`}
-                      onClick={() => toggleGroupUserSelection(userItem.id)}
-                    >
-                      <div className="relative">
-                        {userItem.profile_pic ? (
-                          <img
-                            src={userItem.profile_pic}
-                            alt={userItem.fullName}
-                            className="w-8 h-8 rounded-full object-cover"
-                          />
-                        ) : (
-                          <div
-                            className={`w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold ${
-                              getInitialsAndColor(userItem).colorClass
-                            }`}
-                          >
-                            {getInitialsAndColor(userItem).initials}
-                          </div>
-                        )}
-                      </div>
-                      <div className="flex-1">
-                        <div className="text-sm font-medium">
-                          {userItem.fullName}
-                        </div>
-                        <div className="text-xs opacity-70">
-                          {userItem.userType}
-                        </div>
-                      </div>
-                      {selectedGroupUsers.has(userItem.id) && (
-                        <Check size={16} className="text-amber-500" />
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <div className="flex gap-3 justify-end pt-4 border-t border-gray-200 dark:border-gray-700">
-                <button
-                  onClick={() => {
-                    setShowCreateGroup(false);
-                    setGroupName("");
-                    setSelectedGroupUsers(new Set());
-                  }}
-                  className={`px-4 py-2 rounded-lg transition-colors ${
-                    theme === "dark"
-                      ? "bg-gray-700 text-white hover:bg-gray-600"
-                      : "bg-gray-200 text-gray-800 hover:bg-gray-300"
-                  }`}
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={createGroup}
-                  disabled={!groupName.trim() || selectedGroupUsers.size === 0}
-                  className="px-4 py-2 bg-amber-500 text-white rounded-lg hover:bg-amber-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                >
-                  Create Group
-                </button>
-              </div>
-            </div>
-          </div>
+          <CreateGroupModal
+            theme={theme}
+            users={users}
+            groupName={groupName}
+            setGroupName={setGroupName}
+            selectedGroupUsers={selectedGroupUsers}
+            toggleGroupUserSelection={toggleGroupUserSelection}
+            createGroup={createGroup}
+            setShowCreateGroup={setShowCreateGroup}
+            getInitialsAndColor={getInitialsAndColor}
+          />
         )}
 
-        {/* Group Management Modal */}
-        {showGroupManagement && <GroupManagementModal />}
+        {showGroupManagement && (
+          <GroupManagementModal
+            theme={theme}
+            selectedGroupForManagement={selectedGroupForManagement}
+            groupParticipants={groupParticipants}
+            availableUsersForGroup={availableUsersForGroup}
+            newParticipants={newParticipants}
+            isLoadingGroupDetails={isLoadingGroupDetails}
+            onlineUsers={onlineUsers}
+            getInitialsAndColor={getInitialsAndColor}
+            removeUserFromGroup={removeUserFromGroup}
+            setNewParticipants={setNewParticipants}
+            addUsersToGroup={addUsersToGroup}
+            setShowGroupManagement={setShowGroupManagement}
+          />
+        )}
+
+        {showFileModal && selectedFile?.type === "image" && (
+          <ImageEditorModal
+            theme={theme}
+            selectedFile={selectedFile}
+            imageEditMode={imageEditMode}
+            setImageEditMode={setImageEditMode}
+            imageScale={imageScale}
+            setImageScale={setImageScale}
+            imageRotation={imageRotation}
+            setImageRotation={setImageRotation}
+            annotations={annotations}
+            setAnnotations={setAnnotations}
+            drawingColor={drawingColor}
+            setDrawingColor={setDrawingColor}
+            drawingWidth={drawingWidth}
+            setDrawingWidth={setDrawingWidth}
+            showTextInput={showTextInput}
+            setShowTextInput={setShowTextInput}
+            textInput={textInput}
+            setTextInput={setTextInput}
+            addTextAnnotation={addTextAnnotation}
+            clearAnnotations={clearAnnotations}
+            saveEditedImage={saveEditedImage}
+            downloadFile={downloadFile}
+            setShowFileModal={setShowFileModal}
+            imageCanvasRef={imageCanvasRef}
+            drawingCanvasRef={drawingCanvasRef}
+            isDrawing={isDrawing}
+            setIsDrawing={setIsDrawing}
+            currentAnnotation={currentAnnotation}
+            setCurrentAnnotation={setCurrentAnnotation}
+            startDrawing={startDrawing}
+            draw={draw}
+            stopDrawing={stopDrawing}
+          />
+        )}
+
+        <TextInputModal
+          theme={theme}
+          showTextInput={showTextInput}
+          textInput={textInput}
+          setTextInput={setTextInput}
+          handleTextSubmit={handleTextSubmit}
+          setShowTextInput={setShowTextInput}
+        />
 
         {/* Mobile sidebar toggle */}
         {isMobile && !showSidebar && (
@@ -2372,18 +2596,14 @@ const ChatApp = ({
         )}
 
         {/* Sidebar */}
-        <aside
-          className={`${
-            showSidebar ? "translate-x-0" : "-translate-x-full"
-          } md:translate-x-0 fixed md:relative w-80 ${
-            theme === "dark" ? "bg-gray-800" : "bg-white"
-          } shadow-lg transition-transform duration-300 flex flex-col z-30 h-full`}
-        >
-          <div
-            className={`p-4 border-b flex-shrink-0 ${
-              theme === "dark" ? "border-gray-700" : "border-gray-200"
-            }`}
-          >
+        <aside className={`${
+          showSidebar ? "translate-x-0" : "-translate-x-full"
+        } md:translate-x-0 fixed md:relative w-80 ${
+          theme === "dark" ? "bg-gray-800" : "bg-white"
+        } shadow-lg transition-transform duration-300 flex flex-col z-30 h-full`}>
+          <div className={`p-4 border-b flex-shrink-0 ${
+            theme === "dark" ? "border-gray-700" : "border-gray-200"
+          }`}>
             <div className="flex items-center justify-between">
               <h1 className={`text-4xl font-bold ${amberGradientText}`}>
                 Chatter
@@ -2475,8 +2695,8 @@ const ChatApp = ({
                     showOnlineOnly
                       ? "bg-amber-500 text-white"
                       : theme === "dark"
-                      ? "bg-gray-700 hover:bg-gray-600"
-                      : "bg-gray-100 hover:bg-gray-200"
+                        ? "bg-gray-700 hover:bg-gray-600"
+                        : "bg-gray-100 hover:bg-gray-200"
                   }`}
                 >
                   Online
@@ -2488,11 +2708,9 @@ const ChatApp = ({
             </div>
 
             {showFilters && userCategories.length > 1 && (
-              <div
-                className={`mt-2 p-2 ${
-                  theme === "dark" ? "bg-gray-700" : "bg-white"
-                } rounded-lg shadow-lg filters-container`}
-              >
+              <div className={`mt-2 p-2 ${
+                theme === "dark" ? "bg-gray-700" : "bg-white"
+              } rounded-lg shadow-lg filters-container`}>
                 <div className="flex flex-wrap gap-1">
                   {userCategories.map((category) => (
                     <button
@@ -2502,8 +2720,8 @@ const ChatApp = ({
                         selectedCategory === category
                           ? "bg-amber-500 text-white"
                           : theme === "dark"
-                          ? "bg-gray-600 hover:bg-gray-500"
-                          : "bg-gray-100 hover:bg-gray-200"
+                            ? "bg-gray-600 hover:bg-gray-500"
+                            : "bg-gray-100 hover:bg-gray-200"
                       }`}
                     >
                       {category === "support_agent" ? "Support" : category}
@@ -2541,37 +2759,33 @@ const ChatApp = ({
                     {filteredUsers.length} user
                     {filteredUsers.length !== 1 ? "s" : ""}
                     {selectedCategory !== "all" &&
-                      ` in ${
-                        selectedCategory === "support_agent"
-                          ? "Support"
-                          : selectedCategory
+                      ` in ${selectedCategory === "support_agent"
+                        ? "Support"
+                        : selectedCategory
                       }`}
                     {showOnlineOnly && " (online)"}
                   </div>
                   {filteredUsers.map((userItem) => {
                     const isOnline = onlineUsers.includes(userItem.id);
-                    const { initials, colorClass } =
-                      getInitialsAndColor(userItem);
+                    const { initials, colorClass } = getInitialsAndColor(userItem);
                     const isSelected = selectedUser?.id === userItem.id;
 
                     return (
                       <button
                         key={userItem.id}
-                        onClick={() =>
-                          handleUserOrGroupSelect(userItem, "user")
-                        }
+                        onClick={() => handleUserOrGroupSelect(userItem, "user")}
                         className={`w-full p-3 flex items-center gap-3 rounded-lg mb-1 ${
                           isSelected
                             ? "bg-amber-500/20 border border-amber-500/30"
                             : theme === "dark"
-                            ? "hover:bg-gray-700"
-                            : "hover:bg-gray-100"
+                              ? "hover:bg-gray-700"
+                              : "hover:bg-gray-100"
                         } transition-colors border ${
                           isSelected
                             ? "border-amber-500/30"
                             : theme === "dark"
-                            ? "border-gray-700"
-                            : "border-transparent"
+                              ? "border-gray-700"
+                              : "border-transparent"
                         }`}
                       >
                         <div className="relative">
@@ -2613,87 +2827,82 @@ const ChatApp = ({
                 </div>
               )
             ) : /* Groups Tab */
-            groups.length === 0 ? (
-              <div className="text-center py-8 opacity-70 px-4">
-                <GroupIcon className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                <p>No groups yet</p>
-                <p className="text-sm mt-2">
-                  Create a group to start group messaging
-                </p>
-                <button
-                  onClick={() => setShowCreateGroup(true)}
-                  className="mt-4 px-4 py-2 bg-amber-500 text-white rounded-lg hover:bg-amber-600 transition-colors"
-                >
-                  Create Group
-                </button>
-              </div>
-            ) : (
-              <div className="p-2">
-                <div className="text-xs opacity-70 px-3 py-2 sticky top-0 bg-inherit z-10">
-                  {groups.length} group{groups.length !== 1 ? "s" : ""}
+              groups.length === 0 ? (
+                <div className="text-center py-8 opacity-70 px-4">
+                  <GroupIcon className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                  <p>No groups yet</p>
+                  <p className="text-sm mt-2">
+                    Create a group to start group messaging
+                  </p>
+                  <button
+                    onClick={() => setShowCreateGroup(true)}
+                    className="mt-4 px-4 py-2 bg-amber-500 text-white rounded-lg hover:bg-amber-600 transition-colors"
+                  >
+                    Create Group
+                  </button>
                 </div>
-                {groups.map((group) => {
-                  const isSelected = selectedGroup?.id === group.id;
+              ) : (
+                <div className="p-2">
+                  <div className="text-xs opacity-70 px-3 py-2 sticky top-0 bg-inherit z-10">
+                    {groups.length} group{groups.length !== 1 ? "s" : ""}
+                  </div>
+                  {groups.map((group) => {
+                    const isSelected = selectedGroup?.id === group.id;
 
-                  return (
-                    <div key={group.id} className="relative">
-                      <button
-                        onClick={() => handleUserOrGroupSelect(group, "group")}
-                        className={`w-full p-3 flex items-center gap-3 rounded-lg mb-1 ${
-                          isSelected
-                            ? "bg-amber-500/20 border border-amber-500/30"
-                            : theme === "dark"
-                            ? "hover:bg-gray-700"
-                            : "hover:bg-gray-100"
-                        } transition-colors border ${
-                          isSelected
-                            ? "border-amber-500/30"
-                            : theme === "dark"
-                            ? "border-gray-700"
-                            : "border-transparent"
-                        }`}
-                      >
-                        <div className="w-12 h-12 rounded-full bg-amber-500 flex items-center justify-center flex-shrink-0">
-                          <GroupIcon size={20} className="text-white" />
-                        </div>
-                        <div className="text-left flex-1 min-w-0">
-                          <div className="font-medium truncate">
-                            {group.name}
+                    return (
+                      <div key={group.id} className="relative">
+                        <button
+                          onClick={() => handleUserOrGroupSelect(group, "group")}
+                          className={`w-full p-3 flex items-center gap-3 rounded-lg mb-1 ${
+                            isSelected
+                              ? "bg-amber-500/20 border border-amber-500/30"
+                              : theme === "dark"
+                                ? "hover:bg-gray-700"
+                                : "hover:bg-gray-100"
+                          } transition-colors border ${
+                            isSelected
+                              ? "border-amber-500/30"
+                              : theme === "dark"
+                                ? "border-gray-700"
+                                : "border-transparent"
+                          }`}
+                        >
+                          <div className="w-12 h-12 rounded-full bg-amber-500 flex items-center justify-center flex-shrink-0">
+                            <GroupIcon size={20} className="text-white" />
                           </div>
-                          <div className="text-sm opacity-70 truncate">
-                            {group.participant_count ||
-                              group.participants_count ||
-                              groupParticipants.length ||
-                              0}{" "}
-                            members
+                          <div className="text-left flex-1 min-w-0">
+                            <div className="font-medium truncate">
+                              {group.name}
+                            </div>
+                            <div className="text-sm opacity-70 truncate">
+                              {group.participant_count ||
+                                group.participants_count ||
+                                groupParticipants.length ||
+                                0}{" "}
+                              members
+                            </div>
                           </div>
-                        </div>
-                      </button>
+                        </button>
 
-                      {/* Group management button - SIMPLE ALWAYS VISIBLE */}
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          console.log(
-                            "🔄 Opening group management for:",
-                            group
-                          );
-                          openGroupManagement(group);
-                        }}
-                        className={`absolute right-3 top-1/2 transform -translate-y-1/2 p-2 rounded-full ${
-                          theme === "dark"
-                            ? "text-gray-400 hover:text-white hover:bg-gray-600"
-                            : "text-gray-500 hover:text-gray-700 hover:bg-gray-200"
-                        } transition-colors`}
-                        title="Manage Group"
-                      >
-                        <Settings size={16} />
-                      </button>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            openGroupManagement(group);
+                          }}
+                          className={`absolute right-3 top-1/2 transform -translate-y-1/2 p-2 rounded-full ${
+                            theme === "dark"
+                              ? "text-gray-400 hover:text-white hover:bg-gray-600"
+                              : "text-gray-500 hover:text-gray-700 hover:bg-gray-200"
+                          } transition-colors`}
+                          title="Manage Group"
+                        >
+                          <Settings size={16} />
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
           </div>
         </aside>
 
@@ -2701,13 +2910,11 @@ const ChatApp = ({
         <div className="flex-1 flex flex-col relative">
           {selectedUser || selectedGroup ? (
             <>
-              <div
-                className={`p-4 ${
-                  theme === "dark" ? "bg-gray-800" : "bg-white"
-                } border-b ${
-                  theme === "dark" ? "border-gray-700" : "border-gray-200"
-                } flex items-center justify-between flex-shrink-0`}
-              >
+              <div className={`p-4 ${
+                theme === "dark" ? "bg-gray-800" : "bg-white"
+              } border-b ${
+                theme === "dark" ? "border-gray-700" : "border-gray-200"
+              } flex items-center justify-between flex-shrink-0`}>
                 <div className="flex items-center gap-3">
                   {isMobile && (
                     <button
@@ -2796,8 +3003,8 @@ const ChatApp = ({
                       isSelectMode
                         ? "bg-amber-500 text-white"
                         : theme === "dark"
-                        ? "hover:bg-gray-700"
-                        : "hover:bg-gray-200"
+                          ? "hover:bg-gray-700"
+                          : "hover:bg-gray-200"
                     }`}
                   >
                     <Check size={20} />
@@ -2812,7 +3019,15 @@ const ChatApp = ({
                   >
                     <MoreVertical size={20} />
                   </button>
-                  {showChatMenu && <ChatMenu />}
+                  {showChatMenu && (
+                    <ChatMenu
+                      theme={theme}
+                      setShowCreateGroup={setShowCreateGroup}
+                      setIsSelectMode={setIsSelectMode}
+                      clearSelection={clearSelection}
+                      setShowChatMenu={setShowChatMenu}
+                    />
+                  )}
                 </div>
               </div>
 
@@ -2837,7 +3052,6 @@ const ChatApp = ({
                 ) : (
                   messages.map((message) => {
                     const isOwn = message.senderId === user?.id;
-
                     return (
                       <div
                         key={message.id}
@@ -2865,8 +3079,7 @@ const ChatApp = ({
                     : ""
                 }`}
               >
-                {/* Use the extracted MessageInputWithPrivileges component */}
-                <MessageInputWithPrivileges
+                <MessageInput
                   theme={theme}
                   userRole={userRole}
                   messageCount={messageCount}
@@ -2892,11 +3105,9 @@ const ChatApp = ({
               </div>
             </>
           ) : (
-            <div
-              className={`flex-1 flex items-center justify-center ${
-                theme === "dark" ? "bg-gray-900" : "bg-gray-50"
-              }`}
-            >
+            <div className={`flex-1 flex items-center justify-center ${
+              theme === "dark" ? "bg-gray-900" : "bg-gray-50"
+            }`}>
               <div className="text-center p-8 max-w-md">
                 <div
                   className={`w-20 h-20 ${amberGradient} rounded-full flex items-center justify-center mx-auto mb-6`}
@@ -2960,258 +3171,6 @@ const ChatApp = ({
               >
                 <Trash size={14} /> Delete
               </button>
-            </div>
-          )}
-
-          {showFileModal && selectedFile?.type === "image" && (
-            <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
-              <div className="bg-transparent rounded-lg max-w-6xl w-full max-h-[95vh] overflow-hidden flex flex-col">
-                <div className="p-4 flex justify-between items-center border-b border-gray-700 bg-black/50 backdrop-blur-md">
-                  <h3 className="font-semibold text-white">
-                    {selectedFile.name}
-                  </h3>
-                  <div className="flex gap-2">
-                    {!imageEditMode ? (
-                      <>
-                        <button
-                          onClick={() => setImageEditMode(true)}
-                          className="flex items-center gap-2 px-3 py-2 bg-amber-500 text-white rounded hover:bg-amber-600 transition-colors"
-                        >
-                          <Edit size={16} /> Edit Image
-                        </button>
-                        <button
-                          onClick={() => {
-                            setImageScale(1);
-                            setImageRotation(0);
-                          }}
-                          className="flex items-center gap-2 px-3 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
-                        >
-                          <RotateCw size={16} /> Reset
-                        </button>
-                      </>
-                    ) : (
-                      <>
-                        <div className="flex items-center gap-2 bg-black/50 rounded-lg px-3 py-2">
-                          <button
-                            onClick={() =>
-                              setImageScale((prev) => Math.max(0.1, prev - 0.1))
-                            }
-                            className="p-1 hover:bg-white/20 rounded transition-colors text-white"
-                            title="Zoom Out"
-                          >
-                            <ZoomOut size={16} />
-                          </button>
-                          <span className="text-sm text-white mx-2">
-                            {Math.round(imageScale * 100)}%
-                          </span>
-                          <button
-                            onClick={() =>
-                              setImageScale((prev) => Math.min(3, prev + 0.1))
-                            }
-                            className="p-1 hover:bg-white/20 rounded transition-colors text-white"
-                            title="Zoom In"
-                          >
-                            <ZoomIn size={16} />
-                          </button>
-                        </div>
-                        <button
-                          onClick={() =>
-                            setImageRotation((prev) => (prev + 90) % 360)
-                          }
-                          className="flex items-center gap-2 px-3 py-2 bg-purple-500 text-white rounded hover:bg-purple-600 transition-colors"
-                          title="Rotate 90°"
-                        >
-                          <RotateCw size={16} /> Rotate
-                        </button>
-                        <button
-                          onClick={addTextAnnotation}
-                          className="flex items-center gap-2 px-3 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
-                          title="Add Text"
-                        >
-                          <Type size={16} /> Add Text
-                        </button>
-                        <button
-                          onClick={clearAnnotations}
-                          className="flex items-center gap-2 px-3 py-2 bg-red-500 text-white rounded hover:bg-red-600 transition-colors"
-                          title="Clear Annotations"
-                        >
-                          <Trash size={16} /> Clear
-                        </button>
-                        <button
-                          onClick={saveEditedImage}
-                          className="flex items-center gap-2 px-3 py-2 bg-green-500 text-white rounded hover:bg-green-600 transition-colors"
-                          title="Save & Send"
-                        >
-                          <Save size={16} /> Save & Send
-                        </button>
-                      </>
-                    )}
-                    <button
-                      onClick={() =>
-                        downloadFile(selectedFile.url, selectedFile.name)
-                      }
-                      className="flex items-center gap-2 px-3 py-2 bg-gray-500 text-white rounded hover:bg-gray-600 transition-colors"
-                      title="Download"
-                    >
-                      <Download size={16} /> Download
-                    </button>
-                    <button
-                      onClick={() => {
-                        setShowFileModal(false);
-                        setImageEditMode(false);
-                        setAnnotations([]);
-                        setImageScale(1);
-                        setImageRotation(0);
-                      }}
-                      className="p-2 hover:bg-white/20 rounded transition-colors text-white"
-                      title="Close"
-                    >
-                      <X size={20} />
-                    </button>
-                  </div>
-                </div>
-
-                <div className="flex-1 p-4 overflow-auto flex justify-center items-center bg-transparent">
-                  <div className="relative">
-                    <img
-                      ref={imageCanvasRef}
-                      src={selectedFile.url}
-                      alt={selectedFile.name}
-                      className="max-w-full max-h-[70vh] object-contain transition-transform duration-200"
-                      style={{
-                        transform: `scale(${imageScale}) rotate(${imageRotation}deg)`,
-                      }}
-                      onLoad={() => {
-                        if (
-                          drawingCanvasRef.current &&
-                          imageCanvasRef.current
-                        ) {
-                          drawingCanvasRef.current.width =
-                            imageCanvasRef.current.naturalWidth;
-                          drawingCanvasRef.current.height =
-                            imageCanvasRef.current.naturalHeight;
-                        }
-                      }}
-                    />
-                    {imageEditMode && (
-                      <canvas
-                        ref={drawingCanvasRef}
-                        className="absolute top-0 left-0 cursor-crosshair"
-                        style={{
-                          width: imageCanvasRef.current?.naturalWidth || "100%",
-                          height:
-                            imageCanvasRef.current?.naturalHeight || "100%",
-                        }}
-                        onMouseDown={startDrawing}
-                        onMouseMove={draw}
-                        onMouseUp={stopDrawing}
-                        onMouseLeave={stopDrawing}
-                      />
-                    )}
-                  </div>
-                </div>
-
-                {imageEditMode && (
-                  <div className="p-4 border-t border-gray-700 bg-black/50 backdrop-blur-md">
-                    <div className="flex items-center gap-6 justify-center">
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm text-white">Color:</span>
-                        <input
-                          type="color"
-                          value={drawingColor}
-                          onChange={(e) => setDrawingColor(e.target.value)}
-                          className="w-8 h-8 rounded cursor-pointer border border-gray-600"
-                        />
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm text-white">Brush Size:</span>
-                        <input
-                          type="range"
-                          min="1"
-                          max="20"
-                          value={drawingWidth}
-                          onChange={(e) =>
-                            setDrawingWidth(parseInt(e.target.value))
-                          }
-                          className="w-32"
-                        />
-                        <span className="text-sm text-white w-8">
-                          {drawingWidth}px
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm text-white">Zoom:</span>
-                        <span className="text-sm text-white w-12">
-                          {Math.round(imageScale * 100)}%
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm text-white">Rotation:</span>
-                        <span className="text-sm text-white w-12">
-                          {imageRotation}°
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-
-          {showTextInput && (
-            <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-60 backdrop-blur-sm">
-              <div
-                className={`p-6 rounded-xl ${
-                  theme === "dark" ? "bg-gray-800" : "bg-white"
-                } shadow-2xl max-w-md w-full mx-4`}
-              >
-                <h3
-                  className={`text-lg font-semibold mb-4 ${
-                    theme === "dark" ? "text-white" : "text-gray-900"
-                  }`}
-                >
-                  Add Text to Image
-                </h3>
-                <input
-                  type="text"
-                  value={textInput}
-                  onChange={(e) => setTextInput(e.target.value)}
-                  placeholder="Enter your text here..."
-                  className={`w-full px-4 py-3 border rounded-lg mb-4 focus:outline-none focus:ring-2 focus:ring-amber-500 ${
-                    theme === "dark"
-                      ? "bg-gray-700 border-gray-600 text-white placeholder-gray-400"
-                      : "bg-white border-gray-300 text-gray-900 placeholder-gray-500"
-                  }`}
-                  autoFocus
-                  onKeyPress={(e) => {
-                    if (e.key === "Enter") {
-                      handleTextSubmit();
-                    }
-                  }}
-                />
-                <div className="flex gap-3 justify-end">
-                  <button
-                    onClick={() => {
-                      setShowTextInput(false);
-                      setTextInput("");
-                    }}
-                    className={`px-4 py-2 rounded-lg transition-colors ${
-                      theme === "dark"
-                        ? "bg-gray-700 text-white hover:bg-gray-600"
-                        : "bg-gray-200 text-gray-800 hover:bg-gray-300"
-                    }`}
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={handleTextSubmit}
-                    disabled={!textInput.trim()}
-                    className="px-4 py-2 bg-amber-500 text-white rounded-lg hover:bg-amber-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                  >
-                    Add Text
-                  </button>
-                </div>
-              </div>
             </div>
           )}
         </div>

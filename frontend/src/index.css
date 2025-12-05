@@ -1,30 +1,29 @@
-/* ========== SYNFUSION UI COMPONENTS ========== */
-@import "../node_modules/@syncfusion/ej2-base/styles/material.css";
-@import "../node_modules/@syncfusion/ej2-buttons/styles/material.css";
-@import "../node_modules/@syncfusion/ej2-lists/styles/material.css";
-@import "../node_modules/@syncfusion/ej2-popups/styles/material.css";
-@import "../node_modules/@syncfusion/ej2-inputs/styles/material.css";
-
 /* ========== TAILWIND CSS ========== */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
+/* Import fonts from Google Fonts */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Montserrat:wght@400;500;600;700;800&display=swap');
+
 /* ========== BASE STYLES & THEME SETUP ========== */
 @layer base {
   /* Base body styles with theme transitions */
   body {
-    @apply transition-colors duration-300 bg-black text-white font-poppins;
+    @apply transition-colors duration-300 bg-black text-white font-inter;
+    font-feature-settings: 'kern' 1, 'liga' 1, 'calt' 1;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
 
   /* Light theme variant */
   body.light {
-    @apply bg-white text-black;
+    @apply bg-white text-gray-900;
   }
 
   /* Dark theme variant with gradient background */
   body.dark {
-    @apply bg-gradient-to-r from-gray-900 via-black to-gray-900 text-white;
+    @apply bg-gradient-to-r from-gray-900 via-black to-gray-900 text-gray-100;
   }
 }
 
@@ -43,6 +42,16 @@
     .xs\:px-\[5\%\] { padding-left: 5%; padding-right: 5%; }
     .xs\:px-\[10\%\] { padding-left: 10%; padding-right: 10%; }
   }
+  
+  /* Font smoothing utilities */
+  .font-smooth {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+  
+  /* Better letter spacing for headlines */
+  .tracking-tight { letter-spacing: -0.025em; }
+  .tracking-tighter { letter-spacing: -0.05em; }
 }
 
 /* ========== COMPONENT STYLES ========== */
@@ -74,7 +83,7 @@
     @apply bg-gradient-to-br from-[#332500]/80 to-[#1a1200] border border-amber-400/20;
   }
   .Cards.light {
-    @apply bg-white border border-gray-100;
+    @apply bg-white border border-gray-200;
   }
 
   /* ========== TESTIMONIAL COMPONENTS ========== */
@@ -84,10 +93,10 @@
 
   /* Testimonial theme variants */
   .TestimonialsCard-dark {
-    @apply bg-gradient-to-r from-gray-900 via-gray-800 to-gray-900 text-white;
+    @apply bg-gradient-to-r from-gray-900 via-gray-800 to-gray-900 text-gray-100;
   }
   .TestimonialsCard-light {
-    @apply bg-white text-black;
+    @apply bg-white text-gray-900;
   }
 
   .TestimonialsProfile {
@@ -104,8 +113,13 @@
   }
 
   /* Testimonial text styling */
-  .testimonial-text { @apply text-sm sm:text-base italic; }
-  .testimonial-author { @apply font-semibold text-right mt-3 text-sm sm:text-base; }
+  .testimonial-text { 
+    @apply text-sm sm:text-base italic font-inter;
+    line-height: 1.6;
+  }
+  .testimonial-author { 
+    @apply font-semibold text-right mt-3 text-sm sm:text-base font-montserrat;
+  }
 
   /* Testimonial responsive adjustments */
   @media (max-width: 768px) {
@@ -185,7 +199,7 @@
   position: relative;
   display: inline-block;
   padding-bottom: 4px;
-  @apply transition-all duration-300 ease-in-out text-sm sm:text-base;
+  @apply transition-all duration-300 ease-in-out text-sm sm:text-base font-medium;
 }
 .NavBarBottom a::after {
   content: '';
@@ -229,7 +243,7 @@
 .nav-link {
   position: relative;
   transition: all 0.3s ease-in-out;
-  @apply text-sm md:text-base;
+  @apply text-sm md:text-base font-medium;
 }
 .nav-link:hover { color: #f59e0b; }
 .nav-link::after {
@@ -241,18 +255,46 @@
 }
 
 /* ========== TYPOGRAPHY ========== */
-h1 { @apply text-4xl font-bold mb-6 font-poppins; }
-h2 { @apply text-3xl font-bold mb-3 font-poppins; }
-h3 { @apply text-2xl font-bold mb-2 font-poppins; }
-span { @apply text-amber-400; }
+h1 { 
+  @apply text-4xl font-bold mb-6 font-montserrat tracking-tight;
+  font-weight: 700;
+}
+h2 { 
+  @apply text-3xl font-bold mb-3 font-montserrat tracking-tight;
+  font-weight: 600;
+}
+h3 { 
+  @apply text-2xl font-bold mb-2 font-montserrat tracking-tight;
+  font-weight: 600;
+}
+h4 {
+  @apply text-xl font-semibold mb-2 font-inter;
+}
+h5 {
+  @apply text-lg font-semibold mb-2 font-inter;
+}
+h6 {
+  @apply text-base font-medium mb-2 font-inter;
+}
+
+/* Amber text for both themes */
+span { 
+  @apply text-amber-600 dark:text-amber-400;
+}
+
+/* Paragraph and body text */
+p, li, .body-text {
+  @apply font-inter leading-relaxed;
+  line-height: 1.6;
+}
 
 /* ========== BUTTON STYLES ========== */
 .Button2 {
-  @apply bg-transparent border border-amber-400 transition-all duration-500 transform hover:scale-105 hover:text-black hover:bg-amber-400 shadow-lg;
+  @apply bg-transparent border border-amber-400 transition-all duration-500 transform hover:scale-105 hover:text-black hover:bg-amber-400 shadow-lg font-medium;
 }
 .button {
   @apply px-3 py-1 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded
-  hover:bg-gray-300 dark:hover:bg-gray-600 font-poppins transition-all duration-300;
+  hover:bg-gray-300 dark:hover:bg-gray-600 font-inter transition-all duration-300;
 }
 
 /* ========== GLOBAL ANIMATIONS ========== */
@@ -311,11 +353,23 @@ header {
 
 /* ========== FOOTER STYLES ========== */
 footer p, footer a {
-  @apply py-1 text-sm cursor-pointer hover:text-amber-400 transition-colors duration-500;
+  @apply py-1 text-sm cursor-pointer hover:text-amber-400 transition-colors duration-500 font-inter;
 }
 
 /* ========== FONT SETUP ========== */
-body { font-family: 'Poppins', sans-serif; }
+/* Define font families for use throughout the app */
+body { 
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+/* Font family classes */
+.font-inter {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+.font-montserrat {
+  font-family: 'Montserrat', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
 
 /* ========== ICON CONTAINER EFFECTS ========== */
 .icon-container { transition: all 0.3s ease; }
@@ -332,7 +386,10 @@ body { font-family: 'Poppins', sans-serif; }
 .animate-bounce { animation: bounce 1s infinite; }
 
 /* ========== CUSTOM SCROLLBAR STYLES ========== */
-::-webkit-scrollbar { height: 8px; width: 8px; }
+::-webkit-scrollbar { 
+  height: 8px; 
+  width: 8px; 
+}
 ::-webkit-scrollbar-thumb {
   border-radius: 9999px;
   background: linear-gradient(135deg, hsl(232, 10%, 43%), hsl(232, 62%, 16%));
@@ -404,7 +461,7 @@ body { font-family: 'Poppins', sans-serif; }
 .tile-layer-light { filter: contrast(1); }
 
 /* Enhanced container styling */
-.leaflet-container { font-family: inherit !important; }
+.leaflet-container { font-family: 'Inter', sans-serif !important; }
 .leaflet-container a { color: #3b82f6 !important; }
 .leaflet-container.dark-mode a { color: #60a5fa !important; }
 
@@ -413,6 +470,7 @@ body { font-family: 'Poppins', sans-serif; }
   margin: 0 !important;
   max-height: 200px;
   overflow-y: auto;
+  font-family: 'Inter', sans-serif !important;
 }
 .leaflet-popup-content::-webkit-scrollbar { width: 6px; }
 .leaflet-popup-content::-webkit-scrollbar-track {
@@ -577,7 +635,7 @@ body { font-family: 'Poppins', sans-serif; }
 
 /* Real estate metric badges */
 .real-estate-badge {
-  @apply px-3 py-1 rounded-full text-xs font-semibold backdrop-blur-sm;
+  @apply px-3 py-1 rounded-full text-xs font-semibold backdrop-blur-sm font-inter;
 }
 
 .badge-sales { 
@@ -598,7 +656,7 @@ body { font-family: 'Poppins', sans-serif; }
 
 /* Map legend styling */
 .map-legend {
-  @apply p-3 rounded-lg backdrop-blur-sm border;
+  @apply p-3 rounded-lg backdrop-blur-sm border font-inter;
 }
 .dark .map-legend {
   @apply bg-gray-800/50 border-gray-600;
@@ -636,7 +694,7 @@ body { font-family: 'Poppins', sans-serif; }
   51%, 100% {
     border-color: transparent;
   }
-} /* THIS WAS THE MISSING CLOSING BRACE */
+}
 
 /* ========== BROKER PROFILE MODAL FIXES ========== */
 /* Fix compact layout issue */

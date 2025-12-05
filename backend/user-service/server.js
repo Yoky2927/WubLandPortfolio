@@ -1,4 +1,4 @@
-// server.js - FIXED VERSION
+// server.js - WORKING VERSION
 import express from "express";
 import cookieParser from "cookie-parser";
 import cors from "cors";
@@ -9,8 +9,6 @@ import userRoutes from "./routes/user.routes.js";
 import privilegeRoutes from "./routes/privilege.routes.js";
 import path from 'path';
 import { fileURLToPath } from 'url';
-import db from "../shared/db.js"; // ADD THIS IMPORT
-import brokerRoutes from './routes/brokers.routes.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -19,111 +17,132 @@ dotenv.config();
 
 const app = express();
 
+// ============ CORS SETUP ============
+
+// Configure CORS
+const corsOptions = {
+  origin: process.env.CLIENT_URL || "http://localhost:5173",
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+};
+
+// Apply CORS to all routes
+app.use(cors(corsOptions));
+
+// Handle OPTIONS preflight requests
+app.use((req, res, next) => {
+  if (req.method === 'OPTIONS') {
+    res.header('Access-Control-Allow-Origin', process.env.CLIENT_URL || "http://localhost:5173");
+    res.header('Access-Control-Allow-Credentials', 'true');
+    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    return res.status(200).end();
+  }
+  next();
+});
+
+// ============ MIDDLEWARE ============
+
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ 
+  extended: true, 
+  limit: '50mb'
+}));
+app.use(cookieParser());
+
+// File upload - FIXED configuration
 app.use(fileUpload({
   createParentPath: true,
-  limits: { fileSize: 5 * 1024 * 1024 },
-  abortOnLimit: true,
+  limits: { 
+    fileSize: 10 * 1024 * 1024
+  },
+  useTempFiles: false,
+  safeFileNames: true,
+  preserveExtension: 4
 }));
 
+// Static files
 app.use('/Uploads', express.static(path.join(__dirname, 'Uploads')));
 
-app.use(express.json());
-app.use(cookieParser());
-app.use(cors({
-  origin: process.env.CLIENT_URL,
-  credentials: true
-}));
+// ============ TEST ENDPOINTS ============
 
-app.post("/api/test-upload", (req, res) => {
-  if (!req.files || !req.files.profilePicture) {
-    return res.status(400).json({ error: "No file uploaded" });
-  }
-  
-  const file = req.files.profilePicture;
-  console.log('File received:', file.name, file.size, file.mimetype);
-  
+app.get("/ping", (req, res) => {
   res.json({ 
-    message: "File received successfully", 
-    filename: file.name,
-    size: file.size,
-    type: file.mimetype
+    status: "ok", 
+    service: "user-service",
+    timestamp: new Date().toISOString()
   });
 });
 
+app.get('/health', (req, res) => {
+  res.json({ 
+    status: 'healthy', 
+    service: 'user-service',
+    timestamp: new Date().toISOString()
+  });
+});
+
+// Simple test upload
+app.post("/api/test-upload", (req, res) => {
+  console.log("Test upload endpoint hit");
+  
+  if (!req.files || !req.files.profilePicture) {
+    return res.status(400).json({ 
+      error: "No file uploaded",
+      hasFiles: !!req.files
+    });
+  }
+  
+  const file = req.files.profilePicture;
+  console.log('File received:', file.name, file.size);
+  
+  res.json({ 
+    success: true,
+    message: "File received successfully", 
+    filename: file.name
+  });
+});
+
+// ============ MAIN ROUTES ============
+
 app.use("/api/auth", authRoutes);
 app.use("/api/users", userRoutes);
-app.use('/api/brokers', brokerRoutes);
-app.use("/api/profile", authRoutes);
-app.get("/ping", (req, res) => {
-  res.send("pong");
-});
-app.use('/api/privileges', privilegeRoutes);
+app.use("/api/privileges", privilegeRoutes);
 
-// Debug route to check database schema
-app.get('/api/debug/db-schema', async (req, res) => {
-  try {
-    const [columns] = await db.query(`
-      SELECT COLUMN_NAME, DATA_TYPE, IS_NULLABLE, COLUMN_DEFAULT 
-      FROM INFORMATION_SCHEMA.COLUMNS 
-      WHERE TABLE_NAME = 'users' 
-      AND TABLE_SCHEMA = ?
-      ORDER BY ORDINAL_POSITION
-    `, [process.env.DB_NAME]);
-    
-    res.json({ columns });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
+// ============ ERROR HANDLERS ============
+
+// 404 handler - USE A DIFFERENT PATTERN
+app.use((req, res, next) => {
+  res.status(404).json({ 
+    success: false,
+    error: 'Route not found',
+    path: req.originalUrl,
+    method: req.method
+  });
 });
 
-// Debug route to check a specific user's data
-app.get('/api/debug/user/:id', async (req, res) => {
-  try {
-    const { id } = req.params;
-    const [users] = await db.query('SELECT * FROM users WHERE id = ?', [id]);
-    
-    if (users.length === 0) {
-      return res.status(404).json({ error: 'User not found' });
-    }
-    
-    res.json({ user: users[0] });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
+// Global error handler
+app.use((err, req, res, next) => {
+  console.error('Server error:', err.message);
+  res.status(500).json({
+    success: false,
+    error: 'Internal Server Error',
+    message: err.message
+  });
 });
 
-// Debug route to check database connection
-app.get('/api/debug/db-connection', async (req, res) => {
-  try {
-    const [result] = await db.query('SELECT 1 as test');
-    res.json({ 
-      status: 'connected', 
-      test: result,
-      database: process.env.DB_NAME
-    });
-  } catch (error) {
-    res.status(500).json({ 
-      status: 'error', 
-      error: error.message,
-      database: process.env.DB_NAME
-    });
-  }
-});
-
-// Health check
-app.get('/health', (req, res) => {
-  res.status(200).json({ status: 'healthy', service: 'user-service' });
-});
-
-// Add error handling for incomplete form submissions
-app.post('/api/auth/upload-profile', (req, res) => {
-  if (!req.files || !req.files.profilePicture) {
-    return res.status(400).json({ error: 'No file uploaded' });
-  }
-
-  const profilePicture = req.files.profilePicture;
-  // Handle file upload logic here
-});
+// ============ START SERVER ============
 
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => console.log(`🚀 User service running on port ${PORT}`));
+app.listen(PORT, () => {
+  console.log(`=================================`);
+  console.log(`🚀 User service running on port ${PORT}`);
+  console.log(`🌐 CORS enabled for: ${process.env.CLIENT_URL || "http://localhost:5173"}`);
+  console.log(`📁 Uploads: http://localhost:${PORT}/Uploads`);
+  console.log(`🔧 Test endpoints:`);
+  console.log(`   - GET  http://localhost:${PORT}/health`);
+  console.log(`   - GET  http://localhost:${PORT}/ping`);
+  console.log(`   - POST http://localhost:${PORT}/api/test-upload`);
+  console.log(`=================================`);
+});

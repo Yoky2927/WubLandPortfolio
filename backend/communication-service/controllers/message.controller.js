@@ -3,7 +3,7 @@ import { ChatMessage, GroupChat } from "../models/chatMessage.model.js"; // Add 
 import { io, getReceiverSocketId } from "../utils/socket.js";
 import multer from "multer";
 import { v2 as cloudinary } from "cloudinary";
-import db from "../../shared/db.js"; 
+import db from "../../shared/db.js";
 
 // Configure Cloudinary
 cloudinary.config({
@@ -39,6 +39,7 @@ const upload = multer({
     fileSize: 50 * 1024 * 1024, // 50MB limit
   },
   fileFilter: (req, file, cb) => {
+    console.log("📁 Multer file filter processing:", file.originalname, file.mimetype);
     // Accept all file types
     cb(null, true);
   },
@@ -104,8 +105,24 @@ export const sendMessage = async (req, res) => {
   try {
     console.log("=== REQUEST DETAILS ===");
     console.log("Request body keys:", Object.keys(req.body));
-    console.log("Request file:", req.file);
+    console.log("Request file field:", req.file ? "YES" : "NO");
+    console.log("Request file details:", req.file ? {
+      fieldname: req.file.fieldname,
+      originalname: req.file.originalname,
+      mimetype: req.file.mimetype,
+      size: req.file.size,
+      bufferLength: req.file.buffer?.length,
+      encoding: req.file.encoding,
+      destination: req.file.destination,
+      filename: req.file.filename,
+      path: req.file.path
+    } : "No file");
     console.log("Request headers content-type:", req.headers["content-type"]);
+    console.log("Request headers:", {
+      authorization: req.headers.authorization ? "Present" : "Missing",
+      'content-type': req.headers['content-type'],
+      'content-length': req.headers['content-length']
+    });
 
     const { text } = req.body;
     const { id: receiverId } = req.params;
@@ -164,15 +181,22 @@ export const sendMessage = async (req, res) => {
     // Handle file upload
     if (file) {
       try {
+        console.log("📁 File upload processing...");
+        console.log("📁 File details:", {
+          originalName: file.originalname,
+          mimetype: file.mimetype,
+          size: file.size,
+          bufferExists: !!file.buffer,
+          bufferLength: file.buffer?.length
+        });
+
         // Determine file type based on both extension and mime type
         const extension = file.originalname.split(".").pop().toLowerCase();
         const mimeType = file.mimetype;
 
-        console.log("📁 File upload details:", {
-          originalName: file.originalname,
+        console.log("📁 File type detection:", {
           extension: extension,
           mimeType: mimeType,
-          size: file.size,
         });
 
         // Enhanced file type detection
@@ -221,11 +245,17 @@ export const sendMessage = async (req, res) => {
         }
 
         fileName = file.originalname;
+        fileSize = file.size;
 
         console.log("☁️ Uploading to Cloudinary with type:", fileType);
+        console.log("☁️ File details for upload:", {
+          fileName,
+          fileType,
+          fileSize
+        });
 
         // FIXED: Use proper resource_type for images
-        const resourceType = fileType === "image" ? "image" : "auto";
+        const resourceType = fileType === "image" ? "image" : "raw";
 
         // Upload to Cloudinary
         const uploadResponse = await new Promise((resolve, reject) => {
@@ -251,14 +281,21 @@ export const sendMessage = async (req, res) => {
             }
           );
 
-          uploadStream.end(file.buffer);
+          if (file.buffer) {
+            console.log("📤 Uploading buffer to Cloudinary...");
+            uploadStream.end(file.buffer);
+          } else {
+            console.error("❌ No buffer available for upload");
+            reject(new Error("No file buffer available"));
+          }
         });
 
         fileUrl = uploadResponse.secure_url;
         console.log("✅ File uploaded to Cloudinary:", fileUrl);
       } catch (uploadError) {
         console.error("❌ Cloudinary upload error:", uploadError.message);
-        return res.status(500).json({ error: "Failed to upload file" });
+        console.error("❌ Cloudinary stack:", uploadError.stack);
+        return res.status(500).json({ error: "Failed to upload file: " + uploadError.message });
       }
     }
 
@@ -268,6 +305,8 @@ export const sendMessage = async (req, res) => {
       receiverId,
       senderId
     );
+
+    console.log("💬 Conversation ID:", conversationId);
 
     // Create the message
     const newMessage = await ChatMessage.create({
@@ -279,6 +318,13 @@ export const sendMessage = async (req, res) => {
       fileType: fileType,
       fileSize: fileSize,
       status: "sent",
+    });
+
+    console.log("📝 Message created:", {
+      id: newMessage.id,
+      hasFile: !!fileUrl,
+      fileUrl: fileUrl,
+      fileType: fileType
     });
 
     // Update conversation last message time
@@ -308,7 +354,17 @@ export const sendMessage = async (req, res) => {
   } catch (error) {
     console.error("❌ Error in sendMessage:", error.message);
     console.error("❌ Stack trace:", error.stack);
-    res.status(500).json({ error: "Internal server error" });
+    
+    // Log more error details
+    if (error.response) {
+      console.error("❌ Response error:", error.response.data);
+      console.error("❌ Response status:", error.response.status);
+    }
+    
+    res.status(500).json({ 
+      error: "Internal server error",
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
   }
 };
 
@@ -526,7 +582,7 @@ export const getGroupMessages = async (req, res) => {
     }
 
     console.log("🔍 Executing database query for messages...");
-    
+
     // FIX: Use db.execute with proper query
     const [messages] = await db.execute(
       `SELECT 
@@ -558,7 +614,7 @@ export const getGroupMessages = async (req, res) => {
     );
 
     console.log(`✅ Found ${messages.length} messages for group ${groupId}`);
-    
+
     if (messages.length > 0) {
       console.log("🔍 First message sample:", {
         id: messages[0].id,
@@ -572,15 +628,36 @@ export const getGroupMessages = async (req, res) => {
   } catch (error) {
     console.error("❌ Error in getGroupMessages:", error.message);
     console.error("❌ Full error:", error);
-    res.status(500).json({ 
+    res.status(500).json({
       error: "Failed to fetch group messages",
-      details: error.message 
+      details: error.message
     });
   }
 };
 
 export const sendGroupMessage = async (req, res) => {
   try {
+    console.log("📤 === GROUP MESSAGE REQUEST DETAILS ===");
+    console.log("Request body keys:", Object.keys(req.body));
+    console.log("Request file field:", req.file ? "YES" : "NO");
+    console.log("Request file details:", req.file ? {
+      fieldname: req.file.fieldname,
+      originalname: req.file.originalname,
+      mimetype: req.file.mimetype,
+      size: req.file.size,
+      bufferLength: req.file.buffer?.length,
+      encoding: req.file.encoding,
+      destination: req.file.destination,
+      filename: req.file.filename,
+      path: req.file.path
+    } : "No file");
+    console.log("Request headers content-type:", req.headers["content-type"]);
+    console.log("Request headers:", {
+      authorization: req.headers.authorization ? "Present" : "Missing",
+      'content-type': req.headers['content-type'],
+      'content-length': req.headers['content-length']
+    });
+
     const { groupId } = req.params;
     const { text } = req.body;
     const senderId = req.user.id;
@@ -604,38 +681,120 @@ export const sendGroupMessage = async (req, res) => {
     // Handle file upload (same as direct messages)
     if (file) {
       try {
-        // Your existing file upload logic here
+        console.log("📁 Group file upload processing...");
+        console.log("📁 File details:", {
+          originalName: file.originalname,
+          mimetype: file.mimetype,
+          size: file.size,
+          bufferExists: !!file.buffer,
+          bufferLength: file.buffer?.length
+        });
+
+        // Determine file type
+        const extension = file.originalname.split(".").pop().toLowerCase();
+        const mimeType = file.mimetype;
+
+        console.log("📁 Group file type detection:", {
+          extension: extension,
+          mimeType: mimeType,
+        });
+
+        // Enhanced file type detection
+        const imageExtensions = [
+          "jpg",
+          "jpeg",
+          "png",
+          "gif",
+          "webp",
+          "svg",
+          "jfif",
+          "pjpeg",
+          "pjp",
+          "bmp",
+          "ico",
+          "tiff",
+          "tif",
+        ];
+        const imageMimeTypes = [
+          "image/jpeg",
+          "image/jpg",
+          "image/png",
+          "image/gif",
+          "image/webp",
+          "image/svg+xml",
+          "image/bmp",
+          "image/x-windows-bmp",
+          "image/tiff",
+          "image/x-tiff",
+        ];
+
+        const documentExtensions = ["pdf", "doc", "docx", "txt", "rtf"];
+        const archiveExtensions = ["zip", "rar", "7z", "tar", "gz"];
+
+        if (
+          imageExtensions.includes(extension) ||
+          imageMimeTypes.includes(mimeType)
+        ) {
+          fileType = "image";
+        } else if (documentExtensions.includes(extension)) {
+          fileType = "document";
+        } else if (archiveExtensions.includes(extension)) {
+          fileType = "archive";
+        } else {
+          fileType = "other";
+        }
+
+        fileName = file.originalname;
+        fileSize = file.size;
+
+        console.log("☁️ Uploading group file to Cloudinary with type:", fileType);
+        console.log("☁️ Group file details for upload:", {
+          fileName,
+          fileType,
+          fileSize
+        });
+
+        // Use proper resource_type
+        const resourceType = fileType === "image" ? "image" : "raw";
+
+        // Upload to Cloudinary
         const uploadResponse = await new Promise((resolve, reject) => {
           const uploadStream = cloudinary.uploader.upload_stream(
             {
               folder: "chat_files",
-              resource_type: "auto",
+              resource_type: resourceType,
               quality: "auto",
               fetch_format: "auto",
             },
             (error, result) => {
-              if (error) reject(error);
-              else resolve(result);
+              if (error) {
+                console.error("❌ Cloudinary upload error for group:", error);
+                reject(error);
+              } else {
+                console.log(
+                  "✅ Group file Cloudinary upload successful:",
+                  result.secure_url
+                );
+                resolve(result);
+              }
             }
           );
-          uploadStream.end(file.buffer);
+
+          if (file.buffer) {
+            console.log("📤 Uploading buffer to Cloudinary for group...");
+            uploadStream.end(file.buffer);
+          } else {
+            console.error("❌ No buffer available for group upload");
+            reject(new Error("No file buffer available"));
+          }
         });
 
         fileUrl = uploadResponse.secure_url;
-        fileName = file.originalname;
-        fileSize = file.size;
-
-        // Determine file type
-        const extension = file.originalname.split(".").pop().toLowerCase();
-        const imageExtensions = ["jpg", "jpeg", "png", "gif", "webp"];
-        const documentExtensions = ["pdf", "doc", "docx", "txt"];
-
-        if (imageExtensions.includes(extension)) fileType = "image";
-        else if (documentExtensions.includes(extension)) fileType = "document";
-        else fileType = "other";
+        console.log("✅ Group file uploaded to Cloudinary:", fileUrl);
       } catch (uploadError) {
-        console.error("❌ File upload error:", uploadError);
-        return res.status(500).json({ error: "Failed to upload file" });
+        console.error("❌ Cloudinary upload error for group:", uploadError.message);
+        console.error("❌ Cloudinary stack for group:", uploadError.stack);
+        return res.status(500).json({ error: "Failed to upload file: " + uploadError.message });
       }
     }
 
@@ -649,6 +808,13 @@ export const sendGroupMessage = async (req, res) => {
       fileType: fileType,
       fileSize: fileSize,
       status: "sent",
+    });
+
+    console.log("📝 Group message created:", {
+      id: newMessage.id,
+      hasFile: !!fileUrl,
+      fileUrl: fileUrl,
+      fileType: fileType
     });
 
     // Update conversation last message time
@@ -665,6 +831,7 @@ export const sendGroupMessage = async (req, res) => {
           ...newMessage,
           groupId: groupId,
         });
+        console.log(`✅ Notified participant ${participant.id} via socket`);
       }
     }
 
@@ -672,6 +839,17 @@ export const sendGroupMessage = async (req, res) => {
     res.status(201).json(newMessage);
   } catch (error) {
     console.error("❌ Error in sendGroupMessage:", error.message);
-    res.status(500).json({ error: "Failed to send group message" });
+    console.error("❌ Stack trace:", error.stack);
+
+    // Log more error details
+    if (error.response) {
+      console.error("❌ Response error:", error.response.data);
+      console.error("❌ Response status:", error.response.status);
+    }
+
+    res.status(500).json({
+      error: "Failed to send group message",
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
   }
 };

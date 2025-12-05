@@ -1,3 +1,4 @@
+
 import React, {
   useState,
   useEffect,
@@ -5,6 +6,7 @@ import React, {
   useMemo,
   useCallback,
 } from "react";
+
 import {
   Users,
   Home,
@@ -98,27 +100,24 @@ const UserInfoModal = ({ isOpen, onClose, selectedUser, theme }) => {
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
       <div
-        className={`p-6 rounded-xl shadow-xl ${
-          theme === "dark"
-            ? "bg-gray-800 border-gray-700"
-            : "bg-white border-gray-200"
-        } border max-w-md w-full max-h-[90vh] overflow-y-auto`}
+        className={`p-6 rounded-xl shadow-xl ${theme === "dark"
+          ? "bg-gray-800 border-gray-700"
+          : "bg-white border-gray-200"
+          } border max-w-md w-full max-h-[90vh] overflow-y-auto`}
       >
         <div className="flex justify-between items-center mb-4">
           <h3
-            className={`text-lg font-semibold ${
-              theme === "dark" ? "text-white" : "text-gray-900"
-            }`}
+            className={`text-lg font-semibold ${theme === "dark" ? "text-white" : "text-gray-900"
+              }`}
           >
             User Details
           </h3>
           <button
             onClick={onClose}
-            className={`p-1 rounded ${
-              theme === "dark"
-                ? "hover:bg-gray-700 text-white"
-                : "hover:bg-gray-200 text-gray-900"
-            }`}
+            className={`p-1 rounded ${theme === "dark"
+              ? "hover:bg-gray-700 text-white"
+              : "hover:bg-gray-200 text-gray-900"
+              }`}
             aria-label="Close modal"
           >
             <X className="w-5 h-5" />
@@ -139,9 +138,8 @@ const UserInfoModal = ({ isOpen, onClose, selectedUser, theme }) => {
           </div>
           <ul className="space-y-2">
             <li
-              className={`flex justify-between ${
-                theme === "dark" ? "text-gray-300" : "text-gray-700"
-              }`}
+              className={`flex justify-between ${theme === "dark" ? "text-gray-300" : "text-gray-700"
+                }`}
             >
               <span className="font-medium">Full Name</span>
               <span>
@@ -149,89 +147,79 @@ const UserInfoModal = ({ isOpen, onClose, selectedUser, theme }) => {
               </span>
             </li>
             <li
-              className={`flex justify-between ${
-                theme === "dark" ? "text-gray-300" : "text-gray-700"
-              }`}
+              className={`flex justify-between ${theme === "dark" ? "text-gray-300" : "text-gray-700"
+                }`}
             >
               <span className="font-medium">Username</span>
               <span>{selectedUser.username || "N/A"}</span>
             </li>
             <li
-              className={`flex justify-between ${
-                theme === "dark" ? "text-gray-300" : "text-gray-700"
-              }`}
+              className={`flex justify-between ${theme === "dark" ? "text-gray-300" : "text-gray-700"
+                }`}
             >
               <span className="font-medium">Email</span>
               <span>{selectedUser.email}</span>
             </li>
             <li
-              className={`flex justify-between ${
-                theme === "dark" ? "text-gray-300" : "text-gray-700"
-              }`}
+              className={`flex justify-between ${theme === "dark" ? "text-gray-300" : "text-gray-700"
+                }`}
             >
               <span className="font-medium">Role</span>
               <span
-                className={`px-2 py-1 rounded-full text-xs capitalize ${
-                  selectedUser.role === "super_admin"
-                    ? "bg-red-100 text-red-800"
-                    : selectedUser.role === "admin"
+                className={`px-2 py-1 rounded-full text-xs capitalize ${selectedUser.role === "super_admin"
+                  ? "bg-red-100 text-red-800"
+                  : selectedUser.role === "admin"
                     ? "bg-purple-100 text-purple-800"
                     : selectedUser.role === "broker"
-                    ? "bg-amber-100 text-amber-800"
-                    : selectedUser.role === "support_agent"
-                    ? "bg-blue-100 text-blue-800"
-                    : "bg-green-100 text-green-800"
-                }`}
+                      ? "bg-amber-100 text-amber-800"
+                      : selectedUser.role === "support_agent"
+                        ? "bg-blue-100 text-blue-800"
+                        : "bg-green-100 text-green-800"
+                  }`}
               >
                 {selectedUser.role}
               </span>
             </li>
             {selectedUser.role === "broker" && (
               <li
-                className={`flex justify-between ${
-                  theme === "dark" ? "text-gray-300" : "text-gray-700"
-                }`}
+                className={`flex justify-between ${theme === "dark" ? "text-gray-300" : "text-gray-700"
+                  }`}
               >
                 <span className="font-medium">Broker Type</span>
                 <span
-                  className={`px-2 py-1 rounded-full text-xs capitalize ${
-                    selectedUser.broker_type === "internal"
-                      ? "bg-blue-100 text-blue-800"
-                      : "bg-gray-100 text-gray-800"
-                  }`}
+                  className={`px-2 py-1 rounded-full text-xs capitalize ${selectedUser.broker_type === "internal"
+                    ? "bg-blue-100 text-blue-800"
+                    : "bg-gray-100 text-gray-800"
+                    }`}
                 >
                   {selectedUser.broker_type}
                 </span>
               </li>
             )}
             <li
-              className={`flex justify-between ${
-                theme === "dark" ? "text-gray-300" : "text-gray-700"
-              }`}
+              className={`flex justify-between ${theme === "dark" ? "text-gray-300" : "text-gray-700"
+                }`}
             >
               <span className="font-medium">Status</span>
               <span
-                className={`px-2 py-1 rounded-full text-xs font-medium ${
-                  selectedUser.status === "active"
-                    ? "bg-green-100 text-green-800"
-                    : "bg-red-100 text-red-800"
-                }`}
+                className={`px-2 py-1 rounded-full text-xs font-medium ${selectedUser.status === "active"
+                  ? "bg-green-100 text-green-800"
+                  : "bg-red-100 text-red-800"
+                  }`}
               >
                 {selectedUser.status}
               </span>
             </li>
             <li
-              className={`flex justify-between ${
-                theme === "dark" ? "text-gray-300" : "text-gray-700"
-              }`}
+              className={`flex justify-between ${theme === "dark" ? "text-gray-300" : "text-gray-700"
+                }`}
             >
               <span className="font-medium">Phone</span>
               <span>{selectedUser.phone || "N/A"}</span>
             </li>
             <li
-              className={`flex justify-between ${
-                theme === "dark" ? "text-gray-300" : "text-gray-700"
-              }`}
+              className={`flex justify-between ${theme === "dark" ? "text-gray-300" : "text-gray-700"
+                }`}
             >
               <span className="font-medium">Joined</span>
               <span>
@@ -239,9 +227,8 @@ const UserInfoModal = ({ isOpen, onClose, selectedUser, theme }) => {
               </span>
             </li>
             <li
-              className={`flex justify-between ${
-                theme === "dark" ? "text-gray-300" : "text-gray-700"
-              }`}
+              className={`flex justify-between ${theme === "dark" ? "text-gray-300" : "text-gray-700"
+                }`}
             >
               <span className="font-medium">Verified</span>
               <span>{selectedUser.verified ? "Yes" : "No"}</span>
@@ -285,25 +272,23 @@ const CreateUserModal = ({
 
   const availableRoles = isSuperAdmin
     ? [
-        "super_admin", "admin", "support_admin", "support_lead", 
-        "support_agent", "internal_broker", "external_broker", 
-        "buyer", "seller", "landlord", "renter", "user"
-      ]
+      "super_admin", "admin", "support_admin", "support_lead",
+      "support_agent", "internal_broker", "external_broker",
+      "buyer", "seller", "landlord", "renter", "user"
+    ]
     : ["admin", "support_agent", "internal_broker", "external_broker", "buyer", "seller", "landlord", "renter", "user"];
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
       <div
-        className={`p-6 rounded-xl shadow-xl border max-w-md w-full max-h-[90vh] overflow-y-auto scrollbar-thin scrollbar-thumb-rounded-full scrollbar-track-transparent scrollbar-thumb-amber-500/70 dark:scrollbar-thumb-amber-400/60 ${
-          theme === "dark"
-            ? "bg-gray-800 border-gray-700"
-            : "bg-white border-gray-200"
-        }`}
+        className={`p-6 rounded-xl shadow-xl border max-w-md w-full max-h-[90vh] overflow-y-auto scrollbar-thin scrollbar-thumb-rounded-full scrollbar-track-transparent scrollbar-thumb-amber-500/70 dark:scrollbar-thumb-amber-400/60 ${theme === "dark"
+          ? "bg-gray-800 border-gray-700"
+          : "bg-white border-gray-200"
+          }`}
       >
         <h3
-          className={`text-lg font-semibold mb-4 ${
-            theme === "dark" ? "text-white" : "text-gray-900"
-          }`}
+          className={`text-lg font-semibold mb-4 ${theme === "dark" ? "text-white" : "text-gray-900"
+            }`}
         >
           Create New User
         </h3>
@@ -312,11 +297,10 @@ const CreateUserModal = ({
             type="text"
             name="first_name"
             placeholder="First Name"
-            className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-400 transition-colors ${
-              theme === "dark"
-                ? "bg-gray-700 border-gray-600 text-white placeholder-gray-400"
-                : "bg-white border-gray-300 text-gray-900 placeholder-gray-500"
-            }`}
+            className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-400 transition-colors ${theme === "dark"
+              ? "bg-gray-700 border-gray-600 text-white placeholder-gray-400"
+              : "bg-white border-gray-300 text-gray-900 placeholder-gray-500"
+              }`}
             value={newUser.first_name}
             onChange={handleInputChange}
             required
@@ -325,11 +309,10 @@ const CreateUserModal = ({
             type="text"
             name="last_name"
             placeholder="Last Name"
-            className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-400 transition-colors ${
-              theme === "dark"
-                ? "bg-gray-700 border-gray-600 text-white placeholder-gray-400"
-                : "bg-white border-gray-300 text-gray-900 placeholder-gray-500"
-            }`}
+            className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-400 transition-colors ${theme === "dark"
+              ? "bg-gray-700 border-gray-600 text-white placeholder-gray-400"
+              : "bg-white border-gray-300 text-gray-900 placeholder-gray-500"
+              }`}
             value={newUser.last_name}
             onChange={handleInputChange}
             required
@@ -338,11 +321,10 @@ const CreateUserModal = ({
             type="text"
             name="username"
             placeholder="Username"
-            className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-400 transition-colors ${
-              theme === "dark"
-                ? "bg-gray-700 border-gray-600 text-white placeholder-gray-400"
-                : "bg-white border-gray-300 text-gray-900 placeholder-gray-500"
-            }`}
+            className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-400 transition-colors ${theme === "dark"
+              ? "bg-gray-700 border-gray-600 text-white placeholder-gray-400"
+              : "bg-white border-gray-300 text-gray-900 placeholder-gray-500"
+              }`}
             value={newUser.username}
             onChange={handleInputChange}
           />
@@ -350,11 +332,10 @@ const CreateUserModal = ({
             type="email"
             name="email"
             placeholder="Email"
-            className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-400 transition-colors ${
-              theme === "dark"
-                ? "bg-gray-700 border-gray-600 text-white placeholder-gray-400"
-                : "bg-white border-gray-300 text-gray-900 placeholder-gray-500"
-            }`}
+            className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-400 transition-colors ${theme === "dark"
+              ? "bg-gray-700 border-gray-600 text-white placeholder-gray-400"
+              : "bg-white border-gray-300 text-gray-900 placeholder-gray-500"
+              }`}
             value={newUser.email}
             onChange={handleInputChange}
             required
@@ -364,11 +345,10 @@ const CreateUserModal = ({
               type="password"
               name="password"
               placeholder="Password (min 8 characters)"
-              className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-400 transition-colors ${
-                theme === "dark"
-                  ? "bg-gray-700 border-gray-600 text-white placeholder-gray-400"
-                  : "bg-white border-gray-300 text-gray-900 placeholder-gray-500"
-              }`}
+              className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-400 transition-colors ${theme === "dark"
+                ? "bg-gray-700 border-gray-600 text-white placeholder-gray-400"
+                : "bg-white border-gray-300 text-gray-900 placeholder-gray-500"
+                }`}
               value={newUser.password}
               onChange={handleInputChange}
               required
@@ -386,25 +366,23 @@ const CreateUserModal = ({
             type="text"
             name="phone"
             placeholder="Phone (optional)"
-            className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-400 transition-colors ${
-              theme === "dark"
-                ? "bg-gray-700 border-gray-600 text-white placeholder-gray-400"
-                : "bg-white border-gray-300 text-gray-900 placeholder-gray-500"
-            }`}
+            className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-400 transition-colors ${theme === "dark"
+              ? "bg-gray-700 border-gray-600 text-white placeholder-gray-400"
+              : "bg-white border-gray-300 text-gray-900 placeholder-gray-500"
+              }`}
             value={newUser.phone}
             onChange={handleInputChange}
           />
-          
+
           {/* Privilege Tier Selection */}
           <select
             name="privilege_tier"
             value={newUser.privilege_tier}
             onChange={handleInputChange}
-            className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-400 transition-colors ${
-              theme === "dark"
-                ? "bg-gray-700 border-gray-600 text-white"
-                : "bg-white border-gray-300 text-gray-900"
-            }`}
+            className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-400 transition-colors ${theme === "dark"
+              ? "bg-gray-700 border-gray-600 text-white"
+              : "bg-white border-gray-300 text-gray-900"
+              }`}
           >
             <option value="basic">Basic</option>
             <option value="standard">Standard</option>
@@ -416,11 +394,10 @@ const CreateUserModal = ({
             name="role"
             value={newUser.role}
             onChange={handleInputChange}
-            className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-400 transition-colors ${
-              theme === "dark"
-                ? "bg-gray-700 border-gray-600 text-white"
-                : "bg-white border-gray-300 text-gray-900"
-            }`}
+            className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-400 transition-colors ${theme === "dark"
+              ? "bg-gray-700 border-gray-600 text-white"
+              : "bg-white border-gray-300 text-gray-900"
+              }`}
             required
           >
             {availableRoles.map((role) => (
@@ -439,11 +416,10 @@ const CreateUserModal = ({
               name="broker_type"
               value={newUser.broker_type}
               onChange={handleInputChange}
-              className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-400 transition-colors ${
-                theme === "dark"
-                  ? "bg-gray-700 border-gray-600 text-white"
-                  : "bg-white border-gray-300 text-gray-900"
-              }`}
+              className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-400 transition-colors ${theme === "dark"
+                ? "bg-gray-700 border-gray-600 text-white"
+                : "bg-white border-gray-300 text-gray-900"
+                }`}
               required={newUser.role.includes('broker')}
             >
               <option value="internal">Internal Broker</option>
@@ -455,11 +431,10 @@ const CreateUserModal = ({
             <button
               type="button"
               onClick={onClose}
-              className={`px-4 py-2 rounded-lg transition-colors ${
-                theme === "dark"
-                  ? "bg-gray-700 text-white hover:bg-gray-600"
-                  : "bg-gray-200 text-gray-800 hover:bg-gray-300"
-              }`}
+              className={`px-4 py-2 rounded-lg transition-colors ${theme === "dark"
+                ? "bg-gray-700 text-white hover:bg-gray-600"
+                : "bg-gray-200 text-gray-800 hover:bg-gray-300"
+                }`}
             >
               Cancel
             </button>
@@ -508,25 +483,23 @@ const EditUserModal = ({
 
   const availableRoles = isSuperAdmin
     ? [
-        "super_admin", "admin", "support_admin", "support_lead", 
-        "support_agent", "internal_broker", "external_broker", 
-        "buyer", "seller", "landlord", "renter", "user"
-      ]
+      "super_admin", "admin", "support_admin", "support_lead",
+      "support_agent", "internal_broker", "external_broker",
+      "buyer", "seller", "landlord", "renter", "user"
+    ]
     : ["admin", "support_agent", "internal_broker", "external_broker", "buyer", "seller", "landlord", "renter", "user"];
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
       <div
-        className={`p-6 rounded-xl shadow-xl ${
-          theme === "dark"
-            ? "bg-gray-800 border-gray-700"
-            : "bg-white border-gray-200"
-        } border max-w-md w-full`}
+        className={`p-6 rounded-xl shadow-xl ${theme === "dark"
+          ? "bg-gray-800 border-gray-700"
+          : "bg-white border-gray-200"
+          } border max-w-md w-full`}
       >
         <h3
-          className={`text-lg font-semibold mb-4 ${
-            theme === "dark" ? "text-white" : "text-gray-900"
-          }`}
+          className={`text-lg font-semibold mb-4 ${theme === "dark" ? "text-white" : "text-gray-900"
+            }`}
         >
           Edit User
         </h3>
@@ -536,11 +509,10 @@ const EditUserModal = ({
             name="privilege_tier"
             value={editUser.privilege_tier || ''}
             onChange={handleInputChange}
-            className={`w-full px-3 py-2 border rounded-lg ${
-              theme === "dark"
-                ? "bg-gray-700 border-gray-600 text-white"
-                : "bg-white border-gray-300 text-gray-900"
-            }`}
+            className={`w-full px-3 py-2 border rounded-lg ${theme === "dark"
+              ? "bg-gray-700 border-gray-600 text-white"
+              : "bg-white border-gray-300 text-gray-900"
+              }`}
             required
           >
             <option value="basic">Basic</option>
@@ -553,11 +525,10 @@ const EditUserModal = ({
             name="role"
             value={editUser.role || ""}
             onChange={handleInputChange}
-            className={`w-full px-3 py-2 border rounded-lg ${
-              theme === "dark"
-                ? "bg-gray-700 border-gray-600 text-white"
-                : "bg-white border-gray-300 text-gray-900"
-            }`}
+            className={`w-full px-3 py-2 border rounded-lg ${theme === "dark"
+              ? "bg-gray-700 border-gray-600 text-white"
+              : "bg-white border-gray-300 text-gray-900"
+              }`}
             required
           >
             {availableRoles.map((role) => (
@@ -576,11 +547,10 @@ const EditUserModal = ({
               name="broker_type"
               value={editUser.broker_type || ""}
               onChange={handleInputChange}
-              className={`w-full px-3 py-2 border rounded-lg ${
-                theme === "dark"
-                  ? "bg-gray-700 border-gray-600 text-white"
-                  : "bg-white border-gray-300 text-gray-900"
-              }`}
+              className={`w-full px-3 py-2 border rounded-lg ${theme === "dark"
+                ? "bg-gray-700 border-gray-600 text-white"
+                : "bg-white border-gray-300 text-gray-900"
+                }`}
               required
             >
               <option value="internal">Internal Broker</option>
@@ -592,11 +562,10 @@ const EditUserModal = ({
             name="status"
             value={editUser.status || ""}
             onChange={handleInputChange}
-            className={`w-full px-3 py-2 border rounded-lg ${
-              theme === "dark"
-                ? "bg-gray-700 border-gray-600 text-white"
-                : "bg-white border-gray-300 text-gray-900"
-            }`}
+            className={`w-full px-3 py-2 border rounded-lg ${theme === "dark"
+              ? "bg-gray-700 border-gray-600 text-white"
+              : "bg-white border-gray-300 text-gray-900"
+              }`}
             required
           >
             <option value="active">Active</option>
@@ -607,11 +576,10 @@ const EditUserModal = ({
             <button
               type="button"
               onClick={onClose}
-              className={`px-4 py-2 rounded-lg ${
-                theme === "dark"
-                  ? "bg-gray-700 text-white hover:bg-gray-600"
-                  : "bg-gray-200 text-gray-800 hover:bg-gray-300"
-              }`}
+              className={`px-4 py-2 rounded-lg ${theme === "dark"
+                ? "bg-gray-700 text-white hover:bg-gray-600"
+                : "bg-gray-200 text-gray-800 hover:bg-gray-300"
+                }`}
             >
               Cancel
             </button>
@@ -669,18 +637,16 @@ const UserPrivilegesModal = ({
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className={`p-6 rounded-xl shadow-xl border max-w-2xl w-full max-h-[90vh] overflow-y-auto ${
-        theme === "dark" ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"
-      }`}>
+      <div className={`p-6 rounded-xl shadow-xl border max-w-2xl w-full max-h-[90vh] overflow-y-auto ${theme === "dark" ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"
+        }`}>
         <div className="flex justify-between items-center mb-6">
           <h3 className={`text-xl font-bold ${theme === "dark" ? "text-white" : "text-gray-900"}`}>
             Manage Privileges - {selectedUser.first_name} {selectedUser.last_name}
           </h3>
           <button
             onClick={onClose}
-            className={`p-2 rounded-lg ${
-              theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-200"
-            }`}
+            className={`p-2 rounded-lg ${theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-200"
+              }`}
           >
             <X className="w-5 h-5" />
           </button>
@@ -688,9 +654,8 @@ const UserPrivilegesModal = ({
 
         <div className="space-y-6">
           {/* Property Privileges */}
-          <div className={`p-4 rounded-lg ${
-            theme === "dark" ? "bg-gray-700" : "bg-gray-100"
-          }`}>
+          <div className={`p-4 rounded-lg ${theme === "dark" ? "bg-gray-700" : "bg-gray-100"
+            }`}>
             <h4 className={`font-semibold mb-3 ${theme === "dark" ? "text-white" : "text-gray-900"}`}>
               Property Management
             </h4>
@@ -721,9 +686,8 @@ const UserPrivilegesModal = ({
           </div>
 
           {/* Communication Privileges */}
-          <div className={`p-4 rounded-lg ${
-            theme === "dark" ? "bg-gray-700" : "bg-gray-100"
-          }`}>
+          <div className={`p-4 rounded-lg ${theme === "dark" ? "bg-gray-700" : "bg-gray-100"
+            }`}>
             <h4 className={`font-semibold mb-3 ${theme === "dark" ? "text-white" : "text-gray-900"}`}>
               Communication
             </h4>
@@ -754,9 +718,8 @@ const UserPrivilegesModal = ({
           </div>
 
           {/* Analytics Privileges */}
-          <div className={`p-4 rounded-lg ${
-            theme === "dark" ? "bg-gray-700" : "bg-gray-100"
-          }`}>
+          <div className={`p-4 rounded-lg ${theme === "dark" ? "bg-gray-700" : "bg-gray-100"
+            }`}>
             <h4 className={`font-semibold mb-3 ${theme === "dark" ? "text-white" : "text-gray-900"}`}>
               Analytics & Reports
             </h4>
@@ -787,11 +750,10 @@ const UserPrivilegesModal = ({
         <div className="flex gap-3 justify-end mt-6">
           <button
             onClick={onClose}
-            className={`px-4 py-2 rounded-lg ${
-              theme === "dark"
-                ? "bg-gray-700 text-white hover:bg-gray-600"
-                : "bg-gray-200 text-gray-800 hover:bg-gray-300"
-            }`}
+            className={`px-4 py-2 rounded-lg ${theme === "dark"
+              ? "bg-gray-700 text-white hover:bg-gray-600"
+              : "bg-gray-200 text-gray-800 hover:bg-gray-300"
+              }`}
           >
             Cancel
           </button>
@@ -809,37 +771,33 @@ const UserPrivilegesModal = ({
 
 const SystemHealthCard = ({ title, status, value, icon, color, theme }) => (
   <div
-    className={`p-6 rounded-xl border ${
-      theme === "dark"
-        ? "bg-gray-800 border-gray-700"
-        : "bg-white border-gray-200"
-    } transition-all duration-300 hover:shadow-lg`}
+    className={`p-6 rounded-xl border ${theme === "dark"
+      ? "bg-gray-800 border-gray-700"
+      : "bg-white border-gray-200"
+      } transition-all duration-300 hover:shadow-lg`}
   >
     <div className="flex items-center justify-between mb-4">
       <div className={`p-3 rounded-lg ${color} bg-opacity-10`}>{icon}</div>
       <span
-        className={`text-sm font-medium ${
-          status === "healthy"
-            ? "text-green-500"
-            : status === "warning"
+        className={`text-sm font-medium ${status === "healthy"
+          ? "text-green-500"
+          : status === "warning"
             ? "text-yellow-500"
             : "text-red-500"
-        }`}
+          }`}
       >
         {status}
       </span>
     </div>
     <h3
-      className={`text-2xl font-bold mb-1 ${
-        theme === "dark" ? "text-white" : "text-gray-900"
-      }`}
+      className={`text-2xl font-bold mb-1 ${theme === "dark" ? "text-white" : "text-gray-900"
+        }`}
     >
       {value}
     </h3>
     <p
-      className={`text-sm ${
-        theme === "dark" ? "text-gray-400" : "text-gray-600"
-      }`}
+      className={`text-sm ${theme === "dark" ? "text-gray-400" : "text-gray-600"
+        }`}
     >
       {title}
     </p>
@@ -848,16 +806,14 @@ const SystemHealthCard = ({ title, status, value, icon, color, theme }) => (
 
 const ComingSoonSection = ({ title, description, theme }) => (
   <div
-    className={`p-12 text-center rounded-xl border ${
-      theme === "dark"
-        ? "bg-gray-800 border-gray-700"
-        : "bg-white border-gray-200"
-    }`}
+    className={`p-12 text-center rounded-xl border ${theme === "dark"
+      ? "bg-gray-800 border-gray-700"
+      : "bg-white border-gray-200"
+      }`}
   >
     <h2
-      className={`text-2xl font-bold mb-4 ${
-        theme === "dark" ? "text-white" : "text-gray-900"
-      }`}
+      className={`text-2xl font-bold mb-4 ${theme === "dark" ? "text-white" : "text-gray-900"
+        }`}
     >
       {title}
     </h2>
@@ -881,34 +837,30 @@ const ConfirmationModal = ({
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
       <div
-        className={`p-6 rounded-xl shadow-xl ${
-          theme === "dark"
-            ? "bg-gray-800 border-gray-700"
-            : "bg-white border-gray-200"
-        } border max-w-md w-full transition-all duration-300`}
+        className={`p-6 rounded-xl shadow-xl ${theme === "dark"
+          ? "bg-gray-800 border-gray-700"
+          : "bg-white border-gray-200"
+          } border max-w-md w-full transition-all duration-300`}
       >
         <h3
-          className={`text-lg font-semibold mb-4 ${
-            theme === "dark" ? "text-white" : "text-gray-900"
-          }`}
+          className={`text-lg font-semibold mb-4 ${theme === "dark" ? "text-white" : "text-gray-900"
+            }`}
         >
           {title}
         </h3>
         <p
-          className={`mb-4 ${
-            theme === "dark" ? "text-gray-300" : "text-gray-600"
-          }`}
+          className={`mb-4 ${theme === "dark" ? "text-gray-300" : "text-gray-600"
+            }`}
         >
           {message}
         </p>
         <div className="flex gap-3 justify-end">
           <button
             onClick={onClose}
-            className={`px-4 py-2 rounded-lg ${
-              theme === "dark"
-                ? "bg-gray-700 text-white hover:bg-gray-600"
-                : "bg-gray-200 text-gray-800 hover:bg-gray-300"
-            } transition-colors`}
+            className={`px-4 py-2 rounded-lg ${theme === "dark"
+              ? "bg-gray-700 text-white hover:bg-gray-600"
+              : "bg-gray-200 text-gray-800 hover:bg-gray-300"
+              } transition-colors`}
           >
             Cancel
           </button>
@@ -924,42 +876,74 @@ const ConfirmationModal = ({
   );
 };
 
+const handleLogout = async () => {
+  try {
+    // Get the token from localStorage
+    const token = localStorage.getItem('token');
+    
+    // Call your existing logout endpoint
+    const response = await fetch('http://localhost:5000/api/auth/logout', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      },
+      credentials: 'include' // Important for cookies!
+    });
+
+    // Clear localStorage regardless of response
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    
+    // Check if logout was successful
+    if (response.ok) {
+      console.log('✅ Backend logout successful');
+    } else {
+      console.log('⚠️ Backend logout failed, but cleared local storage');
+    }
+    
+    // Redirect to login page
+    window.location.href = '/login-register';
+    
+  } catch (error) {
+    console.error('❌ Logout error:', error);
+    // Still clear storage and redirect on error
+    localStorage.clear();
+    window.location.href = '/login-register';
+  }
+};
+
 const StatCard = ({ icon, title, value, trend, color, subtitle, theme }) => (
   <div
-    className={`p-6 rounded-xl border ${
-      theme === "dark"
-        ? "bg-gray-800 border-gray-700"
-        : "bg-white border-gray-200"
-    } transition-all duration-300 hover:shadow-lg`}
+    className={`p-6 rounded-xl border ${theme === "dark"
+      ? "bg-gray-800 border-gray-700"
+      : "bg-white border-gray-200"
+      } transition-all duration-300 hover:shadow-lg`}
   >
     <div className="flex items-center justify-between mb-4">
       <div className={`p-3 rounded-lg ${color} bg-opacity-10`}>{icon}</div>
       <span
-        className={`text-sm font-medium ${
-          trend?.includes("+") ? "text-green-500" : "text-red-500"
-        }`}
+        className={`text-sm font-medium ${trend?.includes("+") ? "text-green-500" : "text-red-500"
+          }`}
       >
         {trend}
       </span>
     </div>
     <h3
-      className={`text-2xl font-bold mb-1 ${
-        theme === "dark" ? "text-white" : "text-gray-900"
-      }`}
+      className={`text-2xl font-bold mb-1 ${theme === "dark" ? "text-white" : "text-gray-900"
+        }`}
     >
       {value}
     </h3>
     <p
-      className={`text-sm ${
-        theme === "dark" ? "text-gray-400" : "text-gray-600"
-      }`}
+      className={`text-sm ${theme === "dark" ? "text-gray-400" : "text-gray-600"
+        }`}
     >
       {title}
     </p>
     <p
-      className={`text-xs mt-2 ${
-        theme === "dark" ? "text-gray-500" : "text-gray-400"
-      }`}
+      className={`text-xs mt-2 ${theme === "dark" ? "text-gray-500" : "text-gray-400"
+        }`}
     >
       {subtitle}
     </p>
@@ -1074,25 +1058,31 @@ const SuperAdminDashboard = () => {
   // Fetch system health data
   const fetchSystemHealth = async () => {
     try {
-      const token = localStorage.getItem("token");
-      const response = await fetch(
-        "http://localhost:5004/api/analytics/system-health",
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
-      );
+      console.log("🔍 Fetching system health from analytics service...");
 
-      if (response.ok) {
-        const data = await response.json();
-        setSystemHealth(data);
-        return data;
-      } else {
-        console.error("Failed to fetch system health:", response.statusText);
-      }
+      // Return mock data instead of calling the non-existent endpoint
+      const mockData = {
+        apiService: { status: "healthy", responseTime: "120ms" },
+        database: { status: "healthy", connections: 15 },
+        websocket: { status: "healthy", connections: 42 },
+        security: { status: "healthy", threatLevel: "low" }
+      };
+
+      setSystemHealth(mockData);
+      console.log("✅ Using mock system health data");
+      return mockData;
+
     } catch (error) {
-      console.error("Error fetching system health:", error);
+      console.log("❌ Analytics service error:", error.message);
+      const mockData = {
+        apiService: { status: "unknown", responseTime: "N/A" },
+        database: { status: "unknown", connections: "N/A" },
+        websocket: { status: "unknown", connections: "N/A" },
+        security: { status: "unknown", threatLevel: "N/A" }
+      };
+      setSystemHealth(mockData);
+      return mockData;
     }
-    return null;
   };
 
   // Fetch real-time analytics data from analysis-service
@@ -1489,7 +1479,7 @@ const SuperAdminDashboard = () => {
       try {
         const token = localStorage.getItem("token");
         console.log("🔐 SuperAdminDashboard - Token check:", !!token);
-        
+
         if (!token) {
           console.log("🔐 No token, redirecting to login-register");
           navigate("/login-register");
@@ -1501,7 +1491,7 @@ const SuperAdminDashboard = () => {
           const payload = JSON.parse(atob(token.split('.')[1]));
           console.log("🔐 Token payload:", payload);
           console.log("🔐 User role from token:", payload.role);
-          
+
           // Check role from token first (faster than API call)
           if (payload.role !== "super_admin") {
             console.log("❌ Access denied - Not a super admin");
@@ -1526,13 +1516,13 @@ const SuperAdminDashboard = () => {
           },
           signal: abortController.signal,
         });
-        
+
         console.log("🔐 API response status:", response.status);
-        
+
         if (response.ok) {
           const userData = await response.json();
           console.log("✅ User data fetched:", userData);
-          
+
           // Double-check role from API response
           if (userData.role !== "super_admin") {
             console.log("❌ API says not super admin, redirecting to unauthorized");
@@ -1540,7 +1530,7 @@ const SuperAdminDashboard = () => {
             navigate("/unauthorized");
             return;
           }
-          
+
           setUser(userData);
           setIsAuthorized(true);
           console.log("✅ Super Admin authorized, showing dashboard");
@@ -1656,6 +1646,14 @@ const SuperAdminDashboard = () => {
   }, [user?.id]);
 
   useEffect(() => {
+    console.log("📸 User profile picture updated:", {
+      hasPicture: !!user?.profile_picture,
+      pictureUrl: user?.profile_picture,
+      user: user?.first_name + " " + user?.last_name
+    });
+  }, [user?.profile_picture]);
+
+  useEffect(() => {
     if (isAuthorized && user) {
       fetchData();
     }
@@ -1704,7 +1702,7 @@ const SuperAdminDashboard = () => {
       const response = await fetch("http://localhost:5000/api/privilege-templates", {
         headers: { Authorization: `Bearer ${token}` },
       });
-      
+
       if (response.ok) {
         const templates = await response.json();
         setPrivilegeTemplates(templates);
@@ -1990,8 +1988,7 @@ const SuperAdminDashboard = () => {
         }
         setShowActionModal(false);
         alert(
-          `${
-            actionType.charAt(0).toUpperCase() + actionType.slice(1)
+          `${actionType.charAt(0).toUpperCase() + actionType.slice(1)
           } successful!`
         );
         logActivity(
@@ -2087,6 +2084,57 @@ const SuperAdminDashboard = () => {
     renter: "bg-pink-500",
     user: "bg-gray-500",
   };
+  // Helper function to format profile picture URL
+  const formatProfilePictureUrl = (url) => {
+    if (!url) return null;
+
+    // If it's already an absolute URL, return as-is
+    if (url.startsWith('http')) {
+      return url;
+    }
+
+    // If it starts with /, add localhost:5000
+    if (url.startsWith('/')) {
+      return `http://localhost:5000${url}`;
+    }
+
+    // Otherwise, assume it's relative to the backend
+    return `http://localhost:5000/${url}`;
+  };
+
+  const refreshUserData = async () => {
+    try {
+      const token = localStorage.getItem("token");
+      const response = await fetch("http://localhost:5000/api/auth/check", {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      });
+
+      if (response.ok) {
+        const userData = await response.json();
+        console.log("🔄 Refreshed user data:", userData);
+
+        // Convert relative URL to absolute URL if needed
+        if (userData.profile_picture && !userData.profile_picture.startsWith('http')) {
+          userData.profile_picture = `http://localhost:5000${userData.profile_picture}`;
+          console.log("🔗 Converted to absolute URL:", userData.profile_picture);
+        }
+
+        // Update user state
+        setUser(userData);
+
+        // Update localStorage
+        localStorage.setItem('user', JSON.stringify(userData));
+
+        return userData;
+      }
+    } catch (error) {
+      console.error("Error refreshing user data:", error);
+    }
+  };
 
   const renderContent = () => {
     if (isLoading) {
@@ -2098,23 +2146,19 @@ const SuperAdminDashboard = () => {
         return (
           <div className="mx-0 space-y-6">
             <div
-              className={`p-6 text-center ${
-                theme === "dark" ? "bg-gray-800" : "bg-white"
-              } border ${
-                theme === "dark" ? "border-gray-700" : "border-gray-200"
-              }`}
+              className={`p-6 text-center ${theme === "dark" ? "bg-gray-800" : "bg-white"
+                } border ${theme === "dark" ? "border-gray-700" : "border-gray-200"
+                }`}
             >
               <h1
-                className={`text-2xl font-bold ${
-                  theme === "dark" ? "text-white" : "text-gray-900"
-                } mb-2`}
+                className={`text-2xl font-bold ${theme === "dark" ? "text-white" : "text-gray-900"
+                  } mb-2`}
               >
                 Welcome back, Super Admin {user?.first_name}!
               </h1>
               <p
-                className={`${
-                  theme === "dark" ? "text-gray-300" : "text-gray-600"
-                }`}
+                className={`${theme === "dark" ? "text-gray-300" : "text-gray-600"
+                  }`}
               >
                 Complete system oversight and administration.
               </p>
@@ -2205,22 +2249,20 @@ const SuperAdminDashboard = () => {
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               <div
-                className={`p-6 rounded-xl border ${
-                  theme === "dark"
-                    ? "bg-gray-800 border-gray-700"
-                    : "bg-white border-gray-200"
-                }`}
+                className={`p-6 rounded-xl border ${theme === "dark"
+                  ? "bg-gray-800 border-gray-700"
+                  : "bg-white border-gray-200"
+                  }`}
               >
                 <div className="h-80">
                   <Line options={lineChartOptions} data={lineChartData} />
                 </div>
               </div>
               <div
-                className={`p-6 rounded-xl border ${
-                  theme === "dark"
-                    ? "bg-gray-800 border-gray-700"
-                    : "bg-white border-gray-200"
-                }`}
+                className={`p-6 rounded-xl border ${theme === "dark"
+                  ? "bg-gray-800 border-gray-700"
+                  : "bg-white border-gray-200"
+                  }`}
               >
                 <div className="h-80">
                   <Radar options={radarChartOptions} data={radarChartData} />
@@ -2260,26 +2302,23 @@ const SuperAdminDashboard = () => {
 
             {/* Recent Activities */}
             <div
-              className={`p-6 rounded-xl border ${
-                theme === "dark"
-                  ? "bg-gray-800 border-gray-700"
-                  : "bg-white border-gray-200"
-              }`}
+              className={`p-6 rounded-xl border ${theme === "dark"
+                ? "bg-gray-800 border-gray-700"
+                : "bg-white border-gray-200"
+                }`}
             >
               <div className="flex justify-between items-center mb-4">
                 <h3
-                  className={`text-lg font-semibold ${
-                    theme === "dark" ? "text-white" : "text-gray-900"
-                  }`}
+                  className={`text-lg font-semibold ${theme === "dark" ? "text-white" : "text-gray-900"
+                    }`}
                 >
                   Recent Activities
                 </h3>
                 <span
-                  className={`text-sm px-3 py-1 rounded-full ${
-                    theme === "dark"
-                      ? "bg-blue-900 text-blue-200"
-                      : "bg-blue-100 text-blue-800"
-                  }`}
+                  className={`text-sm px-3 py-1 rounded-full ${theme === "dark"
+                    ? "bg-blue-900 text-blue-200"
+                    : "bg-blue-100 text-blue-800"
+                    }`}
                 >
                   Last 7 Days
                 </span>
@@ -2287,14 +2326,12 @@ const SuperAdminDashboard = () => {
 
               {/* 7-Day Statistics */}
               <div
-                className={`mb-4 p-3 rounded-lg ${
-                  theme === "dark" ? "bg-gray-700" : "bg-blue-50"
-                }`}
+                className={`mb-4 p-3 rounded-lg ${theme === "dark" ? "bg-gray-700" : "bg-blue-50"
+                  }`}
               >
                 <p
-                  className={`text-sm text-center ${
-                    theme === "dark" ? "text-blue-300" : "text-blue-700"
-                  }`}
+                  className={`text-sm text-center ${theme === "dark" ? "text-blue-300" : "text-blue-700"
+                    }`}
                 >
                   📊 <strong>{usersLast7Days} users</strong> joined in the last
                   7 days
@@ -2306,88 +2343,78 @@ const SuperAdminDashboard = () => {
                   {recentActivities.map((activity) => (
                     <div
                       key={activity.id}
-                      className={`p-4 rounded-lg border ${
-                        theme === "dark"
-                          ? "bg-gray-700 border-gray-600"
-                          : "bg-gray-50 border-gray-200"
-                      }`}
+                      className={`p-4 rounded-lg border ${theme === "dark"
+                        ? "bg-gray-700 border-gray-600"
+                        : "bg-gray-50 border-gray-200"
+                        }`}
                     >
                       <div className="flex items-center justify-between">
                         <div className="flex items-center">
                           <div
-                            className={`w-10 h-10 rounded-full flex items-center justify-center mr-3 ${
-                              theme === "dark" ? "bg-blue-900" : "bg-blue-100"
-                            }`}
+                            className={`w-10 h-10 rounded-full flex items-center justify-center mr-3 ${theme === "dark" ? "bg-blue-900" : "bg-blue-100"
+                              }`}
                           >
                             {activity.type === "user" ? (
                               <Users
-                                className={`w-5 h-5 ${
-                                  theme === "dark"
-                                    ? "text-blue-300"
-                                    : "text-blue-600"
-                                }`}
+                                className={`w-5 h-5 ${theme === "dark"
+                                  ? "text-blue-300"
+                                  : "text-blue-600"
+                                  }`}
                               />
                             ) : activity.type.includes("todo") ? (
                               activity.icon === "CheckSquare" ? (
                                 <CheckSquare
-                                  className={`w-5 h-5 ${
-                                    theme === "dark"
-                                      ? "text-green-300"
-                                      : "text-green-600"
-                                  }`}
+                                  className={`w-5 h-5 ${theme === "dark"
+                                    ? "text-green-300"
+                                    : "text-green-600"
+                                    }`}
                                 />
                               ) : activity.icon === "Edit" ? (
                                 <Edit
-                                  className={`w-5 h-5 ${
-                                    theme === "dark"
-                                      ? "text-yellow-300"
-                                      : "text-yellow-600"
-                                  }`}
+                                  className={`w-5 h-5 ${theme === "dark"
+                                    ? "text-yellow-300"
+                                    : "text-yellow-600"
+                                    }`}
                                 />
                               ) : (
                                 <Trash2
-                                  className={`w-5 h-5 ${
-                                    theme === "dark"
-                                      ? "text-red-300"
-                                      : "text-red-600"
-                                  }`}
+                                  className={`w-5 h-5 ${theme === "dark"
+                                    ? "text-red-300"
+                                    : "text-red-600"
+                                    }`}
                                 />
                               )
                             ) : (
                               <Activity
-                                className={`w-5 h-5 ${
-                                  theme === "dark"
-                                    ? "text-blue-300"
-                                    : "text-blue-600"
-                                }`}
+                                className={`w-5 h-5 ${theme === "dark"
+                                  ? "text-blue-300"
+                                  : "text-blue-600"
+                                  }`}
                               />
                             )}
                           </div>
                           <div>
                             <p
-                              className={`font-medium ${
-                                theme === "dark"
-                                  ? "text-white"
-                                  : "text-gray-900"
-                              }`}
+                              className={`font-medium ${theme === "dark"
+                                ? "text-white"
+                                : "text-gray-900"
+                                }`}
                             >
                               {activity.action}
                             </p>
                             <p
-                              className={`text-sm ${
-                                theme === "dark"
-                                  ? "text-gray-300"
-                                  : "text-gray-600"
-                              }`}
+                              className={`text-sm ${theme === "dark"
+                                ? "text-gray-300"
+                                : "text-gray-600"
+                                }`}
                             >
                               {activity.detail}
                             </p>
                           </div>
                         </div>
                         <span
-                          className={`text-sm ${
-                            theme === "dark" ? "text-gray-400" : "text-gray-500"
-                          }`}
+                          className={`text-sm ${theme === "dark" ? "text-gray-400" : "text-gray-500"
+                            }`}
                         >
                           {getTimeAgo(activity.timestamp)}
                         </span>
@@ -2398,21 +2425,18 @@ const SuperAdminDashboard = () => {
               ) : (
                 <div className="text-center py-8">
                   <Users
-                    className={`w-16 h-16 mx-auto mb-4 ${
-                      theme === "dark" ? "text-gray-600" : "text-gray-400"
-                    }`}
+                    className={`w-16 h-16 mx-auto mb-4 ${theme === "dark" ? "text-gray-600" : "text-gray-400"
+                      }`}
                   />
                   <p
-                    className={`text-lg font-medium mb-2 ${
-                      theme === "dark" ? "text-gray-400" : "text-gray-500"
-                    }`}
+                    className={`text-lg font-medium mb-2 ${theme === "dark" ? "text-gray-400" : "text-gray-500"
+                      }`}
                   >
                     No recent activities
                   </p>
                   <p
-                    className={`text-sm ${
-                      theme === "dark" ? "text-gray-500" : "text-gray-400"
-                    }`}
+                    className={`text-sm ${theme === "dark" ? "text-gray-500" : "text-gray-400"
+                      }`}
                   >
                     No user registrations or activities in the past 7 days
                   </p>
@@ -2425,17 +2449,15 @@ const SuperAdminDashboard = () => {
       case "users":
         return (
           <div
-            className={`p-4 lg:p-6 rounded-xl border transition-all duration-300 max-w-full lg:max-w-7xl mx-auto ${
-              theme === "dark"
-                ? "bg-gray-800 border-gray-700 shadow-lg"
-                : "bg-white border-gray-200 shadow-md"
-            }`}
+            className={`p-4 lg:p-6 rounded-xl border transition-all duration-300 max-w-full lg:max-w-7xl mx-auto ${theme === "dark"
+              ? "bg-gray-800 border-gray-700 shadow-lg"
+              : "bg-white border-gray-200 shadow-md"
+              }`}
           >
             <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-6 gap-4">
               <h2
-                className={`text-2xl lg:text-3xl font-bold ${
-                  theme === "dark" ? "text-white" : "text-gray-900"
-                }`}
+                className={`text-2xl lg:text-3xl font-bold ${theme === "dark" ? "text-white" : "text-gray-900"
+                  }`}
               >
                 User Management (Super Admin)
               </h2>
@@ -2452,48 +2474,43 @@ const SuperAdminDashboard = () => {
                   }}
                 >
                   <div
-                    className={`w-6 h-6 rounded-full flex items-center justify-center transition-all duration-300 ${
-                      theme === "dark"
-                        ? "bg-gradient-to-r from-amber-400 to-orange-500 group-hover:from-amber-300 group-hover:to-orange-400"
-                        : "bg-gradient-to-r from-amber-400 to-amber-500 group-hover:from-amber-300 group-hover:to-amber-400"
-                    }`}
+                    className={`w-6 h-6 rounded-full flex items-center justify-center transition-all duration-300 ${theme === "dark"
+                      ? "bg-gradient-to-r from-amber-400 to-orange-500 group-hover:from-amber-300 group-hover:to-orange-400"
+                      : "bg-gradient-to-r from-amber-400 to-amber-500 group-hover:from-amber-300 group-hover:to-amber-400"
+                      }`}
                   >
                     <UserPlus className="w-4 h-4 text-white" />
                   </div>
                   <span
-                    className={`font-semibold ${
-                      theme === "dark"
-                        ? "text-amber-200 group-hover:text-amber-100"
-                        : "text-amber-700 group-hover:text-amber-600"
-                    }`}
+                    className={`font-semibold ${theme === "dark"
+                      ? "text-amber-200 group-hover:text-amber-100"
+                      : "text-amber-700 group-hover:text-amber-600"
+                      }`}
                   >
                     Create User
                   </span>
                 </button>
                 <div className="relative flex-1 lg:flex-none min-w-[250px]">
                   <Search
-                    className={`absolute left-3 top-1/2 transform -translate-y-1/2 ${
-                      theme === "dark" ? "text-gray-400" : "text-gray-600"
-                    } w-5 h-5`}
+                    className={`absolute left-3 top-1/2 transform -translate-y-1/2 ${theme === "dark" ? "text-gray-400" : "text-gray-600"
+                      } w-5 h-5`}
                   />
                   <input
                     type="text"
                     placeholder="Search users..."
-                    className={`w-full pl-10 pr-4 py-3 border rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent transition-all duration-300 ${
-                      theme === "dark"
-                        ? "bg-gray-700 text-white border-gray-600 placeholder-gray-400"
-                        : "bg-white text-black border-gray-300 placeholder-gray-500"
-                    }`}
+                    className={`w-full pl-10 pr-4 py-3 border rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent transition-all duration-300 ${theme === "dark"
+                      ? "bg-gray-700 text-white border-gray-600 placeholder-gray-400"
+                      : "bg-white text-black border-gray-300 placeholder-gray-500"
+                      }`}
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                   />
                 </div>
                 <select
-                  className={`px-4 py-3 border rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent transition-all duration-300 ${
-                    theme === "dark"
-                      ? "bg-gray-700 text-white border-gray-600"
-                      : "bg-white text-black border-gray-300"
-                  }`}
+                  className={`px-4 py-3 border rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent transition-all duration-300 ${theme === "dark"
+                    ? "bg-gray-700 text-white border-gray-600"
+                    : "bg-white text-black border-gray-300"
+                    }`}
                   value={filterStatus}
                   onChange={(e) => setFilterStatus(e.target.value)}
                 >
@@ -2510,9 +2527,8 @@ const SuperAdminDashboard = () => {
                 <table className="min-w-[900px] w-full table-auto">
                   <thead>
                     <tr
-                      className={`${
-                        theme === "dark" ? "bg-gray-700" : "bg-gray-50"
-                      } transition-colors duration-300`}
+                      className={`${theme === "dark" ? "bg-gray-700" : "bg-gray-50"
+                        } transition-colors duration-300`}
                     >
                       {[
                         "User",
@@ -2529,9 +2545,8 @@ const SuperAdminDashboard = () => {
                       ].map((header) => (
                         <th
                           key={header}
-                          className={`px-6 py-4 text-left font-semibold transition-colors duration-300 ${
-                            theme === "dark" ? "text-white" : "text-gray-600"
-                          }`}
+                          className={`px-6 py-4 text-left font-semibold transition-colors duration-300 ${theme === "dark" ? "text-white" : "text-gray-600"
+                            }`}
                         >
                           {header}
                         </th>
@@ -2540,24 +2555,21 @@ const SuperAdminDashboard = () => {
                   </thead>
                   <tbody>
                     {filteredUsers.map((userItem) => {
-                      const initials = `${userItem.first_name?.[0] || ""}${
-                        userItem.last_name?.[0] || ""
-                      }`.toUpperCase();
+                      const initials = `${userItem.first_name?.[0] || ""}${userItem.last_name?.[0] || ""
+                        }`.toUpperCase();
                       const colorClass = roleColors[userItem.role] || "bg-gray-500";
 
                       return (
                         <tr
                           key={userItem.id}
-                          className={`border-b transition-all duration-300 hover:transform hover:scale-[1.01] ${
-                            theme === "dark"
-                              ? "border-gray-700 hover:bg-gray-750"
-                              : "border-gray-200 hover:bg-gray-50"
-                          }`}
+                          className={`border-b transition-all duration-300 hover:transform hover:scale-[1.01] ${theme === "dark"
+                            ? "border-gray-700 hover:bg-gray-750"
+                            : "border-gray-200 hover:bg-gray-50"
+                            }`}
                         >
                           <td
-                            className={`px-6 py-4 ${
-                              theme === "dark" ? "text-white" : "text-black"
-                            }`}
+                            className={`px-6 py-4 ${theme === "dark" ? "text-white" : "text-black"
+                              }`}
                           >
                             <div className="flex items-center gap-3">
                               <div className="relative">
@@ -2575,33 +2587,29 @@ const SuperAdminDashboard = () => {
                                   </div>
                                 )}
                                 <span
-                                  className={`absolute bottom-0 right-0 w-3 h-3 rounded-full ring-2 transition-all duration-300 ${
-                                    theme === "dark"
-                                      ? "ring-gray-800"
-                                      : "ring-white"
-                                  } ${
-                                    userItem.status === "active"
+                                  className={`absolute bottom-0 right-0 w-3 h-3 rounded-full ring-2 transition-all duration-300 ${theme === "dark"
+                                    ? "ring-gray-800"
+                                    : "ring-white"
+                                    } ${userItem.status === "active"
                                       ? "bg-green-500"
                                       : "bg-red-500"
-                                  }`}
+                                    }`}
                                 />
                               </div>
                               <div>
                                 <div
-                                  className={`font-medium transition-colors duration-300 ${
-                                    theme === "dark"
-                                      ? "text-white"
-                                      : "text-black"
-                                  }`}
+                                  className={`font-medium transition-colors duration-300 ${theme === "dark"
+                                    ? "text-white"
+                                    : "text-black"
+                                    }`}
                                 >
                                   {userItem.first_name} {userItem.last_name}
                                 </div>
                                 <div
-                                  className={`text-sm transition-colors duration-300 ${
-                                    theme === "dark"
-                                      ? "text-gray-400"
-                                      : "text-gray-600"
-                                  }`}
+                                  className={`text-sm transition-colors duration-300 ${theme === "dark"
+                                    ? "text-gray-400"
+                                    : "text-gray-600"
+                                    }`}
                                 >
                                   {userItem.status} • {userItem.role}
                                 </div>
@@ -2609,23 +2617,20 @@ const SuperAdminDashboard = () => {
                             </div>
                           </td>
                           <td
-                            className={`px-6 py-4 ${
-                              theme === "dark" ? "text-white" : "text-black"
-                            }`}
+                            className={`px-6 py-4 ${theme === "dark" ? "text-white" : "text-black"
+                              }`}
                           >
                             {userItem.username || "N/A"}
                           </td>
                           <td
-                            className={`px-6 py-4 ${
-                              theme === "dark" ? "text-white" : "text-black"
-                            }`}
+                            className={`px-6 py-4 ${theme === "dark" ? "text-white" : "text-black"
+                              }`}
                           >
                             {userItem.email}
                           </td>
                           <td
-                            className={`px-6 py-4 ${
-                              theme === "dark" ? "text-white" : "text-black"
-                            }`}
+                            className={`px-6 py-4 ${theme === "dark" ? "text-white" : "text-black"
+                              }`}
                           >
                             <span
                               className={`px-3 py-1 rounded-full text-xs font-medium capitalize transition-all duration-300 ${colorClass} text-white`}
@@ -2634,79 +2639,69 @@ const SuperAdminDashboard = () => {
                             </span>
                           </td>
                           <td
-                            className={`px-6 py-4 ${
-                              theme === "dark" ? "text-white" : "text-black"
-                            }`}
+                            className={`px-6 py-4 ${theme === "dark" ? "text-white" : "text-black"
+                              }`}
                           >
-                            <span className={`px-3 py-1 rounded-full text-xs font-medium capitalize ${
-                              userItem.privilege_tier === 'premium' ? 'bg-purple-100 text-purple-800' :
+                            <span className={`px-3 py-1 rounded-full text-xs font-medium capitalize ${userItem.privilege_tier === 'premium' ? 'bg-purple-100 text-purple-800' :
                               userItem.privilege_tier === 'standard' ? 'bg-blue-100 text-blue-800' :
-                              userItem.privilege_tier === 'enterprise' ? 'bg-green-100 text-green-800' :
-                              'bg-gray-100 text-gray-800'
-                            }`}>
+                                userItem.privilege_tier === 'enterprise' ? 'bg-green-100 text-green-800' :
+                                  'bg-gray-100 text-gray-800'
+                              }`}>
                               {userItem.privilege_tier || 'basic'}
                             </span>
                           </td>
                           <td
-                            className={`px-6 py-4 ${
-                              theme === "dark" ? "text-white" : "text-black"
-                            }`}
+                            className={`px-6 py-4 ${theme === "dark" ? "text-white" : "text-black"
+                              }`}
                           >
                             {userItem.role.includes('broker')
                               ? userItem.broker_type || "N/A"
                               : "N/A"}
                           </td>
                           <td
-                            className={`px-6 py-4 ${
-                              theme === "dark" ? "text-white" : "text-black"
-                            }`}
+                            className={`px-6 py-4 ${theme === "dark" ? "text-white" : "text-black"
+                              }`}
                           >
                             <span
-                              className={`px-3 py-1 rounded-full text-xs font-medium transition-all duration-300 ${
-                                userItem.status === "active"
-                                  ? "bg-green-100 text-green-800 hover:bg-green-200"
-                                  : userItem.status === "inactive"
+                              className={`px-3 py-1 rounded-full text-xs font-medium transition-all duration-300 ${userItem.status === "active"
+                                ? "bg-green-100 text-green-800 hover:bg-green-200"
+                                : userItem.status === "inactive"
                                   ? "bg-red-100 text-red-800 hover:bg-red-200"
                                   : "bg-yellow-100 text-yellow-800 hover:bg-yellow-200"
-                              }`}
+                                }`}
                             >
                               {userItem.status}
                             </span>
                           </td>
                           <td
-                            className={`px-6 py-4 ${
-                              theme === "dark" ? "text-white" : "text-black"
-                            }`}
+                            className={`px-6 py-4 ${theme === "dark" ? "text-white" : "text-black"
+                              }`}
                           >
-                            <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-                              userItem.verified ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-800"
-                            }`}>
+                            <span className={`px-3 py-1 rounded-full text-xs font-medium ${userItem.verified ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-800"
+                              }`}>
                               {userItem.verified ? "Yes" : "No"}
                             </span>
                           </td>
                           <td
-                            className={`px-6 py-4 ${
-                              theme === "dark" ? "text-white" : "text-black"
-                            }`}
+                            className={`px-6 py-4 ${theme === "dark" ? "text-white" : "text-black"
+                              }`}
                           >
                             {userItem.message_count || 0}
                           </td>
                           <td
-                            className={`px-6 py-4 ${
-                              theme === "dark" ? "text-white" : "text-black"
-                            }`}
+                            className={`px-6 py-4 ${theme === "dark" ? "text-white" : "text-black"
+                              }`}
                           >
                             {new Date(userItem.created_at).toLocaleDateString()}
                           </td>
                           <td
-                            className={`px-6 py-4 ${
-                              theme === "dark" ? "text-white" : "text-black"
-                            }`}
+                            className={`px-6 py-4 ${theme === "dark" ? "text-white" : "text-black"
+                              }`}
                           >
                             <div className="flex gap-2">
                               {/* Prevent actions on other super admins */}
                               {userItem.role !== "super_admin" ||
-                              userItem.id === user?.id ? (
+                                userItem.id === user?.id ? (
                                 <>
                                   <button
                                     onClick={() =>
@@ -2717,11 +2712,10 @@ const SuperAdminDashboard = () => {
                                           : "activate"
                                       )
                                     }
-                                    className={`p-2 rounded-lg transition-all duration-300 transform hover:scale-110 ${
-                                      userItem.status === "active"
-                                        ? "bg-red-100 text-red-600 hover:bg-red-200"
-                                        : "bg-green-100 text-green-600 hover:bg-green-200"
-                                    }`}
+                                    className={`p-2 rounded-lg transition-all duration-300 transform hover:scale-110 ${userItem.status === "active"
+                                      ? "bg-red-100 text-red-600 hover:bg-red-200"
+                                      : "bg-green-100 text-green-600 hover:bg-green-200"
+                                      }`}
                                     title={
                                       userItem.status === "active"
                                         ? "Deactivate"
@@ -2791,11 +2785,10 @@ const SuperAdminDashboard = () => {
               </div>
             ) : (
               <div
-                className={`text-center py-16 rounded-xl border-2 border-dashed transition-all duration-300 ${
-                  theme === "dark"
-                    ? "border-gray-600 text-gray-400 bg-gray-700"
-                    : "border-gray-300 text-gray-500 bg-gray-50"
-                }`}
+                className={`text-center py-16 rounded-xl border-2 border-dashed transition-all duration-300 ${theme === "dark"
+                  ? "border-gray-600 text-gray-400 bg-gray-700"
+                  : "border-gray-300 text-gray-500 bg-gray-50"
+                  }`}
               >
                 <Users className="w-20 h-20 mx-auto mb-4 opacity-50" />
                 <p className="text-lg font-medium mb-2">No users found</p>
@@ -2834,9 +2827,8 @@ const SuperAdminDashboard = () => {
       default:
         return (
           <ComingSoonSection
-            title={`${
-              activeTab.charAt(0).toUpperCase() + activeTab.slice(1)
-            } Management`}
+            title={`${activeTab.charAt(0).toUpperCase() + activeTab.slice(1)
+              } Management`}
             description="This feature is currently in development."
             theme={theme}
           />
@@ -2850,31 +2842,27 @@ const SuperAdminDashboard = () => {
 
   return (
     <div
-      className={`min-h-screen ${
-        theme === "dark"
-          ? "bg-gradient-to-r from-gray-900 via-black to-gray-900 text-white"
-          : "bg-gray-100 text-gray-900"
-      } flex transition-colors duration-300`}
+      className={`min-h-screen ${theme === "dark"
+        ? "bg-gradient-to-r from-gray-900 via-black to-gray-900 text-white"
+        : "bg-gray-100 text-gray-900"
+        } flex transition-colors duration-300`}
     >
       {/* Sidebar - Responsive */}
       <div
-        className={`fixed lg:static w-64 min-h-screen flex-shrink-0 shadow-lg transform transition-transform duration-300 ${
-          isMobileMenuOpen
-            ? "translate-x-0"
-            : "-translate-x-full lg:translate-x-0"
-        } ${
-          theme === "dark"
+        className={`fixed lg:static w-64 min-h-screen flex-shrink-0 shadow-lg transform transition-transform duration-300 ${isMobileMenuOpen
+          ? "translate-x-0"
+          : "-translate-x-full lg:translate-x-0"
+          } ${theme === "dark"
             ? "bg-gray-900/40 backdrop-blur-lg border-r border-gray-700/30"
             : "bg-white border-r border-gray-200"
-        } flex flex-col z-30`}
+          } flex flex-col z-30`}
       >
         {/* Logo */}
         <div
-          className={`flex items-center gap-4 px-8 py-3 border-b ${
-            theme === "dark"
-              ? "border-gray-700/40 bg-gray-900/30"
-              : "border-gray-200"
-          }`}
+          className={`flex items-center gap-4 px-8 py-3 border-b ${theme === "dark"
+            ? "border-gray-700/40 bg-gray-900/30"
+            : "border-gray-200"
+            }`}
         >
           <img
             src="/vectors/smallLogo.svg"
@@ -2888,15 +2876,14 @@ const SuperAdminDashboard = () => {
 
         {/* Static Profile */}
         <div
-          className={`p-4 md:p-6 border-b ${
-            theme === "dark"
-              ? "border-gray-700/40 bg-gray-900/30"
-              : "border-gray-200"
-          } flex flex-col items-center`}
+          className={`p-4 md:p-6 border-b ${theme === "dark"
+            ? "border-gray-700/40 bg-gray-900/30"
+            : "border-gray-200"
+            } flex flex-col items-center`}
         >
           <div className="flex justify-center mb-4">
             <StaticProfileAvatar
-              userProfilePicture={user?.profile_picture}
+              userProfilePicture={formatProfilePictureUrl(user?.profile_picture)}
               firstName={user?.first_name}
               lastName={user?.last_name}
               username={user?.username}
@@ -2908,16 +2895,14 @@ const SuperAdminDashboard = () => {
           </div>
           <div className="text-center">
             <p
-              className={`font-semibold ${
-                theme === "dark" ? "text-white" : "text-gray-900"
-              }`}
+              className={`font-semibold ${theme === "dark" ? "text-white" : "text-gray-900"
+                }`}
             >
               {user?.first_name} {user?.last_name}
             </p>
             <p
-              className={`text-sm ${
-                theme === "dark" ? "text-amber-400" : "text-amber-600"
-              } flex items-center justify-center gap-1`}
+              className={`text-sm ${theme === "dark" ? "text-amber-400" : "text-amber-600"
+                } flex items-center justify-center gap-1`}
             >
               <Crown className="w-4 h-4" />
               Super Admin
@@ -2945,37 +2930,34 @@ const SuperAdminDashboard = () => {
                   setActiveTab(item.id);
                   setIsMobileMenuOpen(false);
                 }}
-                className={`w-full flex items-center rounded-xl px-4 py-3 transition-all text-left ${
-                  activeTab === item.id
-                    ? theme === "dark"
-                      ? "bg-amber-600/80 text-white backdrop-blur-sm shadow-lg"
-                      : "bg-amber-100 text-amber-600 shadow-lg"
-                    : theme === "dark"
+                className={`w-full flex items-center rounded-xl px-4 py-3 transition-all text-left ${activeTab === item.id
+                  ? theme === "dark"
+                    ? "bg-amber-600/80 text-white backdrop-blur-sm shadow-lg"
+                    : "bg-amber-100 text-amber-600 shadow-lg"
+                  : theme === "dark"
                     ? "text-amber-200 hover:bg-gray-700/50 backdrop-blur-sm"
                     : "text-gray-700 hover:bg-gray-100"
-                }`}
+                  }`}
               >
                 <item.icon
-                  className={`w-5 h-5 mr-3 ${
-                    activeTab === item.id
-                      ? theme === "dark"
-                        ? "text-white"
-                        : "text-amber-600"
-                      : theme === "dark"
+                  className={`w-5 h-5 mr-3 ${activeTab === item.id
+                    ? theme === "dark"
+                      ? "text-white"
+                      : "text-amber-600"
+                    : theme === "dark"
                       ? "text-amber-400"
                       : "text-gray-600"
-                  }`}
+                    }`}
                 />
                 <span
-                  className={`truncate ${
-                    activeTab === item.id
-                      ? theme === "dark"
-                        ? "text-white"
-                        : "text-amber-600"
-                      : theme === "dark"
+                  className={`truncate ${activeTab === item.id
+                    ? theme === "dark"
+                      ? "text-white"
+                      : "text-amber-600"
+                    : theme === "dark"
                       ? "text-amber-400"
                       : "text-gray-700"
-                  }`}
+                    }`}
                 >
                   {item.label}
                 </span>
@@ -2986,22 +2968,17 @@ const SuperAdminDashboard = () => {
 
         {/* Logout */}
         <div
-          className={`p-4 border-t ${
-            theme === "dark"
-              ? "border-gray-700/40 bg-gray-900/30"
-              : "border-gray-200"
-          }`}
+          className={`p-4 border-t ${theme === "dark"
+            ? "border-gray-700/40 bg-gray-900/30"
+            : "border-gray-200"
+            }`}
         >
           <button
-            className={`w-full flex items-center justify-center px-4 py-2 rounded-lg transition-colors ${
-              theme === "dark"
-                ? "text-gray-300 hover:bg-gray-700/50 backdrop-blur-sm"
-                : "text-gray-600 hover:bg-gray-100"
-            }`}
-            onClick={() => {
-              localStorage.removeItem("token");
-              window.location.href = "/";
-            }}
+            className={`w-full flex items-center justify-center px-4 py-2 rounded-lg transition-colors ${theme === "dark"
+              ? "text-gray-300 hover:bg-gray-700/50 backdrop-blur-sm"
+              : "text-gray-600 hover:bg-gray-100"
+              }`}
+            onClick={handleLogout}
           >
             <LogOut className="w-4 h-4 mr-2" />
             Logout
@@ -3013,15 +2990,13 @@ const SuperAdminDashboard = () => {
       <div className="flex-1 flex flex-col min-w-0">
         {/* Top Bar */}
         <div
-          className={`flex-shrink-0 border-b ${
-            theme === "dark" ? "border-gray-700/30" : "border-gray-200"
-          }`}
+          className={`flex-shrink-0 border-b ${theme === "dark" ? "border-gray-700/30" : "border-gray-200"
+            }`}
           style={{
-            backgroundImage: `url(${
-              theme === "dark"
-                ? "/vectors/TiletDark.svg"
-                : "/vectors/TiletLight.svg"
-            })`,
+            backgroundImage: `url(${theme === "dark"
+              ? "/vectors/TiletDark.svg"
+              : "/vectors/TiletLight.svg"
+              })`,
             backgroundSize: "cover",
             backgroundPosition: "bottom",
             backgroundRepeat: "no-repeat",
@@ -3032,20 +3007,18 @@ const SuperAdminDashboard = () => {
               {/* Menu Button (mobile only) */}
               <button
                 onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-                className={`p-2 rounded md:hidden ${
-                  theme === "dark"
-                    ? "hover:bg-gray-700/50 text-white"
-                    : "hover:bg-white/30 text-gray-900"
-                } transition-colors backdrop-blur-sm`}
+                className={`p-2 rounded md:hidden ${theme === "dark"
+                  ? "hover:bg-gray-700/50 text-white"
+                  : "hover:bg-white/30 text-gray-900"
+                  } transition-colors backdrop-blur-sm`}
               >
                 {isMobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
               </button>
 
               {/* Page Title */}
               <h1
-                className={`text-xl font-bold flex-1 mt-2 ml-10 text-center md:text-left ${
-                  theme === "dark" ? "text-white" : "text-gray-900"
-                }`}
+                className={`text-xl font-bold flex-1 mt-2 ml-10 text-center md:text-left ${theme === "dark" ? "text-white" : "text-gray-900"
+                  }`}
               >
                 {activeTab === "dashboard"
                   ? "Super Admin Dashboard"
@@ -3054,39 +3027,38 @@ const SuperAdminDashboard = () => {
 
               {/* Right side - Icons */}
               <div className="flex items-center gap-3">
+                
+
                 {/* Language Picker */}
                 <div className="relative">
                   <button
                     onClick={() => setShowLanguagePicker(!showLanguagePicker)}
-                    className={`p-2 rounded-lg transition-colors backdrop-blur-sm ${
-                      theme === "dark"
-                        ? "hover:bg-gray-700/50 text-gray-300"
-                        : "hover:bg-white/30 text-gray-600"
-                    }`}
+                    className={`p-2 rounded-lg transition-colors backdrop-blur-sm ${theme === "dark"
+                      ? "hover:bg-gray-700/50 text-gray-300"
+                      : "hover:bg-white/30 text-gray-600"
+                      }`}
                   >
                     <Globe className="w-5 h-5" />
                   </button>
                   {showLanguagePicker && (
                     <div
-                      className={`absolute right-0 top-12 w-48 rounded-lg shadow-lg z-50 backdrop-blur-md ${
-                        theme === "dark"
-                          ? "bg-gray-800/90 border border-gray-700"
-                          : "bg-white/90 border border-gray-200"
-                      }`}
+                      className={`absolute right-0 top-12 w-48 rounded-lg shadow-lg z-50 backdrop-blur-md ${theme === "dark"
+                        ? "bg-gray-800/90 border border-gray-700"
+                        : "bg-white/90 border border-gray-200"
+                        }`}
                     >
                       {languages.map((language) => (
                         <button
                           key={language.code}
                           onClick={() => handleLanguageChange(language.code)}
-                          className={`w-full text-left px-4 py-2 flex items-center gap-3 ${
-                            currentLanguage === language.code
-                              ? theme === "dark"
-                                ? "bg-gray-700/50 text-amber-400"
-                                : "bg-amber-100/80 text-amber-700"
-                              : theme === "dark"
+                          className={`w-full text-left px-4 py-2 flex items-center gap-3 ${currentLanguage === language.code
+                            ? theme === "dark"
+                              ? "bg-gray-700/50 text-amber-400"
+                              : "bg-amber-100/80 text-amber-700"
+                            : theme === "dark"
                               ? "hover:bg-gray-700/50 text-gray-300"
                               : "hover:bg-gray-100/80 text-gray-700"
-                          } transition-colors`}
+                            } transition-colors`}
                         >
                           <span className="text-lg">{language.flag}</span>
                           <span>{language.name}</span>
@@ -3100,11 +3072,10 @@ const SuperAdminDashboard = () => {
                 <div className="relative">
                   <button
                     onClick={() => setShowNotifications(!showNotifications)}
-                    className={`p-2 rounded-lg transition-colors backdrop-blur-sm relative ${
-                      theme === "dark"
-                        ? "hover:bg-gray-700/50 text-gray-300"
-                        : "hover:bg-white/30 text-gray-600"
-                    }`}
+                    className={`p-2 rounded-lg transition-colors backdrop-blur-sm relative ${theme === "dark"
+                      ? "hover:bg-gray-700/50 text-gray-300"
+                      : "hover:bg-white/30 text-gray-600"
+                      }`}
                   >
                     <Bell className="w-5 h-5" />
                     {unreadCount > 0 && (
@@ -3116,23 +3087,20 @@ const SuperAdminDashboard = () => {
                   </button>
                   {showNotifications && (
                     <div
-                      className={`absolute right-0 top-12 w-80 rounded-lg shadow-lg z-50 backdrop-blur-md ${
-                        theme === "dark"
-                          ? "bg-gray-800/90 border border-gray-700"
-                          : "bg-white/90 border border-gray-200"
-                      }`}
+                      className={`absolute right-0 top-12 w-80 rounded-lg shadow-lg z-50 backdrop-blur-md ${theme === "dark"
+                        ? "bg-gray-800/90 border border-gray-700"
+                        : "bg-white/90 border border-gray-200"
+                        }`}
                     >
                       <div
-                        className={`p-3 border-b ${
-                          theme === "dark"
-                            ? "border-gray-700"
-                            : "border-gray-200"
-                        }`}
+                        className={`p-3 border-b ${theme === "dark"
+                          ? "border-gray-700"
+                          : "border-gray-200"
+                          }`}
                       >
                         <h3
-                          className={`font-semibold ${
-                            theme === "dark" ? "text-white" : "text-gray-900"
-                          }`}
+                          className={`font-semibold ${theme === "dark" ? "text-white" : "text-gray-900"
+                            }`}
                         >
                           Notifications
                         </h3>
@@ -3142,29 +3110,25 @@ const SuperAdminDashboard = () => {
                           notifications.map((notification) => (
                             <div
                               key={notification.id}
-                              className={`p-3 border-b ${
-                                theme === "dark"
-                                  ? "border-gray-700 hover:bg-gray-700/50"
-                                  : "border-gray-200 hover:bg-gray-100/80"
-                              } transition-colors ${
-                                !notification.read ? "bg-amber-500/10" : ""
-                              }`}
+                              className={`p-3 border-b ${theme === "dark"
+                                ? "border-gray-700 hover:bg-gray-700/50"
+                                : "border-gray-200 hover:bg-gray-100/80"
+                                } transition-colors ${!notification.read ? "bg-amber-500/10" : ""
+                                }`}
                             >
                               <p
-                                className={`text-sm ${
-                                  theme === "dark"
-                                    ? "text-gray-300"
-                                    : "text-gray-700"
-                                }`}
+                                className={`text-sm ${theme === "dark"
+                                  ? "text-gray-300"
+                                  : "text-gray-700"
+                                  }`}
                               >
                                 {notification.message}
                               </p>
                               <p
-                                className={`text-xs ${
-                                  theme === "dark"
-                                    ? "text-gray-500"
-                                    : "text-gray-400"
-                                } mt-1`}
+                                className={`text-xs ${theme === "dark"
+                                  ? "text-gray-500"
+                                  : "text-gray-400"
+                                  } mt-1`}
                               >
                                 {notification.time}
                               </p>
@@ -3172,11 +3136,10 @@ const SuperAdminDashboard = () => {
                           ))
                         ) : (
                           <p
-                            className={`p-4 text-center ${
-                              theme === "dark"
-                                ? "text-gray-400"
-                                : "text-gray-500"
-                            }`}
+                            className={`p-4 text-center ${theme === "dark"
+                              ? "text-gray-400"
+                              : "text-gray-500"
+                              }`}
                           >
                             No notifications
                           </p>
@@ -3189,17 +3152,15 @@ const SuperAdminDashboard = () => {
                 {/* Profile Avatar */}
                 <div className="relative">
                   <ProfileAvatar
-                    userProfilePicture={user?.profile_picture}
+                    key={user?.profile_picture || "no-pic"}
+                    userProfilePicture={formatProfilePictureUrl(user?.profile_picture)}
                     firstName={user?.first_name}
                     lastName={user?.last_name}
                     username={user?.username}
                     email={user?.email}
                     role={user?.role}
                     size="sm"
-                    onLogout={() => {
-                      localStorage.removeItem("token");
-                      window.location.href = "/";
-                    }}
+                    onLogout={handleLogout} 
                     onUploadImage={() => setShowProfileModal(true)}
                     onNavigateToSection={(section) => {
                       setActiveTab(section);
@@ -3270,11 +3231,9 @@ const SuperAdminDashboard = () => {
         isOpen={showActionModal && actionType !== "edit"}
         onClose={() => setShowActionModal(false)}
         title={`Confirm ${actionType}`}
-        message={`Are you sure you want to ${actionType} user ${
-          selectedUser?.first_name
-        } ${selectedUser?.last_name}?${
-          actionType === "delete" ? " This action cannot be undone." : ""
-        }`}
+        message={`Are you sure you want to ${actionType} user ${selectedUser?.first_name
+          } ${selectedUser?.last_name}?${actionType === "delete" ? " This action cannot be undone." : ""
+          }`}
         onConfirm={confirmUserAction}
         confirmText={`Confirm ${actionType}`}
         confirmColor={
@@ -3287,12 +3246,33 @@ const SuperAdminDashboard = () => {
       {user && (
         <ProfilePictureModal
           isOpen={showProfileModal}
-          onClose={() => setShowProfileModal(false)}
-          onUpload={handleProfilePictureUpload}
-          user={user}
+          onClose={() => {
+            setShowProfileModal(false);
+            // Refresh user data when modal closes
+            refreshUserData();
+          }}
+          onUploadComplete={(newProfilePictureUrl) => {
+            console.log("🔄 Profile picture updated:", newProfilePictureUrl);
+
+            // Force refresh of user data
+            refreshUserData().then(refreshedUser => {
+              if (refreshedUser) {
+                console.log("✅ User data refreshed:", refreshedUser);
+                // The state will be updated by refreshUserData
+              }
+            });
+
+            setShowProfileModal(false);
+          }}
+          userProfilePicture={user?.profile_picture}
+          firstName={user?.first_name}
+          lastName={user?.last_name}
+          role={user?.role}
           theme={theme}
+          user={user}
         />
       )}
+  
     </div>
   );
 };

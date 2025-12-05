@@ -97,9 +97,18 @@ router.post('/upload-profile', verifyToken, upload.single('profilePicture'), asy
     const profilePictureUrl = `${req.protocol}://${req.get('host')}/Uploads/profile-pictures/${req.file.filename}`;
 
     // Update user's profile picture in the database
-    const success = await User.updateProfilePicture(req.user.id, profilePictureUrl);
-    if (success) {
-      res.status(200).json({ profilePictureUrl });
+    const db = await import("../../shared/db.js").then(mod => mod.default);
+    const [result] = await db.query(
+      "UPDATE users SET profile_picture = ? WHERE id = ?",
+      [profilePictureUrl, req.user.id]
+    );
+
+    if (result.affectedRows > 0) {
+      res.status(200).json({ 
+        success: true,
+        profilePictureUrl,
+        message: 'Profile picture updated successfully' 
+      });
     } else {
       res.status(500).json({ message: 'Failed to update profile picture' });
     }

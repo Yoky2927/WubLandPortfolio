@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import GridOverlay from "../../components/GridOverlay";
 import Footer from "../../components/Footer";
@@ -10,6 +10,7 @@ import Loader from "../../components/Loader";
 import ProfileAvatar from "../../components/ProfileAvatar";
 import ProfilePictureModal from "../../components/ProfilePictureModal.jsx";
 import { useTheme } from "../../contexts/ThemeContext";
+import { ChevronDown } from "lucide-react";
 
 function Home() {
   const { theme, toggleTheme } = useTheme();
@@ -17,6 +18,40 @@ function Home() {
   const navigate = useNavigate();
   const [user, setUser] = useState(null);
   const [showProfileModal, setShowProfileModal] = useState(false);
+
+  // Add these for typing effect
+  const [typingText, setTypingText] = useState("");
+  const [typingIndex, setTypingIndex] = useState(0);
+  const typingRef = useRef(null);
+
+  // Typing animation effect
+  useEffect(() => {
+    const texts = [
+      "Homes Built on Trust, Inspired by Truth!",
+      "Find Your Perfect Home Today!",
+      "Ethiopia's Trusted Real Estate Platform"
+    ];
+
+    const currentText = texts[typingIndex];
+    let currentChar = 0;
+    let timeout;
+
+    const type = () => {
+      if (currentChar <= currentText.length) {
+        setTypingText(currentText.slice(0, currentChar));
+        currentChar++;
+        timeout = setTimeout(type, 100);
+      } else {
+        timeout = setTimeout(() => {
+          setTypingIndex((prev) => (prev + 1) % texts.length);
+        }, 3000);
+      }
+    };
+
+    type();
+
+    return () => clearTimeout(timeout);
+  }, [typingIndex]);
 
   // Redirect logged-in users to their dashboard
   // In the useEffect for redirecting logged-in users:
@@ -173,24 +208,24 @@ function Home() {
   };
 
   const handleLogout = () => {
-  // Clear all localStorage items
-  localStorage.removeItem("token");
-  localStorage.removeItem("user");
-  
-  // Clear state immediately
-  setUser(null);
-  setIsLoggedIn(false);
-  
-  // Show loading briefly
-  setIsLoading(true);
-  
-  // Redirect to home page after a short delay
-  setTimeout(() => {
-    setIsLoading(false);
-    navigate("/", { replace: true });
-    window.location.reload(); // Force a full page reload to clear any cached state
-  }, 1000);
-};
+    // Clear all localStorage items
+    localStorage.removeItem("token");
+    localStorage.removeItem("user");
+
+    // Clear state immediately
+    setUser(null);
+    setIsLoggedIn(false);
+
+    // Show loading briefly
+    setIsLoading(true);
+
+    // Redirect to home page after a short delay
+    setTimeout(() => {
+      setIsLoading(false);
+      navigate("/", { replace: true });
+      window.location.reload(); // Force a full page reload to clear any cached state
+    }, 1000);
+  };
 
   return (
     <div className="relative min-h-screen overflow-x-hidden">
@@ -201,21 +236,22 @@ function Home() {
         {/* Header Section */}
         <header
           id="header"
-          className="relative w-full max-w-[1580px] mx-auto px-4 sm:px-6 transition-all duration-500"
+          className="relative w-full  mx-auto px-4 sm:px-6 transition-all duration-500 overflow-hidden "
         >
-          {/* Background Decorations */}
+          {/* Background Decorations - ABSOLUTE within header, not fixed */}
           <img
-            className="absolute top-0 -left-[3vw] xs:-left-[15%] h-full w-auto max-w-[100px] sm:max-w-[100px] md:max-w-[150px] lg:max-w-[200px] xl:max-w-[250px]"
+            className="absolute top-0 left-0 h-full w-auto max-w-[100px] sm:max-w-[100px] md:max-w-[150px] lg:max-w-[200px] xl:max-w-[250px] 2xl:max-w-[300px] z-0 pointer-events-none"
             src="/vectors/tiletLeftY.svg"
             alt="Decor Tilet"
           />
           <img
-            className="absolute top-0 -right-[3vw] xs:-right-[15%] h-full w-auto max-w-[100px] sm:max-w-[100px] md:max-w-[150px] lg:max-w-[200px] xl:max-w-[250px]"
+            className="absolute top-0 right-0 h-full w-auto max-w-[100px] sm:max-w-[100px] md:max-w-[150px] lg:max-w-[200px] xl:max-w-[250px] 2xl:max-w-[300px] z-0 pointer-events-none"
             src="/vectors/tiletRightY.svg"
             alt="Decor Tilet"
           />
 
-          <div className="w-full">
+
+          <div className="w-full ">
             {/* Navigation Bar */}
             <div className="NavBar flex flex-col sm:flex-row items-center justify-between py-4 sm:py-6">
               <img
@@ -225,9 +261,8 @@ function Home() {
               />
               <nav className="w-full sm:w-auto flex-wrap">
                 <ul
-                  className={`flex flex-wrap justify-center relative space-x-4 sm:space-x-6 md:space-x-16 lg:space-x-28 sm:-left-52 md:-left-80 lg:-left-12 ${
-                    theme === "dark" ? "text-white" : "text-black"
-                  }`}
+                  className={`flex flex-wrap justify-center relative space-x-4 sm:space-x-6 md:space-x-16 lg:space-x-28 sm:-left-52 md:-left-80 lg:-left-12 ${theme === "dark" ? "text-white" : "text-black"
+                    }`}
                 >
                   <li>
                     <a href="/properties" className="nav-link">
@@ -284,19 +319,23 @@ function Home() {
             </div>
 
             {/* Hero Section */}
-            <div className="w-full lg:w-[350px] mx-auto lg:mx-[19%] pt-[15vh] lg:pt-32 mb-6 text-center lg:text-left">
-              <div className="px-[20vw] lg:px-0">
-                <h1 className="text-[clamp(1.5rem,6vw,2.25rem)] lg:text-4xl">
-                  <strong>
-                    Homes Built on <span className="text-amber-400">Trust</span>
-                    , Inspired by <span className="text-amber-400">Truth</span>!
-                  </strong>
-                </h1>
+            <div className="relative lg:absolute lg:ml-[18%] lg:mb-3 md:-mb-8 sm:md-0">
+              <div className="w-full max-w-[100%] sm:max-w-[80%] md:max-w-[70%] lg:w-[400px] mx-auto lg:mx-0 pt-[10vh] sm:pt-[12vh] sm:md-0 lg:pt-32 ">
+                <div className="px-4 sm:px-6 md:px-8 lg:px-0">
+                  <h1 className="text-[clamp(1.75rem,5vw,2.5rem)] sm:text-[clamp(2rem,5vw,2.75rem)] md:text-3xl lg:text-4xl text-center lg:text-left font-bold">
+                    <span
+                      ref={typingRef}
+                      className={`border-r-2 pr-1 typing-cursor text-amber-400 inline-block ${theme === "dark" ? "border-white" : "border-black"}`}
+                    >
+                      {typingText}
+                    </span>
+                  </h1>
+                </div>
               </div>
             </div>
 
             {/* Subtitle */}
-            <div className="w-full lg:w-[350px] mx-auto lg:mx-[19%] mb-6 text-center lg:text-left min-h-[120px]">
+            <div className="relative lg:mt-72 w-full lg:w-[350px] mx-auto  lg:mx-[19%] mb-6 text-center lg:text-left min-h-[120px]">
               <div className="px-[20vw] lg:px-0">
                 <p className="text-[clamp(0.875rem,3vw,1.125rem)] lg:text-base">
                   Explore verified listings, connect with reliable agents, and
@@ -307,14 +346,13 @@ function Home() {
             </div>
 
             {/* Search Bar */}
-            <div className="relative mb-4 sm:max-w-[350px] sm:mx-[30%] md:max-w-[400px] md:mx-[30%] lg:w-[460px] lg:mx-[19%] text-center lg:text-left flex flex-wrap items-stretch">
+            <div className="relative sm:max-w-[350px] sm:mx-[30%] md:max-w-[400px] md:mx-[30%] lg:w-[460px] lg:mx-[19%] text-center lg:text-left flex flex-wrap items-stretch">
               <input
                 type="search"
-                className={`w-full shadow-lg py-2 sm:py-3 sm:text-sm md:text-base pl-12 pr-6 text-sm transition-all duration-500 ${
-                  theme === "dark"
-                    ? "bg-gray-800 text-white placeholder-gray-400 focus:bg-gray-700 focus:ring-2 focus:ring-amber-400"
-                    : "bg-white text-gray-900 placeholder-gray-500 focus:bg-gray-100 focus:ring-2 focus:ring-amber-400"
-                }`}
+                className={`w-full shadow-lg py-2 sm:py-3 sm:text-sm md:text-base pl-12 pr-6 text-sm transition-all duration-500 ${theme === "dark"
+                  ? "bg-gray-800 text-white placeholder-gray-400 focus:bg-gray-700 focus:ring-2 focus:ring-amber-400"
+                  : "bg-white text-gray-900 placeholder-gray-500 focus:bg-gray-100 focus:ring-2 focus:ring-amber-400"
+                  }`}
                 placeholder="Enter an Address, neighborhood, or city"
                 aria-label="Search"
                 aria-describedby="button-addon2"
@@ -339,9 +377,8 @@ function Home() {
               <div className="mx-auto px-4 sm:px-6 md:px-10 lg:px-16 xl:px-20 py-4 sm:py-5 md:py-6 lg:py-7">
                 <div className="overflow-x-auto hide-scrollbar">
                   <ul
-                    className={`flex whitespace-nowrap justify-center space-x-4 sm:space-x-6 md:space-x-8 lg:space-x-10 ${
-                      theme === "dark" ? "text-white" : "text-black"
-                    }`}
+                    className={`flex whitespace-nowrap justify-center space-x-4 sm:space-x-6 md:space-x-8 lg:space-x-10 ${theme === "dark" ? "text-white" : "text-black"
+                      }`}
                   >
                     <li>
                       <a
@@ -391,6 +428,14 @@ function Home() {
                 </div>
               </div>
             </div>
+            {/* Downward Arrow Animation */}
+            <div className="w-full flex justify-center mt-6 lg:mt-8">
+              <div className="animate-bounce">
+                <ChevronDown
+                  className={`w-8 h-8 ${theme === "dark" ? "text-white" : "text-gray-900"}`}
+                />
+              </div>
+            </div>
           </div>
         </header>
 
@@ -403,11 +448,10 @@ function Home() {
         <div
           id="AboutUs"
           className={`relative mb-5 w-full max-w-[1030px] h-auto min-h-[550px] px-4 md:px-6 lg:px-0
-          ${
-            theme === "dark"
+          ${theme === "dark"
               ? "bg-gradient-to-r from-[#332500] to-[#1a1200] border border-amber-400/30"
               : "bg-gradient-to-r from-amber-50 to-amber-100 border border-amber-200"
-          } overflow-hidden`}
+            } overflow-hidden`}
         >
           <div className="flex flex-col lg:flex-row items-center justify-center lg:justify-between p-4 md:p-6 lg:p-8">
             <div className="w-full lg:w-9/12 lg:mb-0 flex justify-center lg:justify-start">
@@ -422,26 +466,23 @@ function Home() {
                 ABOUT US
               </p>
               <h1
-                className={`lg:text-left mb-4 text-2xl md:text-3xl lg:text-4xl md:text-center font-bold ${
-                  theme === "dark" ? "text-white" : "text-black"
-                }`}
+                className={`lg:text-left mb-4 text-2xl md:text-3xl lg:text-4xl md:text-center font-bold ${theme === "dark" ? "text-white" : "text-black"
+                  }`}
               >
                 Who We Are?
               </h1>
               <div className="space-y-3 md:space-y-4 md:text-justify">
                 <p
-                  className={`text-sm md:text-base ${
-                    theme === "dark" ? "text-gray-300" : "text-gray-700"
-                  }`}
+                  className={`text-sm md:text-base ${theme === "dark" ? "text-gray-300" : "text-gray-700"
+                    }`}
                 >
                   WubLand is a growing Ethiopian real estate agency that
                   originally offered properties of its own, and now also
                   connects clients with trusted third-party listings.
                 </p>
                 <p
-                  className={`text-sm md:text-base ${
-                    theme === "dark" ? "text-gray-300" : "text-gray-700"
-                  }`}
+                  className={`text-sm md:text-base ${theme === "dark" ? "text-gray-300" : "text-gray-700"
+                    }`}
                 >
                   Our platform brings together buyers, sellers, renters, and
                   leasers with both the companies and freelancing brokers
@@ -449,9 +490,8 @@ function Home() {
                   country.
                 </p>
                 <p
-                  className={`text-sm md:text-base ${
-                    theme === "dark" ? "text-gray-300" : "text-gray-700"
-                  }`}
+                  className={`text-sm md:text-base ${theme === "dark" ? "text-gray-300" : "text-gray-700"
+                    }`}
                 >
                   Whether you're looking for a new home or a place to grow your
                   real estate career as a broker, WubLand is your trusted
@@ -471,9 +511,8 @@ function Home() {
               Discover Your Next Property
             </p>
             <h1
-              className={`mb-6 text-2xl md:text-3xl lg:text-4xl font-bold text-left ${
-                theme === "dark" ? "text-white" : "text-black"
-              }`}
+              className={`mb-6 text-2xl md:text-3xl lg:text-4xl font-bold text-left ${theme === "dark" ? "text-white" : "text-black"
+                }`}
             >
               What can you do here?
             </h1>
@@ -484,9 +523,8 @@ function Home() {
           >
             {/* Buy House Card */}
             <div
-              className={`relative Cards ${
-                theme === "dark" ? "dark" : "light"
-              }`}
+              className={`relative Cards ${theme === "dark" ? "dark" : "light"
+                }`}
             >
               <div className={`w-full flex justify-center pt-6`}>
                 <img
@@ -497,16 +535,14 @@ function Home() {
               </div>
               <div className={`p-5 md:p-6 -mt-3`}>
                 <p
-                  className={`text-xl md:text-2xl text-center font-semibold mb-3 ${
-                    theme === "dark" ? "text-white" : "text-black"
-                  }`}
+                  className={`text-xl md:text-2xl text-center font-semibold mb-3 ${theme === "dark" ? "text-white" : "text-black"
+                    }`}
                 >
                   Buy a House
                 </p>
                 <p
-                  className={`px-2 text-center text-sm md:text-base mb-14 ${
-                    theme === "dark" ? "text-gray-300" : "text-gray-700"
-                  }`}
+                  className={`px-2 text-center text-sm md:text-base mb-14 ${theme === "dark" ? "text-gray-300" : "text-gray-700"
+                    }`}
                 >
                   Find your place suiting your style and need by the help of
                   trusted professionals recommending you with the best
@@ -522,9 +558,8 @@ function Home() {
 
             {/* Sell House Card */}
             <div
-              className={`relative Cards ${
-                theme === "dark" ? "dark" : "light"
-              }`}
+              className={`relative Cards ${theme === "dark" ? "dark" : "light"
+                }`}
             >
               <div className={`w-full flex justify-center pt-6`}>
                 <img
@@ -535,16 +570,14 @@ function Home() {
               </div>
               <div className={`p-5 md:p-6 mt-3`}>
                 <p
-                  className={`text-xl md:text-2xl text-center font-semibold mb-3 ${
-                    theme === "dark" ? "text-white" : "text-black"
-                  }`}
+                  className={`text-xl md:text-2xl text-center font-semibold mb-3 ${theme === "dark" ? "text-white" : "text-black"
+                    }`}
                 >
                   Sell a House
                 </p>
                 <p
-                  className={`px-2 text-center text-sm md:text-base ${
-                    theme === "dark" ? "text-gray-300" : "text-gray-700"
-                  }`}
+                  className={`px-2 text-center text-sm md:text-base ${theme === "dark" ? "text-gray-300" : "text-gray-700"
+                    }`}
                 >
                   Leave the tedious work for us and we'll assist you in selling
                   your property and have a successful sale.
@@ -566,9 +599,8 @@ function Home() {
 
             {/* Rent House Card */}
             <div
-              className={`relative Cards ${
-                theme === "dark" ? "dark" : "light"
-              }`}
+              className={`relative Cards ${theme === "dark" ? "dark" : "light"
+                }`}
             >
               <div className={`w-full flex justify-center pt-6`}>
                 <img
@@ -579,16 +611,14 @@ function Home() {
               </div>
               <div className={`p-5 md:p-6`}>
                 <p
-                  className={`text-xl md:text-2xl text-center font-semibold mb-3 ${
-                    theme === "dark" ? "text-white" : "text-black"
-                  }`}
+                  className={`text-xl md:text-2xl text-center font-semibold mb-3 ${theme === "dark" ? "text-white" : "text-black"
+                    }`}
                 >
                   Rent a House
                 </p>
                 <p
-                  className={`px-2 text-center text-sm md:text-base ${
-                    theme === "dark" ? "text-gray-300" : "text-gray-700"
-                  }`}
+                  className={`px-2 text-center text-sm md:text-base ${theme === "dark" ? "text-gray-300" : "text-gray-700"
+                    }`}
                 >
                   Enjoy the seamless online experience as you search for renting
                   properties, and apply to pay your rent monthly or yearly with
@@ -620,9 +650,8 @@ function Home() {
               Testimonials
             </p>
             <h1
-              className={`mb-6 text-2xl md:text-3xl lg:text-4xl font-bold ${
-                theme === "dark" ? "text-white" : "text-black"
-              }`}
+              className={`mb-6 text-2xl md:text-3xl lg:text-4xl font-bold ${theme === "dark" ? "text-white" : "text-black"
+                }`}
             >
               Read What Others Have to Say
             </h1>
@@ -630,11 +659,10 @@ function Home() {
           <div className="flex flex-col md:flex-row flex-wrap justify-center gap-6 lg:gap-8 relative z-10">
             {/* Testimonial 1 */}
             <div
-              className={`TestimonialsCard ${
-                theme === "dark"
-                  ? "TestimonialsCard-dark"
-                  : "TestimonialsCard-light"
-              }`}
+              className={`TestimonialsCard ${theme === "dark"
+                ? "TestimonialsCard-dark"
+                : "TestimonialsCard-light"
+                }`}
             >
               <img
                 src="/vectors/Profile1.svg"
@@ -655,11 +683,10 @@ function Home() {
 
             {/* Testimonial 2 */}
             <div
-              className={`TestimonialsCard ${
-                theme === "dark"
-                  ? "TestimonialsCard-dark"
-                  : "TestimonialsCard-light"
-              }`}
+              className={`TestimonialsCard ${theme === "dark"
+                ? "TestimonialsCard-dark"
+                : "TestimonialsCard-light"
+                }`}
             >
               <img
                 src="/vectors/Profile2.svg"
@@ -679,11 +706,10 @@ function Home() {
 
             {/* Testimonial 3 */}
             <div
-              className={`TestimonialsCard ${
-                theme === "dark"
-                  ? "TestimonialsCard-dark"
-                  : "TestimonialsCard-light"
-              }`}
+              className={`TestimonialsCard ${theme === "dark"
+                ? "TestimonialsCard-dark"
+                : "TestimonialsCard-light"
+                }`}
             >
               <img
                 src="/vectors/Profile3.svg"

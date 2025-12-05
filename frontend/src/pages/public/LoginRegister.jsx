@@ -53,6 +53,12 @@ const LoginRegister = () => {
   const [emailVerificationSent, setEmailVerificationSent] = useState(false);
   const [pendingVerificationEmail, setPendingVerificationEmail] = useState("");
 
+  // Add these states for name validation
+  const [firstNameError, setFirstNameError] = useState("");
+  const [lastNameError, setLastNameError] = useState("");
+  const [isFirstNameValid, setIsFirstNameValid] = useState(true);
+  const [isLastNameValid, setIsLastNameValid] = useState(true);
+
   // Check if user is already logged in (has token) and redirect based on role
   useEffect(() => {
     const token = localStorage.getItem("token");
@@ -117,6 +123,93 @@ const LoginRegister = () => {
     }));
     // Clear invalid field highlight when user starts typing
     setInvalidFields((prev) => prev.filter((field) => field !== name));
+  };
+  // Name validation function
+  const validateName = (name, type) => {
+    // Check for special characters or numbers
+    const specialChars = /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?0-9]/;
+
+    if (specialChars.test(name)) {
+      if (type === 'firstName') {
+        setFirstNameError("First name cannot contain numbers or special characters");
+        setIsFirstNameValid(false);
+      } else {
+        setLastNameError("Last name cannot contain numbers or special characters");
+        setIsLastNameValid(false);
+      }
+      return false;
+    }
+
+    // Check for empty name
+    if (name.trim() === '') {
+      if (type === 'firstName') {
+        setFirstNameError("First name is required");
+        setIsFirstNameValid(false);
+      } else {
+        setLastNameError("Last name is required");
+        setIsLastNameValid(false);
+      }
+      return false;
+    }
+
+    // Clear errors if valid
+    if (type === 'firstName') {
+      setFirstNameError("");
+      setIsFirstNameValid(true);
+    } else {
+      setLastNameError("");
+      setIsLastNameValid(true);
+    }
+    return true;
+  };
+
+  // Handle name input change with validation
+  const handleNameChange = (e) => {
+    const { name, value } = e.target;
+
+    // Update form data
+    setFormData((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
+
+    // Validate if it's a name field
+    if (name === 'firstName') {
+      validateName(value, 'firstName');
+    } else if (name === 'lastName') {
+      validateName(value, 'lastName');
+    }
+  };
+
+  // Handle password input to prevent paste
+  const handlePasswordInput = (e, fieldName) => {
+    // Allow backspace, delete, arrows, etc.
+    if (e.key === 'Backspace' || e.key === 'Delete' ||
+      e.key === 'ArrowLeft' || e.key === 'ArrowRight' ||
+      e.key === 'ArrowUp' || e.key === 'ArrowDown' ||
+      e.key === 'Tab' || e.key === 'Escape' ||
+      e.ctrlKey || e.metaKey) {
+      return true;
+    }
+
+    // Get the current value and cursor position
+    const currentValue = e.target.value;
+    const cursorPosition = e.target.selectionStart;
+
+    // If pasting, prevent it
+    if ((e.ctrlKey || e.metaKey) && (e.key === 'v' || e.key === 'V')) {
+      e.preventDefault();
+      return false;
+    }
+
+    // Regular character input - allow it
+    return true;
+  };
+
+  // Handle paste event on password fields
+  const handlePasswordPaste = (e) => {
+    e.preventDefault();
+    return false;
   };
 
   // Calculate password strength and provide feedback
@@ -304,8 +397,7 @@ const LoginRegister = () => {
   const handleSocialAuth = (platform) => {
     // Show a message that this feature is coming soon
     setError(
-      `${
-        platform.charAt(0).toUpperCase() + platform.slice(1)
+      `${platform.charAt(0).toUpperCase() + platform.slice(1)
       } authentication is coming soon!`
     );
 
@@ -323,20 +415,32 @@ const LoginRegister = () => {
     setError("");
     setInvalidFields([]);
 
+    // Validate names before submission - ONLY for signup
+    if (isSignUpMode) {
+      const isFirstNameValid = validateName(formData.firstName, 'firstName');
+      const isLastNameValid = validateName(formData.lastName, 'lastName');
+
+      if (!isFirstNameValid || !isLastNameValid) {
+        return; // Stop submission if names are invalid
+      }
+    }
+
     // Debug: Check what accountType value is
-    console.log("Account Type:", formData.accountType);
+    if (isSignUpMode) {
+      console.log("Account Type:", formData.accountType);
+    }
 
     // Define required fields based on mode
     const requiredFields = isSignUpMode
       ? [
-          "firstName",
-          "lastName",
-          "username",
-          "email",
-          "password",
-          "retypePassword",
-          "accountType",
-        ]
+        "firstName",
+        "lastName",
+        "username",
+        "email",
+        "password",
+        "retypePassword",
+        "accountType",
+      ]
       : ["username", "password"];
 
     // Check for empty fields
@@ -369,24 +473,35 @@ const LoginRegister = () => {
         setError("Please accept the terms and conditions!");
         return;
       }
+      
       try {
         setIsLoading(true);
         setLoaderType("loading");
         setLoaderMessage("Creating your account...");
+
+        // Prepare data for registration - use the role mapping
+        const signupData = {
+          firstName: formData.firstName,
+          lastName: formData.lastName,
+          username: formData.username,
+          email: formData.email,
+          password: formData.password,
+          role: formData.accountType, // Use the value directly (should be external_broker, seller, etc.)
+        };
+
+        // For external_broker, add broker_type
+        if (formData.accountType === "external_broker") {
+          signupData.broker_type = "external";
+        }
+
+        console.log("📤 Sending signup data:", signupData);
 
         const response = await fetch("http://localhost:5000/api/auth/signup", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
           },
-          body: JSON.stringify({
-            firstName: formData.firstName,
-            lastName: formData.lastName,
-            username: formData.username,
-            email: formData.email,
-            password: formData.password,
-            role: formData.accountType.toLowerCase(),
-          }),
+          body: JSON.stringify(signupData),
         });
 
         console.log(
@@ -399,7 +514,7 @@ const LoginRegister = () => {
           const data = await response.json();
           console.log("🔍 Full signup response data:", data);
 
-          // 🚨 CRITICAL FIX: Check if email verification is required
+          // Check if email verification is required
           if (data.requiresVerification || data.success) {
             setRequiresEmailVerification(true);
             setPendingVerificationEmail(formData.email);
@@ -421,7 +536,7 @@ const LoginRegister = () => {
           // Save token if it exists
           if (data.token) {
             localStorage.setItem("token", data.token);
-            
+
             // ALSO save user data to localStorage for Home.jsx redirect
             const userData = {
               id: data.user?.id,
@@ -429,9 +544,9 @@ const LoginRegister = () => {
               last_name: data.user?.last_name || formData.lastName,
               username: data.user?.username || formData.username,
               email: data.user?.email || formData.email,
-              role: data.user?.role || formData.accountType.toLowerCase()
+              role: data.user?.role || formData.accountType
             };
-            
+
             localStorage.setItem("user", JSON.stringify(userData));
             console.log("✅ Token and user data saved to localStorage:", userData);
           } else {
@@ -494,6 +609,12 @@ const LoginRegister = () => {
         setLoaderMessage("Signing you in...");
 
         console.log("🔄 Sending login request...");
+        console.log("📤 Login endpoint:", "http://localhost:5000/api/auth/login");
+        console.log("📤 Login credentials:", {
+          username: formData.username,
+          password: "***" // Don't log actual password
+        });
+        
         const response = await fetch("http://localhost:5000/api/auth/login", {
           method: "POST",
           headers: {
@@ -505,16 +626,25 @@ const LoginRegister = () => {
           }),
         });
 
-        console.log(
-          "📊 Login response status:",
-          response.status,
-          response.statusText
-        );
-
+        console.log("📊 Login response status:", response.status);
+        
+        // Check if we got any response at all
+        if (!response) {
+          console.log("❌ No response from server - network error?");
+          setError("Network error - server not responding");
+          setIsLoading(false);
+          return;
+        }
+        
+        // Try to get response text first
+        const responseText = await response.text();
+        console.log("📄 Raw response text:", responseText);
+        
         if (response.ok) {
-          const data = await response.json();
-          console.log("🔍 Full login response data:", data);
-
+          // IMPORTANT: Parse the response text to JSON
+          const data = JSON.parse(responseText);
+          console.log("🔍 Parsed login response data:", data);
+          
           // Check if password change is required
           if (data.requiresPasswordChange) {
             setRequiresPasswordChange(true);
@@ -530,7 +660,7 @@ const LoginRegister = () => {
           // Save token if it exists
           if (data.token) {
             localStorage.setItem("token", data.token);
-            
+
             // ALSO save user data to localStorage for Home.jsx redirect
             const payload = JSON.parse(atob(data.token.split(".")[1]));
             const userData = {
@@ -541,7 +671,7 @@ const LoginRegister = () => {
               email: data.user?.email || "",
               role: data.user?.role || payload.role
             };
-            
+
             localStorage.setItem("user", JSON.stringify(userData));
             console.log("✅ LoginRegister - Token and user data saved to localStorage:", userData);
 
@@ -602,13 +732,12 @@ const LoginRegister = () => {
 
           // Try to get error message
           try {
-            const errorText = await response.text();
-            console.log("📝 Login error response text:", errorText);
+            console.log("📝 Login error response text:", responseText);
 
             try {
-              const errorData = JSON.parse(errorText);
+              const errorData = JSON.parse(responseText);
               console.log("📝 Login error details:", errorData);
-              
+
               // 🚨 CRITICAL FIX: Handle email verification requirement in login
               if (errorData.requiresVerification) {
                 setRequiresEmailVerification(true);
@@ -618,13 +747,13 @@ const LoginRegister = () => {
                 setTimeout(() => setIsLoading(false), 2000);
                 return;
               }
-              
+
               setError(
                 `Login failed: ${errorData.message || "Invalid credentials"}`
               );
             } catch (e) {
-              console.log("📝 Login error (non-JSON):", errorText);
-              setError(`Login failed: ${errorText || "Invalid credentials"}`);
+              console.log("📝 Login error (non-JSON):", responseText);
+              setError(`Login failed: ${responseText || "Invalid credentials"}`);
             }
           } catch (e) {
             console.log("📝 No login error details available");
@@ -691,30 +820,26 @@ const LoginRegister = () => {
   const PasswordChangeForm = () => (
     <div className="fixed inset-0 flex items-center justify-center z-50 bg-black/50 backdrop-filter backdrop-blur-sm">
       <div
-        className={`p-8 rounded-lg max-w-md w-full mx-4 ${
-          theme === "dark" ? "bg-gray-800" : "bg-white"
-        }`}
+        className={`p-8 rounded-lg max-w-md w-full mx-4 ${theme === "dark" ? "bg-gray-800" : "bg-white"
+          }`}
       >
         <h2
-          className={`text-2xl font-bold mb-4 ${
-            theme === "dark" ? "text-white" : "text-gray-800"
-          }`}
+          className={`text-2xl font-bold mb-4 ${theme === "dark" ? "text-white" : "text-gray-800"
+            }`}
         >
           Password Change Required
         </h2>
         <p
-          className={`mb-6 ${
-            theme === "dark" ? "text-gray-300" : "text-gray-600"
-          }`}
+          className={`mb-6 ${theme === "dark" ? "text-gray-300" : "text-gray-600"
+            }`}
         >
           For security reasons, you are required to change your password before
           accessing your dashboard.
         </p>
         <form onSubmit={handlePasswordChangeSubmit}>
           <div
-            className={`mb-4 p-3 ${
-              theme === "dark" ? "bg-gray-700" : "bg-gray-100"
-            }`}
+            className={`mb-4 p-3 ${theme === "dark" ? "bg-gray-700" : "bg-gray-100"
+              }`}
           >
             <input
               type="password"
@@ -722,15 +847,13 @@ const LoginRegister = () => {
               placeholder="New Password"
               value={formData.newPassword || ""}
               onChange={handleInputChange}
-              className={`w-full bg-transparent outline-none border-none text-sm font-semibold placeholder-gray-500 ${
-                theme === "dark" ? "text-white" : "text-gray-700"
-              }`}
+              className={`w-full bg-transparent outline-none border-none text-sm font-semibold placeholder-gray-500 ${theme === "dark" ? "text-white" : "text-gray-700"
+                }`}
             />
           </div>
           <div
-            className={`mb-4 p-3 ${
-              theme === "dark" ? "bg-gray-700" : "bg-gray-100"
-            }`}
+            className={`mb-4 p-3 ${theme === "dark" ? "bg-gray-700" : "bg-gray-100"
+              }`}
           >
             <input
               type="password"
@@ -738,16 +861,14 @@ const LoginRegister = () => {
               placeholder="Confirm New Password"
               value={formData.confirmPassword || ""}
               onChange={handleInputChange}
-              className={`w-full bg-transparent outline-none border-none text-sm font-semibold placeholder-gray-500 ${
-                theme === "dark" ? "text-white" : "text-gray-700"
-              }`}
+              className={`w-full bg-transparent outline-none border-none text-sm font-semibold placeholder-gray-500 ${theme === "dark" ? "text-white" : "text-gray-700"
+                }`}
             />
           </div>
           {error && (
             <p
-              className={`text-sm mb-4 ${
-                theme === "dark" ? "text-red-400" : "text-red-600"
-              }`}
+              className={`text-sm mb-4 ${theme === "dark" ? "text-red-400" : "text-red-600"
+                }`}
             >
               {error}
             </p>
@@ -767,9 +888,8 @@ const LoginRegister = () => {
   const EmailVerificationNotice = () => (
     <div className="fixed inset-0 flex items-center justify-center z-50 bg-black/50 backdrop-filter backdrop-blur-sm">
       <div
-        className={`p-8 rounded-lg max-w-md w-full mx-4 ${
-          theme === "dark" ? "bg-gray-800" : "bg-white"
-        }`}
+        className={`p-8 rounded-lg max-w-md w-full mx-4 ${theme === "dark" ? "bg-gray-800" : "bg-white"
+          }`}
       >
         <div className="text-center mb-6">
           <div className="w-16 h-16 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -778,36 +898,31 @@ const LoginRegister = () => {
             </svg>
           </div>
           <h2
-            className={`text-2xl font-bold mb-2 ${
-              theme === "dark" ? "text-white" : "text-gray-800"
-            }`}
+            className={`text-2xl font-bold mb-2 ${theme === "dark" ? "text-white" : "text-gray-800"
+              }`}
           >
             Email Verification Required
           </h2>
         </div>
-        
+
         <p
-          className={`mb-4 text-center ${
-            theme === "dark" ? "text-gray-300" : "text-gray-600"
-          }`}
+          className={`mb-4 text-center ${theme === "dark" ? "text-gray-300" : "text-gray-600"
+            }`}
         >
           We've sent a verification link to:
         </p>
-        
-        <div className={`text-center mb-6 p-3 rounded ${
-          theme === "dark" ? "bg-gray-700" : "bg-amber-50"
-        }`}>
-          <strong className={`text-lg ${
-            theme === "dark" ? "text-amber-400" : "text-amber-600"
+
+        <div className={`text-center mb-6 p-3 rounded ${theme === "dark" ? "bg-gray-700" : "bg-amber-50"
           }`}>
+          <strong className={`text-lg ${theme === "dark" ? "text-amber-400" : "text-amber-600"
+            }`}>
             {pendingVerificationEmail || formData.email}
           </strong>
         </div>
 
         <p
-          className={`mb-6 text-center ${
-            theme === "dark" ? "text-gray-300" : "text-gray-600"
-          }`}
+          className={`mb-6 text-center ${theme === "dark" ? "text-gray-300" : "text-gray-600"
+            }`}
         >
           Please check your inbox and click the verification link to activate your account.
           The link will expire in 24 hours.
@@ -815,17 +930,14 @@ const LoginRegister = () => {
 
         <div className="space-y-4">
           {emailVerificationSent ? (
-            <div className={`text-center p-3 rounded ${
-              theme === "dark" ? "bg-green-900/30" : "bg-green-100"
-            }`}>
-              <p className={`text-green-600 font-semibold ${
-                theme === "dark" ? "text-green-400" : "text-green-600"
+            <div className={`text-center p-3 rounded ${theme === "dark" ? "bg-green-900/30" : "bg-green-100"
               }`}>
+              <p className={`text-green-600 font-semibold ${theme === "dark" ? "text-green-400" : "text-green-600"
+                }`}>
                 ✓ Verification email sent!
               </p>
-              <p className={`text-sm mt-1 ${
-                theme === "dark" ? "text-green-300" : "text-green-700"
-              }`}>
+              <p className={`text-sm mt-1 ${theme === "dark" ? "text-green-300" : "text-green-700"
+                }`}>
                 Check your inbox again
               </p>
             </div>
@@ -840,7 +952,7 @@ const LoginRegister = () => {
               Resend Verification Email
             </button>
           )}
-          
+
           <button
             onClick={() => {
               setRequiresEmailVerification(false);
@@ -860,11 +972,10 @@ const LoginRegister = () => {
                 confirmPassword: "",
               });
             }}
-            className={`w-full border-2 h-12 font-semibold uppercase transition-all duration-300 flex items-center justify-center ${
-              theme === "dark"
-                ? "border-amber-400 text-white hover:bg-amber-400 hover:text-gray-900"
-                : "border-amber-500 text-gray-900 hover:bg-amber-500 hover:text-white"
-            }`}
+            className={`w-full border-2 h-12 font-semibold uppercase transition-all duration-300 flex items-center justify-center ${theme === "dark"
+              ? "border-amber-400 text-white hover:bg-amber-400 hover:text-gray-900"
+              : "border-amber-500 text-gray-900 hover:bg-amber-500 hover:text-white"
+              }`}
           >
             <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
@@ -873,9 +984,8 @@ const LoginRegister = () => {
           </button>
         </div>
 
-        <div className={`mt-6 p-3 rounded text-sm ${
-          theme === "dark" ? "bg-gray-700 text-gray-300" : "bg-gray-100 text-gray-600"
-        }`}>
+        <div className={`mt-6 p-3 rounded text-sm ${theme === "dark" ? "bg-gray-700 text-gray-300" : "bg-gray-100 text-gray-600"
+          }`}>
           <p className="text-center">
             Didn't receive the email? Check your spam folder or try resending.
           </p>
@@ -887,11 +997,10 @@ const LoginRegister = () => {
   return (
     <div
       className={`min-h-screen flex items-center justify-center overflow-x-hidden transition-all duration-1000 ease-in-out relative 
-      ${
-        theme === "dark"
+      ${theme === "dark"
           ? "bg-gradient-to-r from-gray-900 via-black to-gray-900"
           : "bg-white"
-      }`}
+        }`}
     >
       {isLoading && (
         <Loader theme={theme} message={loaderMessage} type={loaderType} />
@@ -921,26 +1030,29 @@ const LoginRegister = () => {
         theme={theme}
       />
 
+      {/* Circle instead of SVG rectangle - REDUCED TRANSPARENCY */}
       <div
-        className="absolute top-32 right-[47%] translate-x-1/2 -translate-y-1/2 w-[1100px] 
-           h-[1100px] transition-all duration-1000 ease-in-out z-0"
+        className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[1200px] h-[1200px] transition-all duration-1000 ease-in-out z-0 rounded-full ${theme === "dark"
+          ? "bg-gradient-to-r from-[#332500] to-[#1a1200]"
+          : "bg-gradient-to-r from-amber-100 to-amber-200"
+          }`}
         style={{
-          backgroundImage: `url('/vectors/Rectangle38.svg')`,
-          backgroundSize: "cover",
-          opacity: 1,
-          backgroundRepeat: "no-repeat",
-          backgroundPosition: "center",
-          transform: isSignUpMode ? "translate(93%, -45%)" : "translateY(-50%)",
+          opacity: 0.8, // Reduced transparency from 1 to 0.8
+          transform: isSignUpMode
+            ? "translateX(calc(50% - 100px)) translateY(-50%)"
+            : "translateX(calc(-50% + 100px)) translateY(-50%)",
         }}
       />
+
+      {/* Updated logo - LogoW.svg */}
       <img
         src="/vectors/LogoY.svg"
         alt="Logo"
-        className="logoTop absolute top-[5%] left-[12%]"
+        className="absolute top-6 left-6 md:top-8 md:left-8 w-60 h-60 md:w-44 md:h-44 sm:w-24 sm:h-24 z-50"
       />
 
       {/* Profile button and home link */}
-      <div className="absolute top-6 right-6 flex items-center space-x-4 z-50">
+      <div className="absolute top-6 right-6 md:top-8 md:right-8 flex items-center space-x-4 z-50">
         <Link
           to="/"
           onClick={(e) => {
@@ -950,10 +1062,10 @@ const LoginRegister = () => {
               window.location.href = "/";
             }, 4000);
           }}
-          className="w-48 px-3 h-12 bg-amber-400 flex items-center justify-center shadow-lg hover:bg-amber-500 transition-all duration-300 group hover:scale-110 text-white hover:text-white"
+          className="px-4 md:px-6 h-10 md:h-12 bg-amber-400 flex items-center justify-center shadow-lg hover:bg-amber-500 transition-all duration-300 group hover:scale-105 text-white hover:text-white text-sm md:text-base"
         >
           <svg
-            className="w-6 h-6 transition-transform group-hover:scale-110 -ml-5 mr-4"
+            className="w-5 h-5 md:w-6 md:h-6 transition-transform group-hover:scale-110 -ml-1 md:-ml-2 mr-2 md:mr-3"
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
@@ -969,49 +1081,49 @@ const LoginRegister = () => {
         </Link>
       </div>
 
-      <div className="relative w-full max-w-6xl mx-4">
+      {/* Main container with better spacing */}
+      <div className="relative w-full max-w-6xl mx-4 md:mx-8 lg:mx-auto px-2 md:px-4 lg:px-0 ">
+        {/* Forms container - LIFTED UP (changed from 48% to 45%) */}
         <div
-          className="absolute top-1/2 left-1/2 md:w-1/2 transform -translate-x-1/2 -translate-y-1/2 transition-all duration-700 ease-in-out z-30 pointer-events-auto"
-          style={{ left: isSignUpMode ? "25%" : "75%" }}
+          className="absolute  top-[45%] left-1/2 transform  -translate-x-1/2 -translate-y-1/2 transition-all duration-700 ease-in-out z-30 pointer-events-auto w-full max-w-md md:max-w-lg"
+          style={{
+            left: isSignUpMode ? "calc(25% + 10px)" : "calc(75% - 10px)",
+            top: isSignUpMode ? "-150px" : "10px"
+          }}
         >
           {/* Login form */}
           <form
             onSubmit={handleSubmit}
-            className={`flex flex-col items-center justify-center px-6 sm:px-10 py-8 transition-all duration-300 ${
-              isSignUpMode ? "opacity-0 pointer-events-none" : "opacity-100"
-            }`}
+            className={`flex flex-col items-center  justify-center px-4 md:px-6 lg:px-8 py-6 md:py-8 transition-all duration-300 ${isSignUpMode ? "opacity-0 pointer-events-none" : "opacity-100"
+              }`}
           >
             <h2
-              className={`text-2xl sm:text-3xl font-bold mb-4 transition-colors duration-300 ${
-                theme === "light" ? "text-gray-800" : "text-white"
-              }`}
+              className={`text-2xl md:text-3xl font-bold mb-4 transition-colors duration-300 ${theme === "light" ? "text-gray-800" : "text-white"
+                }`}
             >
               Sign in
             </h2>
             <div
-              className={`w-full max-w-xs sm:max-w-md my-3 h-12 grid grid-cols-[15%_85%] px-3 transition-all duration-300 ${
-                activeInput === "username"
-                  ? theme === "light"
-                    ? "bg-amber-50 shadow-md"
-                    : "bg-gray-700 shadow-md"
-                  : theme === "light"
+              className={`w-full my-3 h-12 grid grid-cols-[15%_85%] px-3 transition-all duration-300 ${activeInput === "username"
+                ? theme === "light"
+                  ? "bg-amber-50 shadow-md"
+                  : "bg-gray-700 shadow-md"
+                : theme === "light"
                   ? "bg-gray-100 hover:bg-gray-200"
                   : "bg-gray-800 hover:bg-gray-700"
-              } ${
-                invalidFields.includes("username")
+                } ${invalidFields.includes("username")
                   ? "border-2 border-red-500"
                   : ""
-              }`}
+                }`}
               onFocus={() => setActiveInput("username")}
               onBlur={() => setActiveInput(null)}
             >
               <div className="flex items-center justify-center">
                 <svg
-                  className={`w-5 h-5 transition-colors duration-300 ${
-                    activeInput === "username"
-                      ? "text-amber-600"
-                      : "text-gray-400"
-                  }`}
+                  className={`w-5 h-5 transition-colors duration-300 ${activeInput === "username"
+                    ? "text-amber-600"
+                    : "text-gray-400"
+                    }`}
                   fill="currentColor"
                   viewBox="0 0 20 20"
                 >
@@ -1028,35 +1140,31 @@ const LoginRegister = () => {
                 placeholder="Username"
                 value={formData.username}
                 onChange={handleInputChange}
-                className={`bg-transparent outline-none border-none text-sm font-semibold placeholder-gray-500 transition-colors duration-300 ${
-                  theme === "light" ? "text-gray-700" : "text-white bg-gray-800"
-                }`}
+                className={`bg-transparent outline-none border-none text-sm md:text-base font-semibold placeholder-gray-500 transition-colors duration-300 ${theme === "light" ? "text-gray-700" : "text-white bg-gray-800"
+                  }`}
               />
             </div>
             <div
-              className={`w-full max-w-xs sm:max-w-md my-3 h-12 grid grid-cols-[15%_85%] px-3 transition-all duration-300 ${
-                activeInput === "password"
-                  ? theme === "light"
-                    ? "bg-amber-50 shadow-md"
-                    : "bg-gray-700 shadow-md"
-                  : theme === "light"
+              className={`w-full my-3 h-12 grid grid-cols-[15%_85%] px-3 transition-all duration-300 ${activeInput === "password"
+                ? theme === "light"
+                  ? "bg-amber-50 shadow-md"
+                  : "bg-gray-700 shadow-md"
+                : theme === "light"
                   ? "bg-gray-100 hover:bg-gray-200"
                   : "bg-gray-800 hover:bg-gray-700"
-              } ${
-                invalidFields.includes("password")
+                } ${invalidFields.includes("password")
                   ? "border-2 border-red-500"
                   : ""
-              }`}
+                }`}
               onFocus={() => setActiveInput("password")}
               onBlur={() => setActiveInput(null)}
             >
               <div className="flex items-center justify-center">
                 <svg
-                  className={`w-5 h-5 transition-colors duration-300 ${
-                    activeInput === "password"
-                      ? "text-amber-600"
-                      : "text-gray-400"
-                  }`}
+                  className={`w-5 h-5 transition-colors duration-300 ${activeInput === "password"
+                    ? "text-amber-600"
+                    : "text-gray-400"
+                    }`}
                   fill="currentColor"
                   viewBox="0 0 20 20"
                 >
@@ -1073,43 +1181,39 @@ const LoginRegister = () => {
                 placeholder="Password"
                 value={formData.password}
                 onChange={handleInputChange}
-                className={`bg-transparent outline-none border-none text-sm font-semibold placeholder-gray-500 transition-colors duration-300 ${
-                  theme === "light" ? "text-gray-700" : "text-white bg-gray-800"
-                }`}
+                className={`bg-transparent outline-none border-none text-sm md:text-base font-semibold placeholder-gray-500 transition-colors duration-300 ${theme === "light" ? "text-gray-700" : "text-white bg-gray-800"
+                  }`}
               />
             </div>
             {error && (
               <p
-                className={`text-sm ${
-                  theme === "light" ? "text-red-600" : "text-red-400"
-                }`}
+                className={`text-sm ${theme === "light" ? "text-red-600" : "text-red-400"
+                  }`}
               >
                 {error}
               </p>
             )}
             <button
               type="submit"
-              className="w-32 sm:w-36 bg-amber-500 h-12 text-white font-semibold uppercase my-4 cursor-pointer transition-all duration-300 hover:bg-amber-600 hover:scale-105 hover:shadow-lg"
+              className="w-full max-w-xs bg-amber-500 h-12 text-white font-semibold uppercase my-4 cursor-pointer transition-all duration-300 hover:bg-amber-600 hover:scale-105 hover:shadow-lg"
             >
               Login
             </button>
             <p
-              className={`text-xs sm:text-sm my-3 sm:my-4 transition-colors duration-300 ${
-                theme === "light" ? "text-gray-600" : "text-gray-300"
-              }`}
+              className={`text-xs md:text-sm my-3 md:my-4 transition-colors duration-300 ${theme === "light" ? "text-gray-600" : "text-gray-300"
+                }`}
             >
               Or Sign in with social platforms
             </p>
-            <div className="flex justify-center space-x-2 sm:space-x-3">
+            <div className="flex justify-center space-x-3 md:space-x-4 ">
               {socialPlatforms.map((platform) => (
                 <button
                   key={platform.name}
                   onClick={() => handleSocialAuth(platform.name)}
-                  className={`w-8 h-8 sm:w-10 sm:h-10 flex items-center justify-center transition-all duration-300 hover:scale-110 hover:shadow-lg ${
-                    theme === "light"
-                      ? "border border-gray-300 hover:border-amber-500"
-                      : "border border-gray-700 hover:border-amber-500"
-                  }`}
+                  className={`w-9 h-9 md:w-10 md:h-10 flex items-center justify-center transition-all duration-300 hover:scale-110 hover:shadow-lg ${theme === "light"
+                    ? "border border-gray-300 hover:border-amber-500"
+                    : "border border-gray-700 hover:border-amber-500"
+                    }`}
                   style={{
                     backgroundColor: theme === "light" ? "white" : "#1f2937",
                     color: theme === "dark" ? "white" : "#1f2937",
@@ -1123,7 +1227,7 @@ const LoginRegister = () => {
                   }}
                 >
                   <svg
-                    className="w-3 h-3 sm:w-4 sm:h-4"
+                    className="w-4 h-4 md:w-5 md:h-5"
                     viewBox="0 0 24 24"
                     fill="currentColor"
                   >
@@ -1133,47 +1237,48 @@ const LoginRegister = () => {
               ))}
             </div>
           </form>
-          {/* Signup form */}
+
+          {/* Signup form - REMOVED ROUNDED EDGES */}
           <form
             onSubmit={handleSubmit}
-            className={`absolute -top-10 left-0 w-full flex flex-col items-center justify-center px-6 sm:px-10 py-8 transition-all duration-300 ${
-              isSignUpMode
-                ? "opacity-100 z-2 pointer-events-auto"
-                : "opacity-0 z-1 pointer-events-none"
-            }`}
+            className={`absolute top-0 left-0 w-full flex flex-col items-center justify-center px-4 md:px-6 lg:px-8 py-6 md:py-8 transition-all duration-300 ${isSignUpMode
+              ? "opacity-100 z-2 pointer-events-auto"
+              : "opacity-0 z-1 pointer-events-none"
+              }`}
           >
             <h2
-              className={`text-2xl sm:text-3xl font-bold mb-4 transition-colors duration-300 ${
-                theme === "light" ? "text-amber-500" : "text-white"
-              }`}
+              className={`text-2xl md:text-3xl font-bold mb-6 transition-colors duration-300 ${theme === "light" ? "text-amber-500" : "text-white"
+                }`}
             >
               Sign up
             </h2>
-            <div className="w-full max-w-xs sm:max-w-md grid grid-cols-2 gap-3">
+
+            {/* First Name with Validation - REMOVED rounded-lg */}
+            <div className="w-full mb-4">
               <div
-                className={`h-12 grid grid-cols-[15%_85%] px-3 transition-all duration-300 ${
-                  activeInput === "firstName"
-                    ? theme === "light"
-                      ? "bg-amber-50 shadow-md"
-                      : "bg-gray-700 shadow-md"
-                    : theme === "light"
-                    ? "bg-gray-100 hover:bg-gray-200"
-                    : "bg-gray-800 hover:bg-gray-700"
-                } ${
-                  invalidFields.includes("firstName")
-                    ? "border-2 border-red-500"
+                className={`h-12 grid grid-cols-[15%_85%] px-3 transition-all duration-300 ${activeInput === "firstName"
+                  ? theme === "light"
+                    ? "bg-amber-50 shadow-md ring-2 ring-amber-400"
+                    : "bg-gray-700 shadow-md ring-2 ring-amber-400"
+                  : theme === "light"
+                    ? "bg-gray-100 hover:bg-gray-200 border border-gray-300"
+                    : "bg-gray-800 hover:bg-gray-700 border border-gray-700"
+                  } ${!isFirstNameValid || invalidFields.includes("firstName")
+                    ? "border-2 border-red-500 ring-0"
                     : ""
-                }`}
+                  }`}
                 onFocus={() => setActiveInput("firstName")}
-                onBlur={() => setActiveInput(null)}
+                onBlur={(e) => {
+                  setActiveInput(null);
+                  validateName(formData.firstName, 'firstName');
+                }}
               >
                 <div className="flex items-center justify-center">
                   <svg
-                    className={`w-4 h-4 transition-colors duration-300 ${
-                      activeInput === "firstName"
-                        ? "text-amber-600"
-                        : "text-gray-400"
-                    }`}
+                    className={`w-4 h-4 md:w-5 md:h-5 transition-colors duration-300 ${activeInput === "firstName"
+                      ? "text-amber-600"
+                      : isFirstNameValid ? "text-gray-400" : "text-red-500"
+                      }`}
                     fill="currentColor"
                     viewBox="0 0 20 20"
                   >
@@ -1189,38 +1294,48 @@ const LoginRegister = () => {
                   name="firstName"
                   placeholder="First Name"
                   value={formData.firstName}
-                  onChange={handleInputChange}
-                  className={`bg-transparent outline-none border-none text-sm font-semibold placeholder-gray-500 transition-colors duration-300 ${
-                    theme === "light"
-                      ? "text-gray-700"
-                      : "text-white bg-gray-800"
-                  }`}
+                  onChange={handleNameChange}
+                  onBlur={(e) => validateName(e.target.value, 'firstName')}
+                  className={`bg-transparent outline-none border-none text-sm md:text-base font-medium placeholder-gray-500 transition-colors duration-300 ${theme === "light" ? "text-gray-800" : "text-white"
+                    }`}
                 />
               </div>
+              {firstNameError && (
+                <div className="flex items-center mt-1 ml-1">
+                  <svg className="w-3 h-3 text-red-500 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                  </svg>
+                  <p className="text-xs text-red-500">{firstNameError}</p>
+                </div>
+              )}
+            </div>
+
+            {/* Last Name with Validation - REMOVED rounded-lg */}
+            <div className="w-full mb-4">
               <div
-                className={`h-12 grid grid-cols-[15%_85%] px-3 transition-all duration-300 ${
-                  activeInput === "lastName"
-                    ? theme === "light"
-                      ? "bg-amber-50 shadow-md"
-                      : "bg-gray-700 shadow-md"
-                    : theme === "light"
-                    ? "bg-gray-100 hover:bg-gray-200"
-                    : "bg-gray-800 hover:bg-gray-700"
-                } ${
-                  invalidFields.includes("lastName")
-                    ? "border-2 border-red-500"
+                className={`h-12 grid grid-cols-[15%_85%] px-3 transition-all duration-300 ${activeInput === "lastName"
+                  ? theme === "light"
+                    ? "bg-amber-50 shadow-md ring-2 ring-amber-400"
+                    : "bg-gray-700 shadow-md ring-2 ring-amber-400"
+                  : theme === "light"
+                    ? "bg-gray-100 hover:bg-gray-200 border border-gray-300"
+                    : "bg-gray-800 hover:bg-gray-700 border border-gray-700"
+                  } ${!isLastNameValid || invalidFields.includes("lastName")
+                    ? "border-2 border-red-500 ring-0"
                     : ""
-                }`}
+                  }`}
                 onFocus={() => setActiveInput("lastName")}
-                onBlur={() => setActiveInput(null)}
+                onBlur={(e) => {
+                  setActiveInput(null);
+                  validateName(formData.lastName, 'lastName');
+                }}
               >
                 <div className="flex items-center justify-center">
                   <svg
-                    className={`w-4 h-4 transition-colors duration-300 ${
-                      activeInput === "lastName"
-                        ? "text-amber-600"
-                        : "text-gray-400"
-                    }`}
+                    className={`w-4 h-4 md:w-5 md:h-5 transition-colors duration-300 ${activeInput === "lastName"
+                      ? "text-amber-600"
+                      : isLastNameValid ? "text-gray-400" : "text-red-500"
+                      }`}
                     fill="currentColor"
                     viewBox="0 0 20 20"
                   >
@@ -1236,389 +1351,444 @@ const LoginRegister = () => {
                   name="lastName"
                   placeholder="Last Name"
                   value={formData.lastName}
-                  onChange={handleInputChange}
-                  className={`bg-transparent outline-none border-none text-sm font-semibold placeholder-gray-500 transition-colors duration-300 ${
-                    theme === "light"
-                      ? "text-gray-700"
-                      : "text-white bg-gray-800"
-                  }`}
+                  onChange={handleNameChange}
+                  onBlur={(e) => validateName(e.target.value, 'lastName')}
+                  className={`bg-transparent outline-none border-none text-sm md:text-base font-medium placeholder-gray-500 transition-colors duration-300 ${theme === "light" ? "text-gray-800" : "text-white"
+                    }`}
                 />
               </div>
+              {lastNameError && (
+                <div className="flex items-center mt-1 ml-1">
+                  <svg className="w-3 h-3 text-red-500 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                  </svg>
+                  <p className="text-xs text-red-500">{lastNameError}</p>
+                </div>
+              )}
             </div>
-            <div
-              className={`w-full max-w-xs sm:max-w-md my-3 h-12 grid grid-cols-[15%_85%] px-3 transition-all duration-300 ${
-                activeInput === "username"
+
+            {/* Username - REMOVED rounded-lg */}
+            <div className="w-full mb-4">
+              <div
+                className={`h-12 grid grid-cols-[15%_85%] px-3 transition-all duration-300 ${activeInput === "username"
                   ? theme === "light"
-                    ? "bg-amber-50 shadow-md"
-                    : "bg-gray-700 shadow-md"
+                    ? "bg-amber-50 shadow-md ring-2 ring-amber-400"
+                    : "bg-gray-700 shadow-md ring-2 ring-amber-400"
                   : theme === "light"
-                  ? "bg-gray-100 hover:bg-gray-200"
-                  : "bg-gray-800 hover:bg-gray-700"
-              } ${
-                invalidFields.includes("username")
-                  ? "border-2 border-red-500"
-                  : ""
-              }`}
-              onFocus={() => setActiveInput("username")}
-              onBlur={() => setActiveInput(null)}
-            >
-              <div className="flex items-center justify-center">
-                <svg
-                  className={`w-5 h-5 transition-colors duration-300 ${
-                    activeInput === "username"
+                    ? "bg-gray-100 hover:bg-gray-200 border border-gray-300"
+                    : "bg-gray-800 hover:bg-gray-700 border border-gray-700"
+                  } ${invalidFields.includes("username")
+                    ? "border-2 border-red-500 ring-0"
+                    : ""
+                  }`}
+                onFocus={() => setActiveInput("username")}
+                onBlur={() => setActiveInput(null)}
+              >
+                <div className="flex items-center justify-center">
+                  <svg
+                    className={`w-5 h-5 transition-colors duration-300 ${activeInput === "username"
                       ? "text-amber-600"
                       : "text-gray-400"
-                  }`}
-                  fill="currentColor"
-                  viewBox="0 0 20 20"
-                >
-                  <path
-                    fillRule="evenodd"
-                    d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z"
-                    clipRule="evenodd"
-                  />
-                </svg>
-              </div>
-              <input
-                type="text"
-                name="username"
-                placeholder="Username"
-                value={formData.username}
-                onChange={handleInputChange}
-                className={`bg-transparent outline-none border-none text-sm font-semibold placeholder-gray-500 transition-colors duration-300 ${
-                  theme === "light" ? "text-gray-700" : "text-white bg-gray-800"
-                }`}
-              />
-            </div>
-            <div
-              className={`w-full max-w-xs sm:max-w-md mb-3 h-12 grid grid-cols-[15%_85%] px-3 transition-all duration-300 ${
-                activeInput === "email"
-                  ? theme === "light"
-                    ? "bg-amber-50 shadow-md"
-                    : "bg-gray-700 shadow-md"
-                  : theme === "light"
-                  ? "bg-gray-100 hover:bg-gray-200"
-                  : "bg-gray-800 hover:bg-gray-700"
-              } ${
-                invalidFields.includes("email") ? "border-2 border-red-500" : ""
-              }`}
-              onFocus={() => setActiveInput("email")}
-              onBlur={() => setActiveInput(null)}
-            >
-              <div className="flex items-center justify-center">
-                <svg
-                  className={`w-5 h-5 transition-colors duration-300 ${
-                    activeInput === "email" ? "text-amber-600" : "text-gray-400"
-                  }`}
-                  fill="currentColor"
-                  viewBox="0 0 20 20"
-                >
-                  <path d="M2.003 5.884L10 9.882l7.997-3.998A2 2 0 0016 4H4a2 2 0 00-1.997 1.884z" />
-                  <path d="M18 8.118l-8 4-8-4V14a2 2 0 002 2h12a2 2 0 002-2V8.118z" />
-                </svg>
-              </div>
-              <input
-                type="email"
-                name="email"
-                placeholder="Email"
-                value={formData.email}
-                onChange={handleInputChange}
-                className={`bg-transparent outline-none border-none text-sm font-semibold placeholder-gray-500 transition-colors duration-300 ${
-                  theme === "light" ? "text-gray-700" : "text-white bg-gray-800"
-                }`}
-              />
-            </div>
-            <div className="w-full max-w-xs sm:max-w-md grid grid-cols-2 gap-3">
-              <div
-                className={`h-12 grid grid-cols-[15%_85%] px-3 transition-all duration-300 ${
-                  activeInput === "password"
-                    ? theme === "light"
-                      ? "bg-amber-50 shadow-md"
-                      : "bg-gray-700 shadow-md"
-                    : theme === "light"
-                    ? "bg-gray-100 hover:bg-gray-200"
-                    : "bg-gray-800 hover:bg-gray-700"
-                } ${
-                  invalidFields.includes("password")
-                    ? "border-2 border-red-500"
-                    : ""
-                }`}
-                onFocus={() => setActiveInput("password")}
-                onBlur={() => setActiveInput(null)}
-              >
-                <div className="flex items-center justify-center">
-                  <svg
-                    className={`w-4 h-4 transition-colors duration-300 ${
-                      activeInput === "password"
-                        ? "text-amber-600"
-                        : "text-gray-400"
-                    }`}
+                      }`}
                     fill="currentColor"
                     viewBox="0 0 20 20"
                   >
                     <path
                       fillRule="evenodd"
-                      d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z"
+                      d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z"
                       clipRule="evenodd"
                     />
                   </svg>
                 </div>
                 <input
-                  type="password"
-                  name="password"
-                  placeholder="Password"
-                  value={formData.password}
-                  onChange={handlePasswordChange}
-                  className={`bg-transparent outline-none border-none text-sm font-semibold placeholder-gray-500 transition-colors duration-300 ${
-                    theme === "light"
-                      ? "text-gray-700"
-                      : "text-white bg-gray-800"
-                  }`}
-                />
-              </div>
-              <div
-                className={`h-12 grid grid-cols-[15%_85%] px-3 transition-all duration-300 ${
-                  activeInput === "retypePassword"
-                    ? theme === "light"
-                      ? "bg-amber-50 shadow-md"
-                      : "bg-gray-700 shadow-md"
-                    : theme === "light"
-                    ? "bg-gray-100 hover:bg-gray-200"
-                    : "bg-gray-800 hover:bg-gray-700"
-                } ${
-                  invalidFields.includes("retypePassword")
-                    ? "border-2 border-red-500"
-                    : ""
-                }`}
-                onFocus={() => setActiveInput("retypePassword")}
-                onBlur={() => setActiveInput(null)}
-              >
-                <div className="flex items-center justify-center">
-                  <svg
-                    className={`w-4 h-4 transition-colors duration-300 ${
-                      activeInput === "retypePassword"
-                        ? "text-amber-600"
-                        : "text-gray-400"
-                    }`}
-                    fill="currentColor"
-                    viewBox="0 0 20 20"
-                  >
-                    <path
-                      fillRule="evenodd"
-                      d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z"
-                      clipRule="evenodd"
-                    />
-                  </svg>
-                </div>
-                <input
-                  type="password"
-                  name="retypePassword"
-                  placeholder="Retype Password"
-                  value={formData.retypePassword}
+                  type="text"
+                  name="username"
+                  placeholder="Username"
+                  value={formData.username}
                   onChange={handleInputChange}
-                  className={`bg-transparent outline-none border-none text-sm font-semibold placeholder-gray-500 transition-colors duration-300 ${
-                    theme === "light"
-                      ? "text-gray-700"
-                      : "text-white bg-gray-800"
-                  }`}
+                  className={`bg-transparent outline-none border-none text-sm md:text-base font-medium placeholder-gray-500 transition-colors duration-300 ${theme === "light" ? "text-gray-800" : "text-white"
+                    }`}
                 />
               </div>
             </div>
+
+            {/* Email - REMOVED rounded-lg */}
+            <div className="w-full mb-4">
+              <div
+                className={`h-12 grid grid-cols-[15%_85%] px-3 transition-all duration-300 ${activeInput === "email"
+                  ? theme === "light"
+                    ? "bg-amber-50 shadow-md ring-2 ring-amber-400"
+                    : "bg-gray-700 shadow-md ring-2 ring-amber-400"
+                  : theme === "light"
+                    ? "bg-gray-100 hover:bg-gray-200 border border-gray-300"
+                    : "bg-gray-800 hover:bg-gray-700 border border-gray-700"
+                  } ${invalidFields.includes("email")
+                    ? "border-2 border-red-500 ring-0"
+                    : ""
+                  }`}
+                onFocus={() => setActiveInput("email")}
+                onBlur={() => setActiveInput(null)}
+              >
+                <div className="flex items-center justify-center">
+                  <svg
+                    className={`w-5 h-5 transition-colors duration-300 ${activeInput === "email" ? "text-amber-600" : "text-gray-400"
+                      }`}
+                    fill="currentColor"
+                    viewBox="0 0 20 20"
+                  >
+                    <path d="M2.003 5.884L10 9.882l7.997-3.998A2 2 0 0016 4H4a2 2 0 00-1.997 1.884z" />
+                    <path d="M18 8.118l-8 4-8-4V14a2 2 0 002 2h12a2 2 0 002-2V8.118z" />
+                  </svg>
+                </div>
+                <input
+                  type="email"
+                  name="email"
+                  placeholder="Email"
+                  value={formData.email}
+                  onChange={handleInputChange}
+                  className={`bg-transparent outline-none border-none text-sm md:text-base font-medium placeholder-gray-500 transition-colors duration-300 ${theme === "light" ? "text-gray-800" : "text-white"
+                    }`}
+                />
+              </div>
+            </div>
+
+            {/* Password with Anti-Copy-Paste - REMOVED rounded-lg */}
+            <div className="w-full mb-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                  <div
+                    className={`h-12 grid grid-cols-[15%_85%] px-3 transition-all duration-300 ${activeInput === "password"
+                      ? theme === "light"
+                        ? "bg-amber-50 shadow-md ring-2 ring-amber-400"
+                        : "bg-gray-700 shadow-md ring-2 ring-amber-400"
+                      : theme === "light"
+                        ? "bg-gray-100 hover:bg-gray-200 border border-gray-300"
+                        : "bg-gray-800 hover:bg-gray-700 border border-gray-700"
+                      } ${invalidFields.includes("password")
+                        ? "border-2 border-red-500 ring-0"
+                        : ""
+                      }`}
+                    onFocus={() => setActiveInput("password")}
+                    onBlur={() => setActiveInput(null)}
+                  >
+                    <div className="flex items-center justify-center">
+                      <svg
+                        className={`w-4 h-4 md:w-5 md:h-5 transition-colors duration-300 ${activeInput === "password"
+                          ? "text-amber-600"
+                          : "text-gray-400"
+                          }`}
+                        fill="currentColor"
+                        viewBox="0 0 20 20"
+                      >
+                        <path
+                          fillRule="evenodd"
+                          d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z"
+                          clipRule="evenodd"
+                        />
+                      </svg>
+                    </div>
+                    <input
+                      type="password"
+                      name="password"
+                      placeholder="Password"
+                      value={formData.password}
+                      onChange={handlePasswordChange}
+                      onKeyDown={(e) => handlePasswordInput(e, 'password')}
+                      onPaste={handlePasswordPaste}
+                      onCopy={(e) => e.preventDefault()}
+                      onCut={(e) => e.preventDefault()}
+                      className={`bg-transparent outline-none border-none text-sm md:text-base font-medium placeholder-gray-500 transition-colors duration-300 ${theme === "light" ? "text-gray-800" : "text-white"
+                        }`}
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <div
+                    className={`h-12 grid grid-cols-[15%_85%] px-3 transition-all duration-300 ${activeInput === "retypePassword"
+                      ? theme === "light"
+                        ? "bg-amber-50 shadow-md ring-2 ring-amber-400"
+                        : "bg-gray-700 shadow-md ring-2 ring-amber-400"
+                      : theme === "light"
+                        ? "bg-gray-100 hover:bg-gray-200 border border-gray-300"
+                        : "bg-gray-800 hover:bg-gray-700 border border-gray-700"
+                      } ${invalidFields.includes("retypePassword")
+                        ? "border-2 border-red-500 ring-0"
+                        : ""
+                      }`}
+                    onFocus={() => setActiveInput("retypePassword")}
+                    onBlur={() => setActiveInput(null)}
+                  >
+                    <div className="flex items-center justify-center">
+                      <svg
+                        className={`w-4 h-4 md:w-5 md:h-5 transition-colors duration-300 ${activeInput === "retypePassword"
+                          ? "text-amber-600"
+                          : "text-gray-400"
+                          }`}
+                        fill="currentColor"
+                        viewBox="0 0 20 20"
+                      >
+                        <path
+                          fillRule="evenodd"
+                          d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z"
+                          clipRule="evenodd"
+                        />
+                      </svg>
+                    </div>
+                    <input
+                      type="password"
+                      name="retypePassword"
+                      placeholder="Confirm Password"
+                      value={formData.retypePassword}
+                      onChange={handleInputChange}
+                      onKeyDown={(e) => handlePasswordInput(e, 'retypePassword')}
+                      onPaste={handlePasswordPaste}
+                      onCopy={(e) => e.preventDefault()}
+                      onCut={(e) => e.preventDefault()}
+                      className={`bg-transparent outline-none border-none text-sm md:text-base font-medium placeholder-gray-500 transition-colors duration-300 ${theme === "light" ? "text-gray-800" : "text-white"
+                        }`}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Security Notice */}
+              <div className="mt-2">
+                <p className="text-xs text-amber-600 dark:text-amber-400 flex items-center">
+                  <svg
+                    className="w-3 h-3 mr-1"
+                    fill="currentColor"
+                    viewBox="0 0 20 20"
+                  >
+                    <path
+                      fillRule="evenodd"
+                      d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"
+                      clipRule="evenodd"
+                    />
+                  </svg>
+                  For security, passwords must be typed manually (copy/paste disabled)
+                </p>
+              </div>
+            </div>
+
+            {/* Password Strength Indicator */}
             <PasswordStrengthIndicator
               strength={passwordStrength}
               feedback={passwordFeedback}
               theme={theme}
             />
+
+            {/* Password Mismatch Indicator */}
             <PasswordMismatchIndicator
               password={formData.password}
               retypePassword={formData.retypePassword}
               isSignUpMode={isSignUpMode}
             />
-            <div
-              className={`w-full max-w-xs sm:max-w-md my-3 h-12 grid grid-cols-[15%_85%] px-3 transition-all duration-300 ${
-                activeInput === "accountType"
+
+            {/* Account Type */}
+            <div className="w-full mb-4">
+              <div
+                className={`h-12 grid grid-cols-[15%_85%] px-3 transition-all duration-300 ${activeInput === "accountType"
                   ? theme === "light"
-                    ? "bg-amber-50"
-                    : "bg-gray-700"
+                    ? "bg-amber-50 shadow-md ring-2 ring-amber-400"
+                    : "bg-gray-700 shadow-md ring-2 ring-amber-400"
                   : theme === "light"
-                  ? "bg-gray-100 hover:bg-gray-200"
-                  : "bg-gray-800 hover:bg-gray-700"
-              } ${
-                invalidFields.includes("accountType")
-                  ? "border-2 border-red-500"
-                  : ""
-              }`}
-              onFocus={() => setActiveInput("accountType")}
-              onBlur={() => setActiveInput(null)}
-            >
-              <div className="flex items-center justify-center">
-                <svg
-                  className={`w-5 h-5 transition-colors duration-300 ${
-                    activeInput === "accountType"
+                    ? "bg-gray-100 hover:bg-gray-200 border border-gray-300"
+                    : "bg-gray-800 hover:bg-gray-700 border border-gray-700"
+                  } ${invalidFields.includes("accountType")
+                    ? "border-2 border-red-500 ring-0"
+                    : ""
+                  }`}
+                onFocus={() => setActiveInput("accountType")}
+                onBlur={() => setActiveInput(null)}
+              >
+                <div className="flex items-center justify-center">
+                  <svg
+                    className={`w-5 h-5 transition-colors duration-300 ${activeInput === "accountType"
                       ? "text-amber-600"
                       : "text-gray-400"
-                  }`}
-                  fill="currentColor"
-                  viewBox="0 0 20 20"
+                      }`}
+                    fill="currentColor"
+                    viewBox="0 0 20 20"
+                  >
+                    <path d="M5 3a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2V5a2 2 0 00-2-2H5zM5 11a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2v-2a2 2 0 00-2-2H5zM11 5a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V5zM11 13a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
+                  </svg>
+                </div>
+                <select
+                  name="accountType"
+                  value={formData.accountType}
+                  onChange={handleInputChange}
+                  className={`bg-transparent outline-none border-none text-sm md:text-base font-medium transition-colors duration-300 appearance-none cursor-pointer ${theme === "light"
+                    ? formData.accountType ? "text-gray-800" : "text-gray-500"
+                    : formData.accountType ? "text-white" : "text-gray-400"
+                    }`}
                 >
-                  <path d="M5 3a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2V5a2 2 0 00-2-2H5zM5 11a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2v-2a2 2 0 00-2-2H5zM11 5a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V5zM11 13a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
-                </svg>
+                  <option value="" className={theme === "light" ? "text-gray-800" : "text-white"}>
+                    Select Account Type
+                  </option>
+                  {/* CLIENT ROLES - available for self-registration */}
+                  <option value="external_broker" className={theme === "light" ? "text-gray-800" : "text-white"}>
+                    Broker (External)
+                  </option>
+                  <option value="seller" className={theme === "light" ? "text-gray-800" : "text-white"}>
+                    Seller
+                  </option>
+                  <option value="buyer" className={theme === "light" ? "text-gray-800" : "text-white"}>
+                    Buyer
+                  </option>
+                  <option value="landlord" className={theme === "light" ? "text-gray-800" : "text-white"}>
+                    Landlord
+                  </option>
+                  <option value="renter" className={theme === "light" ? "text-gray-800" : "text-white"}>
+                    Renter
+                  </option>
+                  <option value="user" className={theme === "light" ? "text-gray-800" : "text-white"}>
+                    General User
+                  </option>
+                </select>
               </div>
-              <select
-                name="accountType"
-                value={formData.accountType}
-                onChange={handleInputChange}
-                className={`bg-transparent outline-none border-none text-sm font-semibold transition-colors duration-300 ${
-                  theme === "light" ? "text-gray-700" : "text-white bg-gray-800"
-                }`}
-              >
-                <option value="" disabled>
-                  Select Account Type
-                </option>
-                <option value="broker">Brokers Account</option>
-                <option value="seller">Sellers Account</option>
-                <option value="buyer">Buyers Account</option>
-                <option value="renter">Renters Account</option>
-              </select>
             </div>
-            <div className="w-full max-w-xs sm:max-w-md flex items-center my-3">
-              <label className="flex items-center cursor-pointer">
-                <input
-                  type="checkbox"
-                  name="acceptedTerms"
-                  checked={formData.acceptedTerms}
-                  onChange={() => {
-                    if (!formData.acceptedTerms) setShowTermsModal(true);
-                    else
-                      setFormData((prev) => ({
-                        ...prev,
-                        acceptedTerms: false,
-                      }));
-                  }}
-                  className="hidden"
-                />
-                <div
-                  className={`w-5 h-5 border-2 flex items-center justify-center mr-2 transition-all duration-300 ${
-                    formData.acceptedTerms
+
+            {/* Terms and Conditions */}
+            <div className="w-full mb-6">
+              <div className="flex items-center my-3">
+                <label className="flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    name="acceptedTerms"
+                    checked={formData.acceptedTerms}
+                    onChange={() => {
+                      if (!formData.acceptedTerms) setShowTermsModal(true);
+                      else
+                        setFormData((prev) => ({
+                          ...prev,
+                          acceptedTerms: false,
+                        }));
+                    }}
+                    className="hidden"
+                  />
+                  <div
+                    className={`w-5 h-5 border-2 flex items-center justify-center mr-3 transition-all duration-300 ${formData.acceptedTerms
                       ? "bg-amber-500 border-amber-500"
                       : theme === "light"
-                      ? "border-gray-300"
-                      : "border-gray-600"
-                  }`}
-                >
-                  {formData.acceptedTerms && (
-                    <svg
-                      className="w-3 h-3 text-white"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M5 13l4 4L19 7"
-                      />
-                    </svg>
-                  )}
-                </div>
-                <span
-                  className={`text-xs transition-colors duration-300 ${
-                    theme === "light" ? "text-gray-600" : "text-gray-300"
-                  }`}
-                >
-                  I have read and agree to the{" "}
-                  <span
-                    className="text-amber-500 hover:underline cursor-pointer"
-                    onClick={() => setShowTermsModal(true)}
+                        ? "border-gray-300 hover:border-amber-400"
+                        : "border-gray-600 hover:border-amber-400"
+                      }`}
                   >
-                    Terms and Conditions
+                    {formData.acceptedTerms && (
+                      <svg
+                        className="w-3 h-3 text-white"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M5 13l4 4L19 7"
+                        />
+                      </svg>
+                    )}
+                  </div>
+                  <span
+                    className={`text-sm transition-colors duration-300 ${theme === "light" ? "text-gray-700" : "text-gray-300"
+                      }`}
+                  >
+                    I agree to the{" "}
+                    <button
+                      type="button"
+                      className="text-amber-500 hover:text-amber-600 font-medium underline"
+                      onClick={() => setShowTermsModal(true)}
+                    >
+                      Terms and Conditions
+                    </button>
                   </span>
-                </span>
-              </label>
+                </label>
+              </div>
             </div>
-            {error && (
-              <p
-                className={`text-sm ${
-                  theme === "light" ? "text-red-600" : "text-red-400"
-                }`}
-              >
-                {error}
-              </p>
-            )}
+
+            {/* Submit Button */}
             <button
               type="submit"
-              className="w-32 sm:w-36 bg-amber-500 h-12 text-white font-semibold uppercase my-4 cursor-pointer transition-all duration-300 hover:bg-amber-600 hover:scale-105 hover:shadow-lg text-sm sm:text-base"
+              className={`w-full h-12 text-white font-bold uppercase my-2 cursor-pointer transition-all duration-300 shadow-lg hover:shadow-xl ${formData.acceptedTerms
+                ? "bg-amber-500 hover:bg-amber-600 hover:scale-[1.02]"
+                : "bg-gray-400 cursor-not-allowed"
+                } text-sm md:text-base`}
               disabled={!formData.acceptedTerms}
             >
-              Sign up
+              {formData.acceptedTerms ? "Create Account" : "Accept Terms to Continue"}
             </button>
-            <p
-              className={`text-xs sm:text-sm my-3 sm:my-4 transition-colors duration-300 ${
-                theme === "light" ? "text-gray-600" : "text-gray-300"
-              }`}
-            >
-              Or Sign up with social platforms
-            </p>
-            <div className="flex justify-center space-x-2 sm:space-x-3">
-              {socialPlatforms.map((platform) => (
-                <button
-                  key={platform.name}
-                  onClick={() => handleSocialAuth(platform.name)}
-                  className={`w-8 h-8 sm:w-10 sm:h-10 flex items-center justify-center transition-all duration-300 hover:scale-110 hover:shadow-lg ${
-                    theme === "light"
-                      ? "border border-gray-300 hover:border-amber-500"
-                      : "border border-gray-700 hover:border-amber-500"
+
+            {/* Error Message */}
+            {error && (
+              <div className="w-full mt-3 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800">
+                <p className={`text-sm font-medium ${theme === "light" ? "text-red-700" : "text-red-300"
+                  }`}>
+                  {error}
+                </p>
+              </div>
+            )}
+
+            {/* Social Signup */}
+            <div className="w-full mt-6 pt-6 border-t border-gray-200 dark:border-gray-700">
+              <p
+                className={`text-sm text-center mb-4 transition-colors duration-300 ${theme === "light" ? "text-gray-600" : "text-gray-300"
                   }`}
-                  style={{
-                    backgroundColor: theme === "light" ? "white" : "#1f2937",
-                    color: platform.color,
-                  }}
-                  onMouseOver={(e) => {
-                    if (platform.hoverColor)
-                      e.currentTarget.style.color = platform.hoverColor;
-                  }}
-                  onMouseOut={(e) => {
-                    e.currentTarget.style.color = platform.color;
-                  }}
-                >
-                  <svg
-                    className="w-3 h-3 sm:w-4 sm:h-4"
-                    viewBox="0 0 24 24"
-                    fill="currentColor"
+              >
+                Or sign up with
+              </p>
+              <div className="flex justify-center space-x-4">
+                {socialPlatforms.map((platform) => (
+                  <button
+                    key={platform.name}
+                    onClick={() => handleSocialAuth(platform.name)}
+                    className={`w-10 h-10 flex items-center justify-center transition-all duration-300 ${theme === "light"
+                      ? "bg-gray-100 border border-gray-300 hover:bg-amber-50 hover:border-amber-400"
+                      : "bg-gray-800 border border-gray-700 hover:bg-gray-700 hover:border-amber-500"
+                      } hover:scale-110 hover:shadow-lg`}
+                    title={`Sign up with ${platform.name}`}
                   >
-                    {platform.svgPath}
-                  </svg>
-                </button>
-              ))}
+                    <svg
+                      className={`w-5 h-5 ${theme === "light" ? "text-gray-700" : "text-gray-300"
+                        }`}
+                      viewBox="0 0 24 24"
+                      fill="currentColor"
+                    >
+                      {platform.svgPath}
+                    </svg>
+                  </button>
+                ))}
+              </div>
             </div>
           </form>
         </div>
-        <div className="inset-0 grid grid-cols-1 md:grid-cols-2 z-20">
-          <div className="flex flex-1 flex-col items-center md:items-end justify-center text-center md:text-right pr-4 md:pr-12">
+
+        {/* Left side content (New here?) */}
+        <div className="hidden md:flex absolute top-1/2 left-0 transform -translate-y-1/2 w-1/2 px-4 lg:px-8 xl:px-12 z-20">
+          <div className="flex flex-col items-end justify-center text-right pr-4 lg:pr-8 xl:pr-12">
             <div
-              className={`transition-transform duration-700 ${
-                theme === "light" ? "text-gray-800" : "text-white"
-              }`}
+              className={`transition-transform duration-700 ${theme === "light" ? "text-gray-800" : "text-white"
+                }`}
               style={{
                 transform: isSignUpMode
-                  ? "translateX(-800px)"
+                  ? "translateX(-100%)"
                   : "translateX(0)",
+                opacity: isSignUpMode ? 0 : 1,
               }}
             >
-              <h3 className="text-xl md:text-2xl font-semibold mb-2">
+              <h3 className="text-xl lg:text-2xl font-semibold mb-2">
                 New here?
               </h3>
-              <p className="text-sm mb-4 max-w-xs">
+              <p className="text-sm lg:text-base mb-4 max-w-xs lg:max-w-sm">
                 Join our community and discover amazing properties!
               </p>
               <button
                 onClick={() => setIsSignUpMode(true)}
-                className={`border-2 bg-transparent w-28 md:w-32 h-9 md:h-10 font-semibold text-xs md:text-sm transition-all duration-300 hover:scale-105 ${
-                  theme === "light"
-                    ? "border-amber-500 text-gray-900 hover:bg-amber-500 hover:text-white"
-                    : "border-amber-400 text-white hover:bg-amber-400 hover:text-gray-900"
-                }`}
+                className={`border-2 bg-transparent w-28 lg:w-32 h-10 lg:h-12 font-semibold text-sm lg:text-base transition-all duration-300 hover:scale-105 ${theme === "light"
+                  ? "border-amber-500 text-gray-900 hover:bg-amber-500 hover:text-white"
+                  : "border-amber-400 text-white hover:bg-amber-400 hover:text-gray-900"
+                  }`}
               >
                 Sign up
               </button>
@@ -1626,36 +1796,40 @@ const LoginRegister = () => {
             <img
               src="/vectors/Login.svg"
               alt="Login"
-              className="w-[80%] max-w-lg transition-transform duration-700"
+              className="w-full max-w-sm lg:max-w-md transition-transform duration-700"
               style={{
                 transform: isSignUpMode
-                  ? "translateX(-800px)"
+                  ? "translateX(-100%)"
                   : "translateX(0)",
+                opacity: isSignUpMode ? 0 : 1,
               }}
             />
           </div>
-          <div className="flex flex-col items-center md:items-start justify-center text-center md:text-left pl-4 md:pl-12">
+        </div>
+
+        {/* Right side content (One of us?) */}
+        <div className="hidden md:flex absolute top-1/2 right-0 transform -translate-y-1/2 w-1/2 px-4 lg:px-8 xl:px-12 z-20">
+          <div className="flex flex-col items-start justify-center text-left pl-4 lg:pl-8 xl:pl-12">
             <div
-              className={`transition-transform duration-700 ${
-                theme === "light" ? "text-gray-800" : "text-white"
-              }`}
+              className={`transition-transform duration-700 ${theme === "light" ? "text-gray-800" : "text-white"
+                }`}
               style={{
-                transform: isSignUpMode ? "translateX(0)" : "translateX(800px)",
+                transform: isSignUpMode ? "translateX(0)" : "translateX(100%)",
+                opacity: isSignUpMode ? 1 : 0,
               }}
             >
-              <h3 className="text-xl md:text-2xl font-semibold mb-2">
+              <h3 className="text-xl lg:text-2xl font-semibold mb-2">
                 One of us?
               </h3>
-              <p className="text-sm mb-4 max-w-xs">
+              <p className="text-sm lg:text-base mb-4 max-w-xs lg:max-w-sm">
                 Welcome back! Sign in to continue your journey.
               </p>
               <button
                 onClick={() => setIsSignUpMode(false)}
-                className={`border-2 bg-transparent w-28 md:w-32 h-9 md:h-10 font-semibold text-xs md:text-sm transition-all duration-300 hover:scale-105 ${
-                  theme === "light"
-                    ? "border-amber-500 text-gray-900 hover:bg-amber-500 hover:text-white"
-                    : "border-amber-400 text-white hover:bg-amber-400 hover:text-gray-900"
-                }`}
+                className={`border-2 bg-transparent w-28 lg:w-32 h-10 lg:h-12 font-semibold text-sm lg:text-base transition-all duration-300 hover:scale-105 ${theme === "light"
+                  ? "border-amber-500 text-gray-900 hover:bg-amber-500 hover:text-white"
+                  : "border-amber-400 text-white hover:bg-amber-400 hover:text-gray-900"
+                  }`}
               >
                 Login
               </button>
@@ -1663,14 +1837,29 @@ const LoginRegister = () => {
             <img
               src="/vectors/Signup.svg"
               alt="Register"
-              className="w-[80%] max-w-lg transition-transform duration-700"
+              className="w-full max-w-sm lg:max-w-md transition-transform duration-700"
               style={{
-                transform: isSignUpMode ? "translateX(0)" : "translateX(800px)",
+                transform: isSignUpMode ? "translateX(0)" : "translateX(100%)",
+                opacity: isSignUpMode ? 1 : 0,
               }}
             />
           </div>
         </div>
+
+        {/* Mobile toggle buttons */}
+        <div className="md:hidden flex justify-center mt-8 z-30 relative">
+          <button
+            onClick={() => setIsSignUpMode(!isSignUpMode)}
+            className={`border-2 bg-transparent px-6 py-2 font-semibold text-sm transition-all duration-300 ${theme === "light"
+              ? "border-amber-500 text-gray-900 hover:bg-amber-500 hover:text-white"
+              : "border-amber-400 text-white hover:bg-amber-400 hover:text-gray-900"
+              }`}
+          >
+            {isSignUpMode ? "Already have an account? Login" : "New here? Sign up"}
+          </button>
+        </div>
       </div>
+
       {/* Profile picture modal (only accessible after login, as page redirects if logged in) */}
       <ProfilePictureModal
         isOpen={showProfileModal}

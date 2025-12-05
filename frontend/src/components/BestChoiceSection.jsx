@@ -134,7 +134,7 @@ const BestChoiceSection = ({ theme }) => {
                       <div
                         className={`Cards ${
                           theme === "dark" ? "dark" : "light"
-                        } rounded-lg overflow-hidden relative transition-all duration-500 hover:shadow-2xl hover:-translate-y-1`}
+                        } rounded-lg overflow-hidden relative transition-all duration-500 hover:shadow-2xl hover:-translate-y-1 h-full flex flex-col`}
                       >
                         {/* Badge */}
                         <div
@@ -156,50 +156,137 @@ const BestChoiceSection = ({ theme }) => {
                           />
                         </div>
                         
-                        {/* Info */}
-                        <div className="p-4 text-center mt-2">
-                          <p className="text-base font-semibold mb-2">
-                            <span className="text-amber-400 font-bold">
-                              {formatCurrency(property.price)}
-                            </span>
-                            {typeInfo.type === "FOR RENT" && (
-                              <span className="text-xs text-gray-500 ml-1">/month</span>
-                            )}
-                          </p>
-                          <p className="text-sm text-gray-600 dark:text-gray-300 mb-3 line-clamp-2">
-                            {property.address}, {property.city}
-                          </p>
-                          <div className="flex items-center justify-center gap-4 text-gray-600 dark:text-gray-300 mb-4">
-                            <div className="flex items-center gap-2">
-                              <img
-                                src="/vectors/Bed.svg"
-                                alt="Bed"
-                                className="w-5 h-5 opacity-90"
-                              />
-                              <span className="text-xs">{property.beds} beds</span>
+                        {/* Card Content */}
+                        <div className="p-4 flex-1 flex flex-col">
+                          {/* Price - High Contrast */}
+                          <div className="text-center mb-3">
+                            <p className="text-base sm:text-lg font-bold">
+                              <span className={`font-bold ${
+                                theme === "dark" ? "text-amber-400" : "text-amber-600"
+                              }`}>
+                                {formatCurrency(property.price)}
+                              </span>
+                              {typeInfo.type === "FOR RENT" && (
+                                <span className={`text-xs ml-1 ${
+                                  theme === "dark" ? "text-gray-400" : "text-gray-600"
+                                }`}>
+                                  /month
+                                </span>
+                              )}
+                            </p>
+                          </div>
+
+                          {/* Location - Improved Visibility */}
+                          <div className="mb-3 text-center">
+                            <p className={`text-sm font-medium mb-1 ${
+                              theme === "dark" ? "text-gray-200" : "text-gray-800"
+                            }`}>
+                              Location:
+                            </p>
+                            <p className={`text-xs sm:text-sm line-clamp-1 ${
+                              theme === "dark" ? "text-gray-300" : "text-gray-700"
+                            }`}>
+                              {property.address}
+                            </p>
+                            <p className={`text-xs sm:text-sm font-medium ${
+                              theme === "dark" ? "text-gray-300" : "text-gray-700"
+                            }`}>
+                              {property.city}
+                            </p>
+                          </div>
+
+                          {/* Description - Added if available */}
+                          {property.description && (
+                            <div className="mb-4 flex-1">
+                              <p className={`text-xs line-clamp-2 ${
+                                theme === "dark" ? "text-gray-300" : "text-gray-600"
+                              }`}>
+                                {property.description}
+                              </p>
                             </div>
-                            <div className="flex items-center gap-2">
-                              <img
-                                src="/vectors/Shower.svg"
-                                alt="Bath"
-                                className="w-5 h-5 opacity-90"
-                              />
-                              <span className="text-xs">{property.baths} baths</span>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <Ruler
-                                size={20}
-                                className="text-amber-500 opacity-90"
-                              />
-                              <span className="text-xs">{property.sqft} sqft</span>
+                          )}
+
+                          {/* Property Features - Improved Visibility */}
+                          <div className="mb-4">
+                            <div className="flex items-center justify-center gap-4 sm:gap-6">
+                              <div className="flex flex-col items-center">
+                                <div className="flex items-center gap-1 mb-1">
+                                  <img
+                                    src="/vectors/Bed.svg"
+                                    alt="Bed"
+                                    className={`w-4 h-4 sm:w-5 sm:h-5 ${
+                                      theme === "dark" ? "filter brightness-200" : ""
+                                    }`}
+                                  />
+                                  <span className={`text-xs font-semibold ${
+                                    theme === "dark" ? "text-gray-200" : "text-gray-800"
+                                  }`}>
+                                    Bed
+                                  </span>
+                                </div>
+                                <span className={`text-xs ${
+                                  theme === "dark" ? "text-gray-300" : "text-gray-700"
+                                }`}>
+                                  {property.beds} beds
+                                </span>
+                              </div>
+                              
+                              <div className="flex flex-col items-center">
+                                <div className="flex items-center gap-1 mb-1">
+                                  <img
+                                    src="/vectors/Shower.svg"
+                                    alt="Bath"
+                                    className={`w-4 h-4 sm:w-5 sm:h-5 ${
+                                      theme === "dark" ? "filter brightness-200" : ""
+                                    }`}
+                                  />
+                                  <span className={`text-xs font-semibold ${
+                                    theme === "dark" ? "text-gray-200" : "text-gray-800"
+                                  }`}>
+                                    Bath
+                                  </span>
+                                </div>
+                                <span className={`text-xs ${
+                                  theme === "dark" ? "text-gray-300" : "text-gray-700"
+                                }`}>
+                                  {property.baths} baths
+                                </span>
+                              </div>
+                              
+                              <div className="flex flex-col items-center">
+                                <div className="flex items-center gap-1 mb-1">
+                                  <Ruler
+                                    size={16}
+                                    className={theme === "dark" ? "text-amber-400" : "text-amber-600"}
+                                  />
+                                  <span className={`text-xs font-semibold ${
+                                    theme === "dark" ? "text-gray-200" : "text-gray-800"
+                                  }`}>
+                                    Area
+                                  </span>
+                                </div>
+                                <span className={`text-xs ${
+                                  theme === "dark" ? "text-gray-300" : "text-gray-700"
+                                }`}>
+                                  {property.sqft} sqft
+                                </span>
+                              </div>
                             </div>
                           </div>
-                          <button
-                            onClick={() => handleMoreDetails(property)}
-                            className="Button2 w-[50%] mt-2 px-4 py-2 text-sm hover:scale-105 transition-all duration-300 rounded"
-                          >
-                            More Details
-                          </button>
+
+                          {/* CTA Button */}
+                          <div className="mt-auto">
+                            <button
+                              onClick={() => handleMoreDetails(property)}
+                              className={`Button2 ml-20 px-4 py-2 text-sm hover:scale-105 transition-all duration-300 rounded ${
+                                theme === "dark" 
+                                  ? "border-amber-400 text-white hover:bg-amber-500 hover:text-gray-900" 
+                                  : "border-amber-500 text-gray-900 hover:bg-amber-500 hover:text-white"
+                              }`}
+                            >
+                              More Details
+                            </button>
+                          </div>
                         </div>
                       </div>
                     </div>

@@ -9,10 +9,13 @@ const ProfilePictureModal = ({
   firstName,
   lastName,
   role,
+  onUploadComplete,
+  user
 }) => {
   const fileInputRef = useRef(null);
   const [selectedFile, setSelectedFile] = useState(null);
   const [previewUrl, setPreviewUrl] = useState(null);
+  const [isUploading, setIsUploading] = useState(false);
 
   // Normalize role names to handle different formats from backend
   const normalizeRole = (role) => {
@@ -33,6 +36,7 @@ const ProfilePictureModal = ({
       renter: "renter",
       leaser: "leaser",
       lease: "leaser",
+      super_admin: "admin",
     };
 
     return roleMap[roleLower] || "default";
@@ -41,9 +45,8 @@ const ProfilePictureModal = ({
   const normalizedRole = normalizeRole(role);
 
   const getInitials = () => {
-    return `${firstName?.charAt(0) || ""}${
-      lastName?.charAt(0) || ""
-    }`.toUpperCase();
+    return `${firstName?.charAt(0) || ""}${lastName?.charAt(0) || ""
+      }`.toUpperCase();
   };
 
   const getRoleColor = () => {
@@ -75,14 +78,14 @@ const ProfilePictureModal = ({
   };
 
   const getPopupBackground = () => {
-    return theme === 'dark' 
+    return theme === 'dark'
       ? "bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900"
       : "bg-gradient-to-br from-amber-50 via-white to-gray-100";
   };
 
   const getCardBackground = () => {
-    return theme === 'dark' 
-      ? "bg-gray-800/80 border-gray-700" 
+    return theme === 'dark'
+      ? "bg-gray-800/80 border-gray-700"
       : "bg-white border-gray-200";
   };
 
@@ -117,44 +120,117 @@ const ProfilePictureModal = ({
     reader.readAsDataURL(file);
   };
 
-  // Ensure proper file upload handling
   const handleUpload = async () => {
-    const authToken = localStorage.getItem('token'); // Retrieve token from localStorage
-
     if (!selectedFile) {
-      console.error('No file selected for upload');
+      alert('Please select a file first');
       return;
     }
 
-    const formData = new FormData();
-    formData.append('profilePicture', selectedFile);
+    setIsUploading(true);
 
     try {
-      const response = await fetch('/api/auth/upload-profile', {
+      console.log('📤 =========== PROFILE PICTURE UPLOAD START ===========');
+      const authToken = localStorage.getItem('token');
+      
+      const formData = new FormData();
+      formData.append('profilePicture', selectedFile);
+
+      const response = await fetch('http://localhost:5000/api/auth/upload', {
         method: 'POST',
-        body: formData,
         headers: {
-          Authorization: `Bearer ${authToken}`, // Ensure authToken is valid
+          'Authorization': `Bearer ${authToken}`,
         },
+        body: formData,
       });
 
-      if (!response.ok) {
-        throw new Error('Upload failed');
-      }
+      console.log('📤 Response status:', response.status);
 
-      const data = await response.json();
-      console.log('Upload successful:', data);
+      if (response.ok) {
+        const data = await response.json();
+        console.log('✅ Upload successful response:', data);
+
+        if (data.profilePictureUrl) {
+          console.log('✅ New profile picture URL:', data.profilePictureUrl);
+          
+          // Call the parent callback with the new URL
+          if (onUploadComplete) {
+            onUploadComplete(data.profilePictureUrl);
+          }
+
+          // Also update localStorage if user data exists
+          const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+          if (currentUser) {
+            const updatedUser = {
+              ...currentUser,
+              profile_picture: data.profilePictureUrl
+            };
+            localStorage.setItem('user', JSON.stringify(updatedUser));
+            console.log('✅ Updated localStorage');
+          }
+
+          alert('✅ Profile picture uploaded successfully!');
+          
+          // Reset state and close modal
+          setSelectedFile(null);
+          setPreviewUrl(null);
+          onClose();
+        } else {
+          console.error('❌ No profilePictureUrl in response');
+          alert('Upload completed but no URL returned.');
+        }
+      } else {
+        const errorData = await response.json().catch(() => ({ message: 'Upload failed' }));
+        console.error('❌ Server returned error:', errorData);
+        alert(`❌ Upload failed: ${errorData.message || 'Unknown error'}`);
+      }
     } catch (error) {
-      console.error('Upload error:', error);
+      console.error('❌ Network error during upload:', error);
+      alert('🌐 Network error. Please check your connection.');
+    } finally {
+      setIsUploading(false);
     }
   };
 
   const handleRemovePicture = async () => {
-    if (
-      window.confirm("Are you sure you want to remove your profile picture?")
-    ) {
-      console.log("Remove profile picture");
-      alert("Remove functionality coming soon!");
+    if (!window.confirm("Are you sure you want to remove your profile picture?")) {
+      return;
+    }
+
+    try {
+      const authToken = localStorage.getItem('token');
+      const response = await fetch('http://localhost:5000/api/auth/remove-profile-picture', {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${authToken}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (response.ok) {
+        // Call the parent callback with null to indicate removal
+        if (onUploadComplete) {
+          onUploadComplete(null);
+        }
+
+        // Also update localStorage if user data exists
+        const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+        if (currentUser) {
+          const updatedUser = {
+            ...currentUser,
+            profile_picture: null
+          };
+          localStorage.setItem('user', JSON.stringify(updatedUser));
+        }
+
+        alert('✅ Profile picture removed successfully!');
+        onClose();
+      } else {
+        const errorData = await response.json();
+        alert(`❌ Failed to remove profile picture: ${errorData.message || 'Unknown error'}`);
+      }
+    } catch (error) {
+      console.error('❌ Error removing profile picture:', error);
+      alert('🌐 Network error. Please try again.');
     }
   };
 
@@ -167,15 +243,14 @@ const ProfilePictureModal = ({
   if (!isOpen) return null;
 
   return (
-    <div 
+    <div
       className="fixed inset-0 z-[10000]"
       onClick={handleBackdropClick}
     >
       <div className="fixed inset-0 bg-black bg-opacity-60 backdrop-blur-sm flex items-center justify-center p-4">
-        <div 
-          className={`relative rounded-2xl shadow-2xl max-w-md w-full mx-auto overflow-hidden border ${
-            theme === 'dark' ? 'border-gray-600' : 'border-gray-200'
-          } ${getPopupBackground()}`}
+        <div
+          className={`relative rounded-2xl shadow-2xl max-w-md w-full mx-auto overflow-hidden border ${theme === 'dark' ? 'border-gray-600' : 'border-gray-200'
+            } ${getPopupBackground()}`}
           onClick={(e) => e.stopPropagation()}
         >
           {/* Header */}
@@ -188,11 +263,10 @@ const ProfilePictureModal = ({
 
             <button
               onClick={onClose}
-              className={`absolute top-4 right-4 p-2 rounded-full transition-all duration-200 ${
-                theme === 'dark' 
-                  ? 'text-gray-300 hover:bg-gray-700/80 hover:text-white' 
-                  : 'text-gray-600 hover:bg-gray-200 hover:text-gray-800'
-              }`}
+              className={`absolute top-4 right-4 p-2 rounded-full transition-all duration-200 ${theme === 'dark'
+                ? 'text-gray-300 hover:bg-gray-700/80 hover:text-white'
+                : 'text-gray-600 hover:bg-gray-200 hover:text-gray-800'
+                }`}
             >
               <X className="w-5 h-5" />
             </button>
@@ -249,13 +323,13 @@ const ProfilePictureModal = ({
                   </div>
                 )}
               </div>
-              
+
               <p className={`text-center text-sm ${getSecondaryTextColor()}`}>
                 {previewUrl
                   ? "New profile picture preview"
                   : userProfilePicture
-                  ? "Current profile picture"
-                  : "No profile picture set"}
+                    ? "Current profile picture"
+                    : "No profile picture set"}
               </p>
             </div>
 
@@ -264,9 +338,8 @@ const ProfilePictureModal = ({
               <div className={`mb-6 p-4 rounded-xl border ${getCardBackground()} transition-all duration-300`}>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-3">
-                    <div className={`p-2 rounded-lg ${
-                      theme === 'dark' ? 'bg-gray-700' : 'bg-gray-100'
-                    }`}>
+                    <div className={`p-2 rounded-lg ${theme === 'dark' ? 'bg-gray-700' : 'bg-gray-100'
+                      }`}>
                       <Upload className="w-4 h-4 text-amber-500" />
                     </div>
                     <div>
@@ -283,11 +356,11 @@ const ProfilePictureModal = ({
                       setSelectedFile(null);
                       setPreviewUrl(null);
                     }}
-                    className={`p-2 rounded-lg transition-colors ${
-                      theme === 'dark' 
-                        ? 'text-gray-400 hover:text-red-400 hover:bg-gray-700' 
-                        : 'text-gray-500 hover:text-red-500 hover:bg-gray-100'
-                    }`}
+                    className={`p-2 rounded-lg transition-colors ${theme === 'dark'
+                      ? 'text-gray-400 hover:text-red-400 hover:bg-gray-700'
+                      : 'text-gray-500 hover:text-red-500 hover:bg-gray-100'
+                      }`}
+                    disabled={isUploading}
                   >
                     <X className="w-4 h-4" />
                   </button>
@@ -303,19 +376,20 @@ const ProfilePictureModal = ({
                 onChange={handleFileSelect}
                 accept="image/*"
                 className="hidden"
+                disabled={isUploading}
               />
 
               {!selectedFile && (
                 <button
                   onClick={() => fileInputRef.current?.click()}
                   className={`w-full p-4 rounded-xl text-left transition-all duration-200 group hover:scale-[1.02] border ${getCardBackground()} hover:bg-amber-500 hover:text-white shadow-sm hover:shadow-md`}
+                  disabled={isUploading}
                 >
                   <div className="flex items-center gap-3">
-                    <div className={`p-2 rounded-lg transition-colors ${
-                      theme === 'dark' 
-                        ? 'bg-gray-700 group-hover:bg-white group-hover:text-amber-500' 
-                        : 'bg-gray-100 group-hover:bg-white group-hover:text-amber-500'
-                    }`}>
+                    <div className={`p-2 rounded-lg transition-colors ${theme === 'dark'
+                      ? 'bg-gray-700 group-hover:bg-white group-hover:text-amber-500'
+                      : 'bg-gray-100 group-hover:bg-white group-hover:text-amber-500'
+                      }`}>
                       <Camera className="w-5 h-5" />
                     </div>
                     <div className="flex-1">
@@ -333,41 +407,45 @@ const ProfilePictureModal = ({
               {selectedFile && (
                 <button
                   onClick={handleUpload}
-                  className="w-full bg-amber-500 text-white py-4 px-6 rounded-xl font-medium hover:bg-amber-600 transition-all duration-200 flex items-center justify-center gap-2 shadow-lg hover:shadow-xl hover:scale-105"
+                  disabled={isUploading}
+                  className="w-full bg-amber-500 text-white py-4 px-6 rounded-xl font-medium hover:bg-amber-600 transition-all duration-200 flex items-center justify-center gap-2 shadow-lg hover:shadow-xl hover:scale-105 disabled:opacity-70 disabled:cursor-not-allowed"
                 >
-                  <>
-                    <Upload className="w-5 h-5" />
-                    <span>Upload Photo</span>
-                  </>
+                  {isUploading ? (
+                    <>
+                      <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                      <span>Uploading...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Upload className="w-5 h-5" />
+                      <span>Upload Photo</span>
+                    </>
+                  )}
                 </button>
               )}
 
-              {userProfilePicture && !selectedFile && (
+              {userProfilePicture && !selectedFile && !isUploading && (
                 <button
                   onClick={handleRemovePicture}
-                  className={`w-full p-4 rounded-xl text-left transition-all duration-200 group hover:scale-[1.02] border ${
-                    theme === 'dark'
-                      ? 'bg-gray-800/50 hover:bg-red-600/20 border-red-700'
-                      : 'bg-white hover:bg-red-50 border-red-200'
-                  } shadow-sm hover:shadow-md`}
+                  className={`w-full p-4 rounded-xl text-left transition-all duration-200 group hover:scale-[1.02] border ${theme === 'dark'
+                    ? 'bg-gray-800/50 hover:bg-red-600/20 border-red-700'
+                    : 'bg-white hover:bg-red-50 border-red-200'
+                    } shadow-sm hover:shadow-md`}
                 >
                   <div className="flex items-center gap-3">
-                    <div className={`p-2 rounded-lg transition-colors ${
-                      theme === 'dark' 
-                        ? 'bg-gray-700 group-hover:bg-red-500 group-hover:text-white' 
-                        : 'bg-gray-100 group-hover:bg-red-500 group-hover:text-white'
-                    }`}>
+                    <div className={`p-2 rounded-lg transition-colors ${theme === 'dark'
+                      ? 'bg-gray-700 group-hover:bg-red-500 group-hover:text-white'
+                      : 'bg-gray-100 group-hover:bg-red-500 group-hover:text-white'
+                      }`}>
                       <Trash2 className="w-5 h-5" />
                     </div>
                     <div className="flex-1">
-                      <div className={`font-medium text-sm ${
-                        theme === 'dark' ? 'text-white' : 'text-gray-900'
-                      } group-hover:text-red-600 dark:group-hover:text-red-400`}>
+                      <div className={`font-medium text-sm ${theme === 'dark' ? 'text-white' : 'text-gray-900'
+                        } group-hover:text-red-600 dark:group-hover:text-red-400`}>
                         Remove Current Photo
                       </div>
-                      <div className={`text-xs ${
-                        theme === 'dark' ? 'text-gray-400' : 'text-gray-600'
-                      } group-hover:text-red-500`}>
+                      <div className={`text-xs ${theme === 'dark' ? 'text-gray-400' : 'text-gray-600'
+                        } group-hover:text-red-500`}>
                         Delete your profile picture
                       </div>
                     </div>
@@ -381,11 +459,11 @@ const ProfilePictureModal = ({
           <div className="p-4 border-t border-gray-200 dark:border-gray-700">
             <button
               onClick={onClose}
-              className={`w-full py-3 px-4 rounded-xl font-medium transition-all duration-200 border ${
-                theme === 'dark'
-                  ? 'bg-gray-800/50 border-gray-600 text-gray-300 hover:bg-gray-700/70'
-                  : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'
-              } shadow-sm hover:shadow-md`}
+              disabled={isUploading}
+              className={`w-full py-3 px-4 rounded-xl font-medium transition-all duration-200 border ${theme === 'dark'
+                ? 'bg-gray-800/50 border-gray-600 text-gray-300 hover:bg-gray-700/70 disabled:opacity-50'
+                : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50 disabled:opacity-50'
+                } shadow-sm hover:shadow-md`}
             >
               Cancel
             </button>

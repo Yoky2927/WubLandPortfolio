@@ -31,6 +31,7 @@ import {
   Phone,
   Menu,
   Map,
+  Ruler,
 } from "lucide-react";
 
 const Properties = () => {
@@ -517,7 +518,7 @@ const Properties = () => {
         >
           {/* Properties Content - Scrollable */}
           <div className="flex-1 overflow-y-auto pb-20 lg:pb-0">
-            <div className="container mx-auto px-4 py-8">
+            <div className="container mx-auto px-4 py-8 max-w-7xl">
               {/* Header */}
               <div className="flex justify-between items-start mb-8">
                 <div>
@@ -848,7 +849,7 @@ const Properties = () => {
                     </p>
                   </div>
                   {viewMode === "grid" ? (
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
                       {filteredProperties.map((property) => (
                         <PropertyCard
                           key={property.id}
@@ -860,7 +861,7 @@ const Properties = () => {
                       ))}
                     </div>
                   ) : (
-                    <div className="space-y-4">
+                    <div className="space-y-6">
                       {filteredProperties.map((property) => (
                         <PropertyListCard
                           key={property.id}
@@ -905,7 +906,7 @@ const Properties = () => {
           </div>
 
           {/* Footer - Only on the right side */}
-          <div className="mt-auto hidden lg:block ">
+          <div className="mt-auto hidden lg:block">
             <Footer />
           </div>
         </div>
@@ -928,25 +929,29 @@ const Properties = () => {
   );
 };
 
-// Property Card (Grid View)
+// Property Card (Grid View) - Improved
 const PropertyCard = ({ property, theme, onPropertyClick, formatCurrency }) => (
   <div
     onClick={() => onPropertyClick(property)}
-    className={`relative rounded-xl overflow-hidden transition-all duration-300 hover:shadow-xl hover:scale-105 cursor-pointer ${
+    className={`group relative rounded-xl overflow-hidden transition-all duration-300 hover:shadow-2xl cursor-pointer h-full flex flex-col ${
       theme === "dark"
-        ? "bg-gradient-to-br from-[#332500]/80 to-[#1a1200] border border-amber-400/20"
-        : "bg-white border border-gray-100"
+        ? "bg-gradient-to-br from-gray-800/80 to-gray-900 border border-gray-700"
+        : "bg-white border border-gray-200"
     }`}
   >
-    <div className="relative">
+    {/* Image Container */}
+    <div className="relative h-48 overflow-hidden">
       <img
         src={property.images[0]}
         alt={property.title}
-        className="w-full h-48 object-cover transition-transform duration-500 hover:scale-110"
+        className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
       />
+      <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent" />
+      
+      {/* Status Badge */}
       <div className="absolute top-3 right-3">
         <span
-          className={`px-3 py-1 rounded-full text-xs font-bold text-white shadow-lg ${
+          className={`px-3 py-1.5 rounded-full text-xs font-bold text-white shadow-lg ${
             property.propertyStatus === "for sale"
               ? "bg-gradient-to-r from-green-500 to-green-600"
               : "bg-gradient-to-r from-orange-500 to-orange-600"
@@ -955,53 +960,99 @@ const PropertyCard = ({ property, theme, onPropertyClick, formatCurrency }) => (
           {property.propertyStatus === "for sale" ? "FOR SALE" : "FOR RENT"}
         </span>
       </div>
-      <div className="absolute top-3 left-3 flex space-x-1">
-        <button className="p-1.5 bg-white/80 rounded-full hover:bg-white">
-          <Heart size={16} className="text-gray-600" />
-        </button>
-        <button className="p-1.5 bg-white/80 rounded-full hover:bg-white">
-          <Share2 size={16} className="text-gray-600" />
-        </button>
+      
+      {/* Favorite Button */}
+      <button className="absolute top-3 left-3 p-2 bg-white/90 rounded-full hover:bg-white transition-colors">
+        <Heart size={18} className="text-gray-600" />
+      </button>
+      
+      {/* Property Type Badge */}
+      <div className="absolute bottom-3 left-3">
+        <span className={`px-3 py-1 rounded-full text-xs font-medium ${
+          theme === "dark" ? "bg-black/70 text-white" : "bg-white/90 text-gray-800"
+        }`}>
+          <Home size={12} className="inline mr-1" />
+          {property.propertyType}
+        </span>
       </div>
     </div>
-    <div className="p-4">
-      <h3
-        className={`text-lg font-semibold mb-2 ${
-          theme === "dark" ? "text-white" : "text-gray-900"
-        }`}
-      >
-        {property.title}
-      </h3>
-      <p className="text-amber-400 font-bold text-xl mb-2">
-        {formatCurrency(property.price)}
-      </p>
-      <p
-        className={`flex items-center text-sm mb-3 ${
-          theme === "dark" ? "text-gray-300" : "text-gray-600"
-        }`}
-      >
-        <MapPin size={14} className="mr-1" />
-        {property.address}, {property.city}
-      </p>
-      <div className="flex justify-between text-sm text-gray-600 dark:text-gray-400">
-        <div className="flex items-center space-x-1">
-          <Bed size={14} />
-          <span>{property.beds} Beds</span>
+
+    {/* Content Container */}
+    <div className="flex-1 p-4 flex flex-col">
+      <div className="flex-1">
+        <h3
+          className={`text-lg font-bold mb-2 line-clamp-1 ${
+            theme === "dark" ? "text-white" : "text-gray-900"
+          }`}
+        >
+          {property.title}
+        </h3>
+        <p className="flex items-center text-sm mb-3 text-gray-500 dark:text-gray-400">
+          <MapPin size={14}  className={`mr-1 flex-shrink-0  ${
+            theme === "dark" ? "text-white" : " text-gray-600"
+          }`}/>
+          <span  className={`line-clamp-1  ${
+            theme === "dark" ? "text-white" : " text-gray-600"
+          }`}>{property.address}, {property.city}</span>
+        </p>
+      </div>
+
+      {/* Price */}
+      <div className="mb-4">
+        <p className="text-amber-600 font-bold text-xl">
+          {formatCurrency(property.price)}
+        </p>
+        {property.pricePerSqft && (
+          <p className="text-xs text-gray-500 dark:text-gray-400">
+            {formatCurrency(property.pricePerSqft)}/sqft
+          </p>
+        )}
+      </div>
+
+      {/* Features */}
+      <div className="flex justify-between text-sm text-gray-600 dark:text-gray-400 border-t border-gray-200 dark:border-gray-700 pt-4">
+        <div className="flex flex-col items-center">
+          <Bed size={18} className="mb-1 text-amber-600" />
+          <span className={`font-medium  ${
+            theme === "dark" ? "text-white" : "text-gray-600"
+          }`}>{property.beds}</span>
+          <span className={`text-xs ${
+            theme === "dark" ? "text-white" : " text-gray-600"
+          }`}>Beds</span>
         </div>
-        <div className="flex items-center space-x-1">
-          <Bath size={14} />
-          <span>{property.baths} Baths</span>
+        <div className="flex flex-col items-center">
+          <Bath size={18} className="mb-1 text-amber-600" />
+          <span className={`font-medium  ${
+            theme === "dark" ? "text-white" : "text-gray-600"
+          }`}>{property.baths}</span>
+          <span className={`text-xs ${
+            theme === "dark" ? "text-white" : " text-gray-600"
+          }`}>Baths</span>
         </div>
-        <div className="flex items-center space-x-1">
-          <Square size={14} />
-          <span>{property.sqft?.toLocaleString()} Sqft</span>
+        <div className="flex flex-col items-center">
+          <Ruler size={18} className="mb-1 text-amber-600" />
+          <span className={`font-medium  ${
+            theme === "dark" ? "text-white" : "text-gray-600"
+          }`}>{(property.sqft / 1000).toFixed(1)}K</span>
+          <span className={`text-xs ${
+            theme === "dark" ? "text-white" : " text-gray-600"
+          }`}>Sqft</span>
+        </div>
+        <div className="flex flex-col items-center">
+          <Car size={18} className="mb-1 text-amber-600" />
+          <span className={`font-medium  ${
+            theme === "dark" ? "text-white" : "text-gray-600"
+          }`}>{property.garage || 0}</span>
+          <span className={`text-xs ${
+            theme === "dark" ? "text-white" : " text-gray-600"
+          }`}>Garage</span>
         </div>
       </div>
     </div>
   </div>
 );
 
-// Property Card (List View)
+// Property Card (List View) - Improved
 const PropertyListCard = ({
   property,
   theme,
@@ -1010,22 +1061,26 @@ const PropertyListCard = ({
 }) => (
   <div
     onClick={() => onPropertyClick(property)}
-    className={`rounded-xl overflow-hidden transition-all duration-300 hover:shadow-xl cursor-pointer ${
+    className={`group rounded-xl overflow-hidden transition-all duration-300 hover:shadow-2xl cursor-pointer ${
       theme === "dark"
-        ? "bg-gradient-to-br from-[#332500]/80 to-[#1a1200] border border-amber-400/20"
-        : "bg-white border border-gray-100"
+        ? "bg-gradient-to-br from-gray-800/80 to-gray-900 border border-gray-700"
+        : "bg-white border border-gray-200"
     }`}
   >
     <div className="flex flex-col md:flex-row">
-      <div className="relative md:w-64 flex-shrink-0">
-        <img
-          src={property.images[0]}
-          alt={property.title}
-          className="w-full h-48 md:h-full object-cover"
-        />
+      {/* Image Container */}
+      <div className="relative md:w-64 lg:w-72 flex-shrink-0">
+        <div className="h-56 md:h-full">
+          <img
+            src={property.images[0]}
+            alt={property.title}
+            className="w-full h-full object-cover"
+          />
+          <div className="absolute inset-0 bg-gradient-to-r from-black/10 to-transparent md:from-black/5" />
+        </div>
         <div className="absolute top-3 right-3">
           <span
-            className={`px-3 py-1 rounded-full text-xs font-bold text-white shadow-lg ${
+            className={`px-3 py-1.5 rounded-full text-xs font-bold text-white shadow-lg ${
               property.propertyStatus === "for sale"
                 ? "bg-gradient-to-r from-green-500 to-green-600"
                 : "bg-gradient-to-r from-orange-500 to-orange-600"
@@ -1035,78 +1090,125 @@ const PropertyListCard = ({
           </span>
         </div>
       </div>
-      <div className="flex-1 p-4">
-        <div className="flex justify-between items-start mb-3">
-          <div>
-            <div className="flex items-center space-x-2 mb-2">
-              <span
-                className={`px-3 py-1 rounded-full text-xs font-bold text-white shadow-lg ${
-                  property.propertyStatus === "for sale"
-                    ? "bg-gradient-to-r from-green-500 to-green-600"
-                    : "bg-gradient-to-r from-orange-500 to-orange-600"
-                }`}
-              >
-                {property.propertyStatus === "for sale"
-                  ? "FOR SALE"
-                  : "FOR RENT"}
-              </span>
-              <span className="text-xs text-gray-500 flex items-center">
-                <Home size={12} className="mr-1" />
-                {property.propertyType}
-              </span>
+
+      {/* Content Container */}
+      <div className="flex-1 p-5">
+        <div className="flex flex-col h-full">
+          {/* Header */}
+          <div className="flex-1">
+            <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-3">
+              <div>
+                <div className="flex items-center gap-2 mb-2">
+                  <span className={`px-3 py-1 rounded-full text-xs font-medium ${
+                    theme === "dark" ? "bg-gray-700 text-white" : "bg-gray-100 text-gray-800"
+                  }`}>
+                    <Home size={12} className="inline mr-1" />
+                    {property.propertyType}
+                  </span>
+                  <span className="text-xs text-gray-500 flex items-center">
+                    <Star size={12} className="mr-1" fill="currentColor" />
+                    {property.rating || "New"}
+                  </span>
+                </div>
+                <h3
+                  className={`text-xl font-bold ${
+                    theme === "dark" ? "text-white" : "text-gray-900"
+                  }`}
+                >
+                  {property.title}
+                </h3>
+              </div>
+              <div className="text-right">
+                <p className="text-amber-500 font-bold text-2xl">
+                  {formatCurrency(property.price)}
+                </p>
+                {property.pricePerSqft && (
+                  <p className="text-sm text-gray-500 dark:text-gray-400">
+                    {formatCurrency(property.pricePerSqft)}/sqft
+                  </p>
+                )}
+              </div>
             </div>
-            <h3
-              className={`text-lg font-semibold ${
-                theme === "dark" ? "text-white" : "text-gray-900"
+
+            {/* Location */}
+            <p
+              className={`flex items-center text-sm mb-4 ${
+                theme === "dark" ? "text-gray-300" : "text-gray-600"
               }`}
             >
-              {property.title}
-            </h3>
+              <MapPin size={16} className="mr-2 flex-shrink-0" />
+              {property.address}, {property.city}
+            </p>
+
+            {/* Description */}
+            <p
+              className={`text-sm line-clamp-2 mb-4 ${
+                theme === "dark" ? "text-gray-300" : "text-gray-600"
+              }`}
+            >
+              {property.description}
+            </p>
           </div>
-          <p className="text-amber-400 font-bold text-xl">
-            {formatCurrency(property.price)}
-          </p>
-        </div>
-        <p
-          className={`flex items-center text-sm mb-3 ${
-            theme === "dark" ? "text-gray-300" : "text-gray-600"
-          }`}
-        >
-          <MapPin size={14} className="mr-1" />
-          {property.address}, {property.city}
-        </p>
-        <div className="flex items-center space-x-4 text-sm text-gray-600 dark:text-gray-400 mb-3">
-          <div className="flex items-center space-x-1">
-            <Bed size={14} />
-            <span>{property.beds} Beds</span>
+
+          {/* Features & Actions */}
+          <div className="space-y-4">
+            {/* Features */}
+            <div className="grid grid-cols-4 gap-2 text-sm">
+              <div className={`flex items-center justify-center p-2 rounded-lg ${
+                theme === "dark" ? "bg-gray-700/50" : "bg-gray-100"
+              }`}>
+                <Bed size={16} className="mr-2" />
+                <div>
+                  <div className="font-bold">{property.beds}</div>
+                  <div className="text-xs text-gray-500">Beds</div>
+                </div>
+              </div>
+              <div className={`flex items-center justify-center p-2 rounded-lg ${
+                theme === "dark" ? "bg-gray-700/50" : "bg-gray-100"
+              }`}>
+                <Bath size={16} className="mr-2" />
+                <div>
+                  <div className="font-bold">{property.baths}</div>
+                  <div className="text-xs text-gray-500">Baths</div>
+                </div>
+              </div>
+              <div className={`flex items-center justify-center p-2 rounded-lg ${
+                theme === "dark" ? "bg-gray-700/50" : "bg-gray-100"
+              }`}>
+                <Square size={16} className="mr-2" />
+                <div>
+                  <div className="font-bold">{(property.sqft / 1000).toFixed(1)}K</div>
+                  <div className="text-xs text-gray-500">Sqft</div>
+                </div>
+              </div>
+              <div className={`flex items-center justify-center p-2 rounded-lg ${
+                theme === "dark" ? "bg-gray-700/50" : "bg-gray-100"
+              }`}>
+                <Car size={16} className="mr-2" />
+                <div>
+                  <div className="font-bold">{property.garage || 0}</div>
+                  <div className="text-xs text-gray-500">Garage</div>
+                </div>
+              </div>
+            </div>
+
+            {/* Actions */}
+            <div className="flex gap-3">
+              <button className="flex-1 bg-amber-500 hover:bg-amber-600 text-white font-semibold px-4 py-3 rounded-lg transition-colors text-sm">
+                View Details
+              </button>
+              <button className="flex-1 border border-amber-500 text-amber-500 hover:bg-amber-500 hover:text-white font-semibold px-4 py-3 rounded-lg transition-colors text-sm">
+                Contact Agent
+              </button>
+              <button className={`p-3 rounded-lg ${
+                theme === "dark" 
+                  ? "bg-gray-700 hover:bg-gray-600 text-white" 
+                  : "bg-gray-100 hover:bg-gray-200 text-gray-700"
+              }`}>
+                <Heart size={18} />
+              </button>
+            </div>
           </div>
-          <div className="flex items-center space-x-1">
-            <Bath size={14} />
-            <span>{property.baths} Baths</span>
-          </div>
-          <div className="flex items-center space-x-1">
-            <Square size={14} />
-            <span>{property.sqft?.toLocaleString()} Sqft</span>
-          </div>
-          <div className="flex items-center space-x-1">
-            <Car size={14} />
-            <span>{property.garage || 0} Garage</span>
-          </div>
-        </div>
-        <p
-          className={`text-sm line-clamp-2 mb-3 ${
-            theme === "dark" ? "text-gray-300" : "text-gray-600"
-          }`}
-        >
-          {property.description}
-        </p>
-        <div className="flex space-x-3">
-          <button className="bg-amber-400 hover:bg-amber-500 text-black font-semibold px-4 py-2 rounded-lg transition-colors text-sm">
-            View Details
-          </button>
-          <button className="border border-amber-400 text-amber-400 hover:bg-amber-400 hover:text-white font-semibold px-4 py-2 rounded-lg transition-colors text-sm">
-            Contact Agent
-          </button>
         </div>
       </div>
     </div>

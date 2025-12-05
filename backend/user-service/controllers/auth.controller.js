@@ -30,7 +30,6 @@ let EmailService = FallbackEmailService;
 const initializeEmailService = async () => {
   if (EmailService === FallbackEmailService) {
     try {
-      // Use dynamic import for ES modules
       const emailModule = await import(
         "../../communication-service/utils/emailService.js"
       );
@@ -46,11 +45,41 @@ const initializeEmailService = async () => {
   }
 };
 
+// Helper to get broker_type from broker_profiles
+async function getBrokerType(userId) {
+  try {
+    const [brokerProfiles] = await db.query(
+      "SELECT broker_type FROM broker_profiles WHERE user_id = ?",
+      [userId]
+    );
+    return brokerProfiles.length > 0 ? brokerProfiles[0].broker_type : null;
+  } catch (error) {
+    console.error("Error getting broker type:", error);
+    return null;
+  }
+}
+
+// Helper to check if user is internal employee (uses broker_type from broker_profiles)
+async function isInternalEmployee(userId, role) {
+  if (!["admin", "support_admin", "support_lead", "support_agent", "broker"].includes(role)) {
+    return false;
+  }
+
+  // For brokers, check broker_type from broker_profiles
+  if (role === "broker") {
+    const brokerType = await getBrokerType(userId);
+    return brokerType === "internal";
+  }
+
+  // For other internal roles, they're always internal
+  return true;
+}
+
 export const signup = async (req, res) => {
   const { firstName, lastName, username, email, password, role, broker_type } =
     req.body;
 
-  console.log("Received signup data:", {
+  console.log("📝 Received signup data:", {
     firstName,
     lastName,
     username,
@@ -60,11 +89,10 @@ export const signup = async (req, res) => {
   });
 
   try {
-    // 1. Validation and Checks
     await initializeEmailService();
 
     if (!firstName || !lastName || !username || !email || !password || !role) {
-      console.log("Missing fields:", {
+      console.log("❌ Missing fields:", {
         firstName,
         lastName,
         username,
@@ -75,88 +103,135 @@ export const signup = async (req, res) => {
     }
 
     if (password.length < 8)
-      return res.status(400).json({ message: "Password must be 8+ chars" });
+      return res.status(400).json({ message: "Password must be at least 8 characters long" });
 
-    // Check if user already exists (even unverified ones)
     const existingUser = await User.findByEmail(email);
     if (existingUser)
       return res.status(400).json({ message: "Email already exists" });
 
-    let allowedRoles = ["user", "broker", "seller", "buyer", "renter"];
+    // Map frontend role names to backend database role names
+    const roleMapping = {
+      // Client roles (for self-registration)
+      "broker": "external_broker",      // Frontend "broker" = backend "external_broker"
+      "external_broker": "external_broker", // Direct mapping if frontend uses this
+      "seller": "seller",
+      "buyer": "buyer",
+      "landlord": "landlord",           // Changed from "leaser" to "landlord"
+      "renter": "renter",
+      "user": "user"
+    };
+
+    // Admin-only roles (not available for self-registration)
+    const adminOnlyRoles = [
+      "super_admin", "admin", "support_admin",
+      "support_lead", "support_agent", "internal_broker"
+    ];
+
+    let finalRole = roleMapping[role];
     let finalBrokerType = null;
 
-    // Enhanced role permissions
+    console.log("🔍 Role mapping:", { frontendRole: role, backendRole: finalRole });
+
+    // If role not found in mapping and we're not an admin creating users
+    if (!finalRole && !req.user) {
+      return res.status(400).json({
+        message: "Invalid role selected. Please choose a valid account type."
+      });
+    }
+
+    // For admin-created users, allow any valid role
     if (req.user) {
-      if (req.user.role === "admin" || req.user.role === "super_admin") {
-        allowedRoles = allowedRoles.concat([
-          "admin",
-          "support_agent",
-          "support_lead",
-        ]);
-      }
-      if (
-        req.user.role === "support_admin" ||
-        req.user.role === "super_admin"
-      ) {
-        allowedRoles = allowedRoles.concat(["support_admin"]);
+      // Check if admin is allowed to create this role
+      const isAdminOrSuperAdmin = ["admin", "super_admin"].includes(req.user.role);
+      const isSupportAdmin = req.user.role === "support_admin";
+
+      if (isAdminOrSuperAdmin) {
+        // Admin/Super admin can create any role
+        finalRole = role; // Use the role directly
+      } else if (isSupportAdmin) {
+        // Support admin can only create support roles
+        const allowedSupportRoles = ["support_agent", "support_lead"];
+        if (allowedSupportRoles.includes(role)) {
+          finalRole = role;
+        } else {
+          return res.status(403).json({
+            message: "You are not authorized to create this role type."
+          });
+        }
+      } else {
+        return res.status(403).json({
+          message: "You are not authorized to create users."
+        });
       }
     }
 
-    // 🚨 FIXED: Proper broker type handling
-    if (role === "broker") {
-      // For public signup (no req.user), default to 'external'
+    // Handle broker type logic
+    if (finalRole === "external_broker" || finalRole === "internal_broker") {
       if (!req.user) {
+        // Self-registration: always external broker
         finalBrokerType = "external";
-      } 
-      // For admin creation, validate the provided broker_type
-      else {
+        finalRole = "external_broker"; // Ensure correct role
+      } else {
+        // Admin creating broker
         if (!broker_type || !["internal", "external"].includes(broker_type)) {
-          return res
-            .status(400)
-            .json({
-              message: "Invalid broker type. Must be 'internal' or 'external'",
-            });
+          return res.status(400).json({
+            message: "Invalid broker type. Must be 'internal' or 'external'",
+          });
         }
         finalBrokerType = broker_type;
+        finalRole = broker_type === "internal" ? "internal_broker" : "external_broker";
+      }
+    } else if (finalRole === "broker") {
+      // Handle legacy "broker" role name
+      if (!req.user) {
+        finalBrokerType = "external";
+        finalRole = "external_broker";
+      } else {
+        if (!broker_type || !["internal", "external"].includes(broker_type)) {
+          return res.status(400).json({
+            message: "Invalid broker type. Must be 'internal' or 'external'",
+          });
+        }
+        finalBrokerType = broker_type;
+        finalRole = broker_type === "internal" ? "internal_broker" : "external_broker";
       }
     }
 
-    if (!allowedRoles.includes(role)) {
-      return res.status(403).json({ message: "Invalid role for registration" });
-    }
+    console.log("✅ Final role after processing:", finalRole);
+    console.log("✅ Final broker type:", finalBrokerType);
 
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // 🚨 CRITICAL CHANGE: For public signup, don't create user in DB yet
     if (!req.user) {
-      // 1. Prepare Verification Token
+      // SELF-REGISTRATION (Public signup)
+      console.log("👤 Processing self-registration...");
+
       const emailVerificationToken = crypto.randomBytes(32).toString("hex");
-      const expiryDate = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+      const expiryDate = new Date(Date.now() + 24 * 60 * 60 * 1000);
       const emailVerificationExpires = expiryDate
         .toISOString()
         .slice(0, 19)
         .replace("T", " ");
 
-      // 2. Create a temporary pending registration record instead of actual user
       await createPendingRegistration(
         firstName,
         lastName,
         username,
         email,
         hashedPassword,
-        role,
+        finalRole, // Use the mapped role
         finalBrokerType,
         emailVerificationToken,
         emailVerificationExpires
       );
 
-      // 3. Send verification email
       await EmailService.sendVerificationEmail(
         { email, fullName: `${firstName} ${lastName}` },
         emailVerificationToken
       );
 
-      // 4. Final Response for Public Signup
+      console.log("✅ Self-registration initiated for:", email);
+
       return res.status(201).json({
         success: true,
         message:
@@ -164,28 +239,48 @@ export const signup = async (req, res) => {
         requiresVerification: true,
       });
     } else {
-      // --- ADMIN CREATION LOGIC (No changes needed, auto-verified) ---
+      // ADMIN CREATING USER
+      console.log("👔 Admin creating user...");
+
       const isEmailVerified = 1;
 
-      // Create user immediately for admin-created users
+      // Create user WITHOUT broker_type in users table
       const newUserResult = await User.create(
         firstName,
         lastName,
         username,
         email,
         hashedPassword,
-        role,
-        finalBrokerType,
+        finalRole, // Use the final role
+        null, // Don't pass broker_type to users table
         isEmailVerified,
-        null, // No token needed for admin-created, verified user
-        null // No expiry needed for admin-created, verified user
+        null,
+        null
       );
       const newUserId = newUserResult.insertId;
 
+      // If user is a broker, create broker profile
+      if ((finalRole === "external_broker" || finalRole === "internal_broker") && finalBrokerType) {
+        await db.query(
+          `INSERT INTO broker_profiles (user_id, broker_type, created_at) 
+           VALUES (?, ?, NOW())`,
+          [newUserId, finalBrokerType]
+        );
+        console.log("✅ Broker profile created:", { userId: newUserId, brokerType: finalBrokerType });
+      }
+
       const createdUser = await User.findById(newUserId);
 
-      // Admin created user response:
-      generateToken(createdUser, res);
+      // Generate token WITHOUT broker_type
+      generateToken({
+        id: createdUser.id,
+        username: createdUser.username,
+        role: createdUser.role,
+        privilege_tier: createdUser.privilege_tier || 'basic'
+      }, res);
+
+      console.log("✅ User created successfully:", createdUser.username);
+
       return res.status(201).json({
         ...createdUser,
         password: undefined,
@@ -194,24 +289,22 @@ export const signup = async (req, res) => {
       });
     }
   } catch (error) {
-    // This catch block handles:
-    // 1. Database errors
-    // 2. Validation errors
-    // 3. EmailService errors
-    console.error("signup error details:", error);
-    
-    // If email fails, delete any pending registration that might have been created
+    console.error("❌ signup error details:", error);
+    console.error("❌ Error stack:", error.stack);
+
     if (!req.user) {
       try {
         await deletePendingRegistration(email);
+        console.log("✅ Cleaned up pending registration for:", email);
       } catch (deleteError) {
-        console.error("Error cleaning up pending registration:", deleteError);
+        console.error("❌ Error cleaning up pending registration:", deleteError);
       }
     }
-    
-    res
-      .status(500)
-      .json({ message: "Internal Server Error", details: error.message });
+
+    res.status(500).json({
+      message: "Internal Server Error",
+      details: error.message
+    });
   }
 };
 
@@ -220,11 +313,20 @@ export const login = async (req, res) => {
   const ip = req.ip || req.connection.remoteAddress;
   const userAgent = req.get("User-Agent");
 
+  console.log("🔍 LOGIN ATTEMPT:", { username, ip, userAgent });
+
   try {
-    // Initialize email service if needed
     await initializeEmailService();
 
     const user = await User.findByUsername(username);
+    console.log("🔍 User found:", user ? {
+      id: user.id,
+      username: user.username,
+      role: user.role,
+      is_email_verified: user.is_email_verified,
+      verified: user.verified
+    } : "NOT FOUND");
+
     if (!user) {
       await logFailedLoginAttempt(
         null,
@@ -236,17 +338,19 @@ export const login = async (req, res) => {
       return res.status(400).json({ message: "Invalid credentials" });
     }
 
-    // Check if account is locked
+    console.log("🔍 Checking account lock status...");
     const isLocked = await User.isAccountLocked(user.id);
     if (isLocked) {
+      console.log("🔍 Account is locked for user:", user.id);
       return res.status(423).json({
         message:
           "Account temporarily locked due to too many failed attempts. Try again in 30 minutes.",
       });
     }
 
-    // Check email verification (STRICTER VERSION)
+    console.log("🔍 Checking email verification...");
     if (!user.is_email_verified && !user.verified) {
+      console.log("🔍 User email not verified");
       return res.status(403).json({
         message:
           "Please verify your email before logging in. Check your inbox for the verification link.",
@@ -255,11 +359,13 @@ export const login = async (req, res) => {
       });
     }
 
-    // Check password
+    console.log("🔍 Comparing passwords...");
     const isValid = await bcrypt.compare(password, user.password);
+    console.log("🔍 Password valid?", isValid);
+
     if (!isValid) {
-      // Handle failed login attempt
       const { locked } = await User.handleFailedLogin(user.id);
+      console.log("🔍 Password invalid, locked?", locked);
 
       await logFailedLoginAttempt(
         user.id,
@@ -270,7 +376,6 @@ export const login = async (req, res) => {
       );
 
       if (locked) {
-        // Send security alert for account lock
         try {
           await EmailService.sendSecurityAlert({
             type: "Account Locked Due to Failed Login Attempts",
@@ -289,31 +394,29 @@ export const login = async (req, res) => {
       return res.status(400).json({ message: "Invalid credentials" });
     }
 
-    // Reset login attempts on successful login
     await User.resetLoginAttempts(user.id);
+    console.log("🔍 Login attempts reset");
 
-    // Check if password change is required for internal employees
-    const internalRoles = [
-      "admin",
-      "support_admin",
-      "support_lead",
-      "support_agent",
-      "broker",
-    ];
-    const isInternalEmployee =
-      internalRoles.includes(user.role) && user.broker_type !== "external";
+    // Check if password change is required - get broker_type from broker_profiles
+    console.log("🔍 Checking if internal employee...");
+    console.log("🔍 User role:", user.role);
+    console.log("🔍 User ID:", user.id);
 
-    if (isInternalEmployee && user.password_change_required) {
+    const internal = await isInternalEmployee(user.id, user.role);
+    console.log("🔍 Is internal employee?", internal);
+    console.log("🔍 Password change required?", user.password_change_required);
+
+    if (internal && user.password_change_required) {
+      console.log("🔍 Password change required for internal employee");
       const tempToken = generateToken(
         {
           userId: user.id,
           requiresPasswordChange: true,
         },
         res,
-        "1h" // 1 hour expiry for password change
+        "1h"
       );
 
-      // Send password change required email
       try {
         await EmailService.sendPasswordChangeRequired({
           email: user.email,
@@ -331,17 +434,23 @@ export const login = async (req, res) => {
       });
     }
 
-    // Generate regular token for successful login - FIXED: Don't pass the entire user object
+    console.log("🔍 Generating token...");
+    // Generate token WITHOUT broker_type
     const token = generateToken({
       id: user.id,
       username: user.username,
       role: user.role,
-      broker_type: user.broker_type,
       privilege_tier: user.privilege_tier
     }, res);
 
-    // Update last login time
+    // Get broker_type separately if needed
+    const brokerType = await getBrokerType(user.id);
+    console.log("🔍 Broker type:", brokerType);
+
     await User.updateLastLogin(user.id);
+    console.log("🔍 Last login updated");
+
+    console.log("🔍 LOGIN SUCCESSFUL for user:", user.username);
 
     res.json({
       success: true,
@@ -354,22 +463,20 @@ export const login = async (req, res) => {
         username: user.username,
         email: user.email,
         role: user.role,
-        broker_type: user.broker_type,
+        broker_type: brokerType, // From broker_profiles
         profile_picture: user.profile_picture,
         is_email_verified: user.is_email_verified || user.verified,
         privilege_tier: user.privilege_tier,
-        // Add privilege info separately to avoid circular dependency
         privileges: await getPrivilegeInfo(user)
       },
     });
   } catch (error) {
-    console.error("login error:", error.message);
-    console.error("login error stack:", error.stack);
+    console.error("❌ login error:", error.message);
+    console.error("❌ login error stack:", error.stack);
     res.status(500).json({ message: "Internal Server Error" });
   }
 };
-
-// Helper function to get privilege info without circular dependency
+// Helper function to get privilege info
 async function getPrivilegeInfo(user) {
   try {
     const privilegeService = await import('../services/privilege.service.js');
@@ -384,7 +491,6 @@ async function getPrivilegeInfo(user) {
   }
 }
 
-// NEW: Updated Email verification endpoint
 export const verifyEmail = async (req, res) => {
   try {
     const { token } = req.query;
@@ -396,7 +502,6 @@ export const verifyEmail = async (req, res) => {
       });
     }
 
-    // 🚨 CRITICAL CHANGE: Find in pending registrations instead of users
     const pendingRegistration = await getPendingRegistrationByToken(token);
     if (!pendingRegistration) {
       return res.status(400).json({
@@ -405,7 +510,7 @@ export const verifyEmail = async (req, res) => {
       });
     }
 
-    // 🚨 CRITICAL CHANGE: Create the actual user account now
+    // Create user WITHOUT broker_type
     const newUserResult = await User.create(
       pendingRegistration.first_name,
       pendingRegistration.last_name,
@@ -413,18 +518,27 @@ export const verifyEmail = async (req, res) => {
       pendingRegistration.email,
       pendingRegistration.password,
       pendingRegistration.role,
-      pendingRegistration.broker_type,
-      1, // is_email_verified = 1 (verified)
-      null, // Clear token
-      null  // Clear expiry
+      null, // Don't pass broker_type
+      1,
+      null,
+      null
     );
 
-    // Delete the pending registration
+    // If user is a broker, create broker profile
+    if (pendingRegistration.role === "broker" && pendingRegistration.broker_type) {
+      await db.query(
+        `INSERT INTO broker_profiles (user_id, broker_type, created_at) 
+         VALUES (?, ?, NOW())`,
+        [newUserResult.insertId, pendingRegistration.broker_type]
+      );
+    }
+
     await deletePendingRegistration(pendingRegistration.email);
 
-    // Generate session token and log the user in automatically
     const newUser = await User.findById(newUserResult.insertId);
     const authToken = generateToken(newUser, res);
+
+    const brokerType = await getBrokerType(newUser.id);
 
     res.json({
       success: true,
@@ -439,7 +553,7 @@ export const verifyEmail = async (req, res) => {
         username: newUser.username,
         email: newUser.email,
         role: newUser.role,
-        broker_type: newUser.broker_type,
+        broker_type: brokerType,
         profile_picture: newUser.profile_picture,
         is_email_verified: true,
       },
@@ -453,7 +567,6 @@ export const verifyEmail = async (req, res) => {
   }
 };
 
-// NEW: Updated Web verification endpoint
 export const verifyEmailWeb = async (req, res) => {
   try {
     const { token } = req.query;
@@ -464,7 +577,6 @@ export const verifyEmailWeb = async (req, res) => {
       );
     }
 
-    // 🚨 CRITICAL CHANGE: Find in pending registrations instead of users
     const pendingRegistration = await getPendingRegistrationByToken(token);
     if (!pendingRegistration) {
       return res.redirect(
@@ -472,7 +584,6 @@ export const verifyEmailWeb = async (req, res) => {
       );
     }
 
-    // 🚨 CRITICAL CHANGE: Create the actual user account now
     const newUserResult = await User.create(
       pendingRegistration.first_name,
       pendingRegistration.last_name,
@@ -480,20 +591,25 @@ export const verifyEmailWeb = async (req, res) => {
       pendingRegistration.email,
       pendingRegistration.password,
       pendingRegistration.role,
-      pendingRegistration.broker_type,
-      1, // is_email_verified = 1 (verified)
-      null, // Clear token
-      null  // Clear expiry
+      null,
+      1,
+      null,
+      null
     );
 
-    // Delete the pending registration
+    if (pendingRegistration.role === "broker" && pendingRegistration.broker_type) {
+      await db.query(
+        `INSERT INTO broker_profiles (user_id, broker_type, created_at) 
+         VALUES (?, ?, NOW())`,
+        [newUserResult.insertId, pendingRegistration.broker_type]
+      );
+    }
+
     await deletePendingRegistration(pendingRegistration.email);
 
-    // Generate session token
     const newUser = await User.findById(newUserResult.insertId);
     generateToken(newUser, res);
 
-    // Redirect to success page or dashboard
     return res.redirect(`${process.env.CLIENT_URL}/dashboard?verified=true`);
   } catch (error) {
     console.error("Email verification error:", error);
@@ -503,7 +619,6 @@ export const verifyEmailWeb = async (req, res) => {
   }
 };
 
-// NEW: Change required password for employees
 export const changeRequiredPassword = async (req, res) => {
   try {
     const { newPassword, confirmPassword } = req.body;
@@ -530,10 +645,7 @@ export const changeRequiredPassword = async (req, res) => {
       });
     }
 
-    // Hash new password
     const hashedPassword = await bcrypt.hash(newPassword, 12);
-
-    // Update password and reset security flags
     await User.updatePassword(userId, hashedPassword);
 
     res.json({
@@ -550,7 +662,6 @@ export const changeRequiredPassword = async (req, res) => {
   }
 };
 
-// NEW: Resend verification email
 export const resendVerificationEmail = async (req, res) => {
   try {
     const { email } = req.body;
@@ -562,7 +673,6 @@ export const resendVerificationEmail = async (req, res) => {
       });
     }
 
-    // Initialize email service if needed
     await initializeEmailService();
 
     const user = await User.findByEmail(email);
@@ -580,9 +690,8 @@ export const resendVerificationEmail = async (req, res) => {
       });
     }
 
-    // Generate new verification token
     const emailVerificationToken = crypto.randomBytes(32).toString("hex");
-    const expiryDate = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+    const expiryDate = new Date(Date.now() + 24 * 60 * 60 * 1000);
     const emailVerificationExpires = expiryDate
       .toISOString()
       .slice(0, 19)
@@ -594,7 +703,6 @@ export const resendVerificationEmail = async (req, res) => {
       emailVerificationExpires
     );
 
-    // Send verification email
     try {
       await EmailService.sendVerificationEmail(
         { email: user.email, fullName: `${user.first_name} ${user.last_name}` },
@@ -621,7 +729,6 @@ export const resendVerificationEmail = async (req, res) => {
   }
 };
 
-// Helper function to log security events
 async function logFailedLoginAttempt(
   userId,
   identifier,
@@ -649,11 +756,24 @@ async function logFailedLoginAttempt(
   }
 }
 
-// Keep all your existing functions below (they should work as-is)
 export const logout = (req, res) => {
   try {
-    res.cookie("jwt", "", { maxAge: 0 });
-    res.status(200).json({ message: "Logged out successfully" });
+    // Clear JWT cookie with explicit settings
+    res.clearCookie('jwt', {
+      httpOnly: true,
+      sameSite: 'strict',
+      secure: process.env.NODE_ENV !== 'development'
+    });
+
+    // Also clear any other auth cookies that might exist
+    res.clearCookie('token');
+    res.clearCookie('auth_token');
+
+    res.status(200).json({
+      success: true,
+      message: "Logged out successfully",
+      redirect: true  // Signal frontend to redirect
+    });
   } catch (error) {
     console.error("logout error:", error.message);
     res.status(500).json({ message: "Internal Server Error" });
@@ -732,7 +852,14 @@ export const updateUsername = async (req, res) => {
 
 export const checkAuth = async (req, res) => {
   try {
-    res.status(200).json({ ...req.user, password: undefined });
+    // Get broker_type separately
+    const brokerType = await getBrokerType(req.user.id);
+    const userWithBrokerType = {
+      ...req.user,
+      broker_type: brokerType,
+      password: undefined
+    };
+    res.status(200).json(userWithBrokerType);
   } catch (err) {
     console.error("checkAuth error:", err.message);
     res.status(500).json({ message: "Internal Server Error" });
@@ -743,14 +870,12 @@ export const updateRole = async (req, res) => {
   try {
     const { userId, newRole, broker_type } = req.body;
 
-    // Validate input
     if (!userId || !newRole) {
       return res
         .status(400)
         .json({ message: "User ID and new role are required" });
     }
 
-    // Validate role
     const validRoles = [
       "user",
       "broker",
@@ -770,7 +895,6 @@ export const updateRole = async (req, res) => {
         });
     }
 
-    // Restrict admin and support roles to admin users only
     if (
       ["admin", "support_agent", "support_lead", "support_admin"].includes(
         newRole
@@ -791,17 +915,24 @@ export const updateRole = async (req, res) => {
       }
     }
 
-    // Update role and broker_type in database
     const [result] = await db.query(
-      "UPDATE users SET role = ?, broker_type = ? WHERE id = ?",
-      [newRole, setBrokerType, userId]
+      "UPDATE users SET role = ? WHERE id = ?",
+      [newRole, userId]
     );
 
     if (result.affectedRows > 0) {
+      if (newRole === "broker" && setBrokerType) {
+        await db.query(
+          `INSERT INTO broker_profiles (user_id, broker_type, created_at) 
+           VALUES (?, ?, NOW()) 
+           ON DUPLICATE KEY UPDATE broker_type = ?`,
+          [userId, setBrokerType, setBrokerType]
+        );
+      }
+
       const updatedUser = await User.findById(userId);
       console.log(
-        `✅ Role updated for user ${userId} to ${newRole}${
-          setBrokerType ? ` (broker_type: ${setBrokerType})` : ""
+        `✅ Role updated for user ${userId} to ${newRole}${setBrokerType ? ` (broker_type: ${setBrokerType})` : ""
         }`
       );
       res.status(200).json({
@@ -820,29 +951,94 @@ export const updateRole = async (req, res) => {
 };
 
 export const uploadProfilePicture = async (req, res) => {
+  console.log("📤 =========== UPLOAD START ===========");
+  console.log("📤 Request user ID:", req.user?.id);
+  console.log("📤 Request user:", req.user?.username);
+  console.log("📤 Content-Type:", req.headers['content-type']);
+  console.log("📤 Request has files:", !!req.files);
+
   try {
-    console.log("📤 Upload profile picture request received");
-    console.log("📤 Request files:", req.files);
-
+    // Check if middleware parsed the file
     if (!req.files || !req.files.profilePicture) {
-      return res.status(400).json({ message: "No file uploaded" });
+      console.log("❌ No files received by middleware");
+      console.log("❌ Available files:", req.files ? Object.keys(req.files) : 'none');
+      console.log("❌ Request body keys:", Object.keys(req.body || {}));
+
+      return res.status(400).json({
+        success: false,
+        message: "No file uploaded. Please select an image file.",
+        error: "FILE_NOT_RECEIVED"
+      });
     }
+
     const profilePicture = req.files.profilePicture;
+    console.log("✅ File received successfully:", {
+      name: profilePicture.name,
+      size: profilePicture.size,
+      mimetype: profilePicture.mimetype,
+      encoding: profilePicture.encoding,
+      md5: profilePicture.md5
+    });
 
+    // Validate file type
+    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml'];
     if (!profilePicture.mimetype.startsWith("image/")) {
-      return res.status(400).json({ message: "Please upload an image file" });
+      console.log("❌ Not an image file:", profilePicture.mimetype);
+      return res.status(400).json({
+        success: false,
+        message: "Please upload an image file (JPEG, PNG, GIF, WebP, SVG)",
+        error: "INVALID_FILE_TYPE",
+        receivedType: profilePicture.mimetype
+      });
     }
 
-    if (profilePicture.size > 5 * 1024 * 1024) {
-      return res
-        .status(400)
-        .json({ message: "File size should be less than 5MB" });
+    // Validate specific image types
+    if (!allowedTypes.includes(profilePicture.mimetype.toLowerCase())) {
+      console.log("❌ Unsupported image type:", profilePicture.mimetype);
+      return res.status(400).json({
+        success: false,
+        message: "Unsupported image format. Use JPEG, PNG, GIF, WebP, or SVG.",
+        error: "UNSUPPORTED_FORMAT",
+        receivedType: profilePicture.mimetype
+      });
     }
 
+    // Validate file size (10MB max)
+    const maxSize = 10 * 1024 * 1024; // 10MB
+    if (profilePicture.size > maxSize) {
+      console.log("❌ File too large:", profilePicture.size, "bytes");
+      return res.status(400).json({
+        success: false,
+        message: "File size should be less than 10MB",
+        error: "FILE_TOO_LARGE",
+        receivedSize: profilePicture.size,
+        maxSize: maxSize
+      });
+    }
+
+    if (profilePicture.size === 0) {
+      console.log("❌ File is empty (0 bytes)");
+      return res.status(400).json({
+        success: false,
+        message: "File is empty",
+        error: "EMPTY_FILE"
+      });
+    }
+
+    // Generate unique filename
     const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
-    const fileExtension = profilePicture.name.split(".").pop();
-    const fileName = `profile-${req.user.id}-${uniqueSuffix}.${fileExtension}`;
+    const fileExtension = path.extname(profilePicture.name) ||
+      (profilePicture.mimetype === 'image/jpeg' ? '.jpg' :
+        profilePicture.mimetype === 'image/png' ? '.png' :
+          profilePicture.mimetype === 'image/gif' ? '.gif' :
+            profilePicture.mimetype === 'image/webp' ? '.webp' : '.jpg');
 
+    const safeFileName = profilePicture.name.replace(/[^a-zA-Z0-9.-]/g, '_');
+    const fileName = `profile-${req.user.id}-${uniqueSuffix}${fileExtension}`;
+
+    console.log("📤 Generated filename:", fileName);
+
+    // Define upload path
     const uploadPath = path.join(
       process.cwd(),
       "Uploads",
@@ -850,39 +1046,121 @@ export const uploadProfilePicture = async (req, res) => {
       fileName
     );
 
+    // Create directory if it doesn't exist
     const uploadDir = path.dirname(uploadPath);
     if (!fs.existsSync(uploadDir)) {
+      console.log("📁 Creating upload directory:", uploadDir);
       fs.mkdirSync(uploadDir, { recursive: true });
+      console.log("✅ Upload directory created");
     }
 
-    await profilePicture.mv(uploadPath);
+    // Save file using mv() method
+    console.log("📤 Saving file to:", uploadPath);
 
-    if (!fs.existsSync(uploadPath)) {
-      throw new Error("File was not created successfully");
-    }
-
-    const profilePictureUrl = `http://localhost:5000/Uploads/profile-pictures/${fileName}`;
-
-    const [result] = await db.query(
-      "UPDATE users SET profile_picture = ? WHERE id = ?",
-      [profilePictureUrl, req.user.id]
-    );
-
-    if (result.affectedRows > 0) {
-      const updatedUser = await User.findById(req.user.id);
-      res.status(200).json({
-        message: "Profile picture updated successfully",
-        profilePictureUrl,
-        user: { ...updatedUser, password: undefined },
+    try {
+      await profilePicture.mv(uploadPath);
+      console.log("✅ File saved successfully");
+    } catch (mvError) {
+      console.error("❌ File move error:", mvError.message);
+      console.error("❌ Move error stack:", mvError.stack);
+      return res.status(500).json({
+        success: false,
+        message: "Failed to save file",
+        error: "FILE_SAVE_ERROR",
+        details: mvError.message
       });
-    } else {
-      res.status(400).json({ message: "Failed to update profile picture" });
     }
+
+    // Verify file was created
+    if (!fs.existsSync(uploadPath)) {
+      console.error("❌ File was not created at:", uploadPath);
+      return res.status(500).json({
+        success: false,
+        message: "File was not saved properly",
+        error: "FILE_NOT_CREATED"
+      });
+    }
+
+    // Get file stats to confirm
+    const stats = fs.statSync(uploadPath);
+    console.log("✅ File verified:", {
+      size: stats.size,
+      created: stats.birthtime,
+      path: uploadPath
+    });
+
+    // Create URL (use relative path)
+    const profilePictureUrl = `/Uploads/profile-pictures/${fileName}`;
+    const fullUrl = `http://localhost:5000${profilePictureUrl}`;
+    console.log("✅ File URL:", profilePictureUrl);
+    console.log("✅ Full URL:", fullUrl);
+
+    // Update database
+    console.log("📤 Updating database for user:", req.user.id);
+
+    try {
+      const [result] = await db.query(
+        "UPDATE users SET profile_picture = ? WHERE id = ?",
+        [profilePictureUrl, req.user.id]
+      );
+
+      console.log("📤 Database result:", {
+        affectedRows: result.affectedRows,
+        changedRows: result.changedRows
+      });
+
+      if (result.affectedRows > 0) {
+        // Get updated user
+        const [updatedUser] = await db.query(
+          `SELECT id, first_name, last_name, username, email, role, 
+                  profile_picture, created_at, status, verified 
+           FROM users WHERE id = ?`,
+          [req.user.id]
+        );
+
+        console.log("✅ Database updated successfully");
+        console.log("✅ Updated user profile picture:", updatedUser[0]?.profile_picture);
+
+        // SUCCESS RESPONSE
+        return res.status(200).json({
+          success: true,
+          message: "Profile picture updated successfully",
+          profilePictureUrl: profilePictureUrl,
+          fullUrl: fullUrl,
+          user: updatedUser[0]
+        });
+
+      } else {
+        console.log("❌ Database update failed - no rows affected");
+        return res.status(400).json({
+          success: false,
+          message: "Failed to update profile picture in database",
+          error: "DATABASE_UPDATE_FAILED"
+        });
+      }
+    } catch (dbError) {
+      console.error("❌ Database error:", dbError.message);
+      console.error("❌ Database error stack:", dbError.stack);
+      return res.status(500).json({
+        success: false,
+        message: "Database error while updating profile",
+        error: "DATABASE_ERROR",
+        details: dbError.message
+      });
+    }
+
   } catch (error) {
-    console.error("uploadProfilePicture error:", error.message);
-    res
-      .status(500)
-      .json({ message: "Internal Server Error", error: error.message });
+    console.error("❌ uploadProfilePicture CRITICAL error:", error.message);
+    console.error("❌ Error stack:", error.stack);
+
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error during upload",
+      error: "INTERNAL_ERROR",
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  } finally {
+    console.log("📤 =========== UPLOAD END ===========");
   }
 };
 
@@ -911,8 +1189,7 @@ export const adminCreateUser = async (req, res) => {
     if (existingUser)
       return res.status(400).json({ message: "Email already exists" });
 
-    // Define client roles vs employee roles
-    const clientRoles = ["user", "buyer", "seller", "renter", "broker"]; // brokers can be external (clients)
+    const clientRoles = ["user", "buyer", "seller", "renter", "broker"];
     const employeeRoles = [
       "admin",
       "support_agent",
@@ -922,7 +1199,6 @@ export const adminCreateUser = async (req, res) => {
 
     let finalBrokerType = null;
 
-    // Handle broker type
     if (role === "broker") {
       if (!broker_type || !["internal", "external"].includes(broker_type)) {
         return res
@@ -933,11 +1209,9 @@ export const adminCreateUser = async (req, res) => {
       }
       finalBrokerType = broker_type;
 
-      // If creating an internal broker, it's an employee role
       if (broker_type === "internal") {
-        // No warning for internal brokers (employees)
+        // No warning for internal brokers
       } else {
-        // External brokers are clients - show warning
         return res.status(200).json({
           warning: true,
           message:
@@ -948,7 +1222,6 @@ export const adminCreateUser = async (req, res) => {
       }
     }
 
-    // Check if it's a client role and show warning
     if (clientRoles.includes(role) && role !== "broker") {
       return res.status(200).json({
         warning: true,
@@ -958,10 +1231,9 @@ export const adminCreateUser = async (req, res) => {
       });
     }
 
-    // If employee role or confirmed client creation, proceed
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Call the updated User.create with full parameters, setting verified to 1 and token/expiry to null.
+    // Create user WITHOUT broker_type
     const newUserResult = await User.create(
       firstName,
       lastName,
@@ -969,17 +1241,24 @@ export const adminCreateUser = async (req, res) => {
       email,
       hashedPassword,
       role,
-      finalBrokerType,
-      1, // is_email_verified = 1 (Auto-verify)
+      null, // Don't pass broker_type
+      1,
       null,
       null
     );
     const newUserId = newUserResult.insertId;
 
-    // Auto-verify admin-created users by setting email verification
     await User.verifyEmail(newUserId);
 
-    // For internal employees, require password change on first login
+    // If user is a broker, create broker profile
+    if (role === "broker" && finalBrokerType) {
+      await db.query(
+        `INSERT INTO broker_profiles (user_id, broker_type, created_at) 
+         VALUES (?, ?, NOW())`,
+        [newUserId, finalBrokerType]
+      );
+    }
+
     if (
       employeeRoles.includes(role) ||
       (role === "broker" && finalBrokerType === "internal")
@@ -1016,8 +1295,6 @@ async function createPendingRegistration(
   emailVerificationExpires
 ) {
   try {
-    // Create a pending_registrations table or use a temporary storage
-    // For now, we'll store in a separate table
     await db.query(
       `INSERT INTO pending_registrations 
        (first_name, last_name, username, email, password, role, broker_type, 
@@ -1042,7 +1319,6 @@ async function createPendingRegistration(
   }
 }
 
-// Helper function to delete pending registration
 async function deletePendingRegistration(email) {
   try {
     await db.query("DELETE FROM pending_registrations WHERE email = ?", [email]);
@@ -1052,7 +1328,6 @@ async function deletePendingRegistration(email) {
   }
 }
 
-// Helper function to get pending registration by token
 async function getPendingRegistrationByToken(token) {
   try {
     const [rows] = await db.query(

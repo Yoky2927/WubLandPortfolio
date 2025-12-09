@@ -1,9 +1,9 @@
 // frontend/src/data/sampleBrokers.js
 
-// Real brokers from your database
+// Real brokers from your database - IDs match user IDs
 export const sampleBrokers = [
   {
-    id: 3,
+    id: 3, // Beza Hilemariam - matches user ID 3
     name: "Beza Hilemariam",
     profile_picture: "/uploads/profiles/beza.jpg",
     rating: "4.8",
@@ -27,7 +27,7 @@ export const sampleBrokers = [
     current_active_clients: 3
   },
   {
-    id: 13,
+    id: 9, // Elias Kebede - matches user ID 9
     name: "Elias Kebede",
     profile_picture: null,
     rating: "4.6",

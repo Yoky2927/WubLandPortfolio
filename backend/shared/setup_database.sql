@@ -77,6 +77,11 @@ CREATE TABLE IF NOT EXISTS users (
     -- Timestamps for record tracking
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    deleted_at TIMESTAMP NULL, -- For soft deletes
+    
+    -- Audit trail
+    created_by_user_id INT NULL,
+    last_modified_by_user_id INT NULL,
     
     -- Indexes for performance optimization
     INDEX idx_email (email),
@@ -84,7 +89,8 @@ CREATE TABLE IF NOT EXISTS users (
     INDEX idx_role (role),
     INDEX idx_status (status),
     INDEX idx_privilege_tier (privilege_tier),
-    INDEX idx_created_at (created_at)
+    INDEX idx_created_at (created_at),
+    INDEX idx_deleted_at (deleted_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- User preferences table for personalized settings
@@ -102,6 +108,10 @@ CREATE TABLE IF NOT EXISTS user_preferences (
     timezone VARCHAR(50) DEFAULT 'UTC',
     theme ENUM('light', 'dark', 'auto') DEFAULT 'light',
     email_frequency ENUM('immediate', 'daily', 'weekly') DEFAULT 'immediate',
+    
+    -- Timestamps
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     
     -- Foreign key constraint
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
@@ -159,7 +169,7 @@ CREATE TABLE IF NOT EXISTS password_reset_tokens (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- =============================================
--- BROKER MANAGEMENT TABLES
+-- BROKER MANAGEMENT TABLES (EXCEPT broker_reviews)
 -- =============================================
 
 -- Broker profiles table for broker-specific information
@@ -208,6 +218,7 @@ CREATE TABLE IF NOT EXISTS broker_profiles (
     -- Timestamps
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    deleted_at TIMESTAMP NULL,
     
     -- Foreign key and indexes
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
@@ -217,6 +228,208 @@ CREATE TABLE IF NOT EXISTS broker_profiles (
     INDEX idx_average_rating (average_rating)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- Broker availability schedule table
+CREATE TABLE IF NOT EXISTS broker_availability (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    broker_id INT NOT NULL,
+    
+    -- Schedule details
+    day_of_week ENUM('monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday') NOT NULL,
+    start_time TIME NOT NULL,
+    end_time TIME NOT NULL,
+    is_available BOOLEAN DEFAULT TRUE,
+    
+    -- Timestamps
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    
+    -- Foreign key and constraints
+    FOREIGN KEY (broker_id) REFERENCES users(id) ON DELETE CASCADE,
+    UNIQUE KEY unique_broker_schedule (broker_id, day_of_week),
+    INDEX idx_broker_availability (broker_id, is_available)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- =============================================
+-- PROPERTY SERVICE TABLES (CREATED BEFORE BROKER_REVIEWS)
+-- =============================================
+
+-- Main properties table for real estate listings
+CREATE TABLE IF NOT EXISTS properties (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    
+    -- Property identification
+    property_uuid VARCHAR(36) NOT NULL UNIQUE,
+    
+    -- Property basic information
+    title VARCHAR(255) NOT NULL,
+    description TEXT,
+    property_type ENUM('residential', 'commercial', 'industrial', 'land', 'apartment', 'house', 'condo', 'townhouse') NOT NULL,
+    property_status ENUM('active', 'pending', 'sold', 'rented', 'inactive', 'draft') DEFAULT 'draft',
+    
+    -- Location information
+    address TEXT NOT NULL,
+    city VARCHAR(100) NOT NULL,
+    state VARCHAR(100),
+    country VARCHAR(100) DEFAULT 'Ethiopia',
+    zip_code VARCHAR(20),
+    neighborhood VARCHAR(100),
+    -- coordinates POINT SRID 4326, -- For geographical queries (commented out for now)
+    google_place_id VARCHAR(255),
+    
+    -- Property specifications
+    beds INT,
+    baths INT,
+    sqft DECIMAL(10,2),
+    lot_size DECIMAL(10,2),
+    year_built INT,
+    garage_spaces INT DEFAULT 0,
+    parking_spaces INT DEFAULT 0,
+    
+    -- Pricing information
+    price DECIMAL(15,2) NOT NULL,
+    currency VARCHAR(3) DEFAULT 'ETB',
+    price_per_sqft DECIMAL(10,2),
+    is_negotiable BOOLEAN DEFAULT TRUE,
+    deposit_amount DECIMAL(15,2),
+    monthly_rent DECIMAL(15,2),
+    
+    -- Listing information
+    listing_type ENUM('sale', 'rent', 'lease') NOT NULL,
+    mls_number VARCHAR(100),
+    listing_date DATE,
+    expiration_date DATE,
+    
+    -- Ownership and management
+    owner_user_id INT NOT NULL, -- Seller/Landlord
+    created_by_user_id INT NOT NULL, -- Who created the listing
+    assigned_broker_id INT NULL, -- Assigned broker for this property
+    is_exclusive BOOLEAN DEFAULT FALSE,
+    
+    -- Features and amenities
+    features JSON DEFAULT '[]',
+    amenities JSON DEFAULT '[]',
+    property_tags JSON DEFAULT '[]',
+    
+    -- Status tracking
+    views_count INT DEFAULT 0,
+    saves_count INT DEFAULT 0,
+    inquiries_count INT DEFAULT 0,
+    is_featured BOOLEAN DEFAULT FALSE,
+    is_premium BOOLEAN DEFAULT FALSE,
+    
+    -- Financial details
+    tax_amount DECIMAL(10,2),
+    hoa_fees DECIMAL(10,2),
+    insurance_amount DECIMAL(10,2),
+    
+    -- Historical data
+    price_history JSON DEFAULT '[]',
+    status_history JSON DEFAULT '[]',
+    
+    -- Timestamps with audit trail
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    deleted_at TIMESTAMP NULL,
+    published_at TIMESTAMP NULL,
+    last_modified_by_user_id INT NULL,
+    
+    -- Foreign keys
+    FOREIGN KEY (owner_user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (created_by_user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (assigned_broker_id) REFERENCES users(id) ON DELETE SET NULL,
+    FOREIGN KEY (last_modified_by_user_id) REFERENCES users(id) ON DELETE SET NULL,
+    
+    -- Indexes
+    INDEX idx_property_uuid (property_uuid),
+    INDEX idx_property_type (property_type),
+    INDEX idx_property_status (property_status),
+    INDEX idx_listing_type (listing_type),
+    INDEX idx_city_state (city, state),
+    INDEX idx_price (price),
+    INDEX idx_owner_user (owner_user_id),
+    INDEX idx_assigned_broker (assigned_broker_id),
+    INDEX idx_created_at (created_at)
+    -- SPATIAL INDEX idx_coordinates (coordinates) -- commented out for now
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- =============================================
+-- TRANSACTION SERVICE TABLES (CREATED BEFORE BROKER_REVIEWS)
+-- =============================================
+
+-- Main transactions table
+CREATE TABLE IF NOT EXISTS transactions (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    transaction_uuid VARCHAR(36) NOT NULL UNIQUE,
+    
+    -- Transaction identification
+    transaction_type ENUM('sale', 'rental', 'lease') NOT NULL,
+    transaction_status ENUM('draft', 'offer_pending', 'offer_accepted', 'offer_rejected', 
+                           'under_contract', 'pending_approval', 'approved', 'closed', 
+                           'cancelled', 'expired') DEFAULT 'draft',
+    
+    -- Property information
+    property_id INT NOT NULL,
+    
+    -- Parties involved
+    buyer_user_id INT, -- For sales/rentals
+    seller_user_id INT NOT NULL, -- Property owner
+    broker_id INT, -- Assigned broker
+    
+    -- Financial details
+    offer_price DECIMAL(15,2),
+    final_price DECIMAL(15,2),
+    deposit_amount DECIMAL(15,2),
+    commission_amount DECIMAL(15,2),
+    commission_rate DECIMAL(5,2),
+    tax_amount DECIMAL(15,2),
+    fees_amount DECIMAL(15,2),
+    currency VARCHAR(3) DEFAULT 'ETB',
+    
+    -- Dates
+    offer_date DATE,
+    acceptance_date DATE,
+    closing_date DATE,
+    occupancy_date DATE,
+    lease_start_date DATE,
+    lease_end_date DATE,
+    
+    -- Terms and conditions
+    terms JSON,
+    special_conditions TEXT,
+    
+    -- Audit trail
+    created_by_user_id INT NOT NULL,
+    last_modified_by_user_id INT NULL,
+    
+    -- Timestamps
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    deleted_at TIMESTAMP NULL,
+    status_changed_at TIMESTAMP NULL,
+    
+    -- Foreign keys
+    FOREIGN KEY (property_id) REFERENCES properties(id) ON DELETE CASCADE,
+    FOREIGN KEY (buyer_user_id) REFERENCES users(id) ON DELETE SET NULL,
+    FOREIGN KEY (seller_user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (broker_id) REFERENCES users(id) ON DELETE SET NULL,
+    FOREIGN KEY (created_by_user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (last_modified_by_user_id) REFERENCES users(id) ON DELETE SET NULL,
+    
+    -- Indexes
+    INDEX idx_transaction_uuid (transaction_uuid),
+    INDEX idx_transaction_type (transaction_type),
+    INDEX idx_transaction_status (transaction_status),
+    INDEX idx_property_id (property_id),
+    INDEX idx_buyer_user (buyer_user_id),
+    INDEX idx_seller_user (seller_user_id),
+    INDEX idx_broker_id (broker_id),
+    INDEX idx_closing_date (closing_date)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- =============================================
+-- NOW CREATE BROKER_REVIEWS TABLE
+-- =============================================
+
 -- Broker reviews and ratings table
 CREATE TABLE IF NOT EXISTS broker_reviews (
     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -225,6 +438,7 @@ CREATE TABLE IF NOT EXISTS broker_reviews (
     broker_id INT NOT NULL,
     client_id INT NOT NULL,
     property_id INT NULL, -- Optional link to specific property
+    transaction_id INT NULL, -- Link to specific transaction
     
     -- Rating components (1-5 scale)
     overall_rating INT NOT NULL CHECK (overall_rating BETWEEN 1 AND 5),
@@ -254,91 +468,819 @@ CREATE TABLE IF NOT EXISTS broker_reviews (
     -- Foreign keys and indexes
     FOREIGN KEY (broker_id) REFERENCES users(id) ON DELETE CASCADE,
     FOREIGN KEY (client_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (property_id) REFERENCES properties(id) ON DELETE SET NULL,
+    FOREIGN KEY (transaction_id) REFERENCES transactions(id) ON DELETE SET NULL,
     INDEX idx_broker_rating (broker_id, overall_rating),
     INDEX idx_created_at (created_at),
     INDEX idx_is_approved (is_approved)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Broker availability schedule table
-CREATE TABLE IF NOT EXISTS broker_availability (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    broker_id INT NOT NULL,
-    
-    -- Schedule details
-    day_of_week ENUM('monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday') NOT NULL,
-    start_time TIME NOT NULL,
-    end_time TIME NOT NULL,
-    is_available BOOLEAN DEFAULT TRUE,
-    
-    -- Foreign key and constraints
-    FOREIGN KEY (broker_id) REFERENCES users(id) ON DELETE CASCADE,
-    UNIQUE KEY unique_broker_schedule (broker_id, day_of_week),
-    INDEX idx_broker_availability (broker_id, is_available)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
 -- =============================================
--- PROPERTY MANAGEMENT TABLES
+-- CONTINUE WITH OTHER PROPERTY-RELATED TABLES
 -- =============================================
 
--- Main properties table for real estate listings
-CREATE TABLE IF NOT EXISTS properties (
+-- Property images table
+CREATE TABLE IF NOT EXISTS property_images (
     id INT AUTO_INCREMENT PRIMARY KEY,
+    property_id INT NOT NULL,
     
-    -- Property basic information
-    title VARCHAR(255) NOT NULL,
-    price DECIMAL(15,2) NOT NULL,
-    address TEXT,
-    city VARCHAR(100),
-    region VARCHAR(100),
+    -- Image information
+    image_url VARCHAR(500) NOT NULL,
+    thumbnail_url VARCHAR(500),
+    image_order INT DEFAULT 0,
+    caption VARCHAR(255),
+    alt_text VARCHAR(255),
     
-    -- Property specifications
-    beds INT,
-    baths INT,
-    sqft INT,
-    garage INT,
-    property_type VARCHAR(100),
-    property_status VARCHAR(50),
-    price_per_sqft DECIMAL(10,2),
-    year_built INT,
-    lot_size INT,
+    -- Image metadata
+    file_size INT,
+    mime_type VARCHAR(100),
+    width INT,
+    height INT,
+    is_primary BOOLEAN DEFAULT FALSE,
     
-    -- Property description
-    description TEXT,
-    images JSON,
-    features JSON,
-    coordinates JSON,
-    
-    -- Listing information
-    listed_date DATE,
-    views INT DEFAULT 0,
-    saves INT DEFAULT 0,
-    mls_number VARCHAR(100),
-    source VARCHAR(100),
-    
-    -- Financial information
-    est_payment DECIMAL(10,2),
-    premium BOOLEAN DEFAULT FALSE,
-    
-    -- Relationship to broker
-    broker_id INT,
-    
-    -- Historical and additional data
-    price_history JSON,
-    tax_history JSON,
-    nearby_schools JSON,
-    floor_plans JSON,
+    -- Upload information
+    uploaded_by_user_id INT NOT NULL,
     
     -- Timestamps
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    deleted_at TIMESTAMP NULL,
+    
+    -- Foreign keys
+    FOREIGN KEY (property_id) REFERENCES properties(id) ON DELETE CASCADE,
+    FOREIGN KEY (uploaded_by_user_id) REFERENCES users(id) ON DELETE CASCADE,
+    
+    -- Indexes
+    INDEX idx_property_id (property_id),
+    INDEX idx_is_primary (is_primary),
+    INDEX idx_image_order (image_order)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Property documents table
+CREATE TABLE IF NOT EXISTS property_documents (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    property_id INT NOT NULL,
+    
+    -- Document information
+    document_type ENUM('deed', 'survey', 'inspection', 'floor_plan', 'certificate', 'permit', 'other') NOT NULL,
+    title VARCHAR(255) NOT NULL,
+    description TEXT,
+    document_url VARCHAR(500) NOT NULL,
+    file_name VARCHAR(255),
+    file_size INT,
+    mime_type VARCHAR(100),
+    
+    -- Document metadata
+    is_public BOOLEAN DEFAULT FALSE,
+    expiration_date DATE,
+    
+    -- Upload information
+    uploaded_by_user_id INT NOT NULL,
+    
+    -- Timestamps
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    deleted_at TIMESTAMP NULL,
+    
+    -- Foreign keys
+    FOREIGN KEY (property_id) REFERENCES properties(id) ON DELETE CASCADE,
+    FOREIGN KEY (uploaded_by_user_id) REFERENCES users(id) ON DELETE CASCADE,
+    
+    -- Indexes
+    INDEX idx_property_id (property_id),
+    INDEX idx_document_type (document_type)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Property viewing schedule
+CREATE TABLE IF NOT EXISTS property_viewings (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    property_id INT NOT NULL,
+    
+    -- Viewing information
+    viewing_type ENUM('in_person', 'virtual', 'open_house') NOT NULL,
+    scheduled_date DATE NOT NULL,
+    start_time TIME NOT NULL,
+    end_time TIME,
+    timezone VARCHAR(50) DEFAULT 'UTC',
+    
+    -- Location details (if different from property)
+    viewing_address TEXT,
+    virtual_tour_url VARCHAR(500),
+    
+    -- Organizer information
+    organized_by_user_id INT NOT NULL, -- Broker or agent
+    max_attendees INT DEFAULT 1,
+    
+    -- Status
+    status ENUM('scheduled', 'confirmed', 'completed', 'cancelled', 'no_show') DEFAULT 'scheduled',
+    
+    -- Notes
+    notes TEXT,
+    
+    -- Timestamps
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    deleted_at TIMESTAMP NULL,
+    
+    -- Foreign keys
+    FOREIGN KEY (property_id) REFERENCES properties(id) ON DELETE CASCADE,
+    FOREIGN KEY (organized_by_user_id) REFERENCES users(id) ON DELETE CASCADE,
+    
+    -- Indexes
+    INDEX idx_property_id (property_id),
+    INDEX idx_scheduled_date (scheduled_date),
+    INDEX idx_organized_by (organized_by_user_id),
+    INDEX idx_status (status)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Property viewing attendees
+CREATE TABLE IF NOT EXISTS property_viewing_attendees (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    viewing_id INT NOT NULL,
+    user_id INT NOT NULL, -- Buyer/Renter
+    
+    -- Attendee status
+    attendee_status ENUM('invited', 'confirmed', 'attended', 'cancelled', 'no_show') DEFAULT 'invited',
+    
+    -- Additional information
+    additional_guests INT DEFAULT 0,
+    notes TEXT,
+    
+    -- Timestamps
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    confirmed_at TIMESTAMP NULL,
+    
+    -- Foreign keys
+    FOREIGN KEY (viewing_id) REFERENCES property_viewings(id) ON DELETE CASCADE,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    
+    -- Unique constraint
+    UNIQUE KEY unique_viewing_attendee (viewing_id, user_id),
+    
+    -- Indexes
+    INDEX idx_viewing_id (viewing_id),
+    INDEX idx_user_id (user_id),
+    INDEX idx_attendee_status (attendee_status)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- =============================================
+-- CONTINUE WITH OTHER TRANSACTION-RELATED TABLES
+-- =============================================
+
+-- Offers table (for both purchase and rental)
+CREATE TABLE IF NOT EXISTS offers (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    
+    -- Offer identification
+    offer_type ENUM('purchase', 'rental') NOT NULL,
+    offer_status ENUM('pending', 'accepted', 'rejected', 'countered', 'withdrawn', 'expired') DEFAULT 'pending',
+    
+    -- Property and transaction context
+    property_id INT NOT NULL,
+    transaction_id INT NULL,
+    
+    -- Offer details
+    offered_price DECIMAL(15,2) NOT NULL,
+    offered_deposit DECIMAL(15,2),
+    offer_terms TEXT,
+    expiration_date DATE,
+    
+    -- Parties involved
+    offered_by_user_id INT NOT NULL, -- Buyer/Renter
+    owner_user_id INT NOT NULL, -- Seller/Landlord
+    
+    -- Response information
+    response_notes TEXT,
+    counter_offer_id INT NULL, -- Link to counter offer
+    
+    -- Timestamps
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    responded_at TIMESTAMP NULL,
+    
+    -- Foreign keys
+    FOREIGN KEY (property_id) REFERENCES properties(id) ON DELETE CASCADE,
+    FOREIGN KEY (transaction_id) REFERENCES transactions(id) ON DELETE SET NULL,
+    FOREIGN KEY (offered_by_user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (owner_user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (counter_offer_id) REFERENCES offers(id) ON DELETE SET NULL,
+    
+    -- Indexes
+    INDEX idx_offer_type (offer_type),
+    INDEX idx_offer_status (offer_status),
+    INDEX idx_property_id (property_id),
+    INDEX idx_offered_by (offered_by_user_id),
+    INDEX idx_owner_user (owner_user_id),
+    INDEX idx_expiration_date (expiration_date)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Contracts table
+CREATE TABLE IF NOT EXISTS contracts (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    contract_uuid VARCHAR(36) NOT NULL UNIQUE,
+    transaction_id INT NOT NULL,
+    
+    -- Contract details
+    contract_type ENUM('purchase', 'lease', 'rental', 'brokerage') NOT NULL,
+    contract_status ENUM('draft', 'sent', 'signed', 'expired', 'cancelled') DEFAULT 'draft',
+    
+    -- Document information
+    title VARCHAR(255) NOT NULL,
+    description TEXT,
+    contract_url VARCHAR(500),
+    file_name VARCHAR(255),
+    file_size INT,
+    
+    -- Signature tracking
+    signatory_data JSON, -- Array of signatories with their status
+    fully_signed_at TIMESTAMP NULL,
+    
+    -- Terms
+    effective_date DATE,
+    expiration_date DATE,
+    terms_and_conditions TEXT,
+    
+    -- Timestamps
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    deleted_at TIMESTAMP NULL,
+    
+    -- Created by
+    created_by_user_id INT NOT NULL,
+    
+    -- Foreign keys
+    FOREIGN KEY (transaction_id) REFERENCES transactions(id) ON DELETE CASCADE,
+    FOREIGN KEY (created_by_user_id) REFERENCES users(id) ON DELETE CASCADE,
+    
+    -- Indexes
+    INDEX idx_contract_uuid (contract_uuid),
+    INDEX idx_transaction_id (transaction_id),
+    INDEX idx_contract_type (contract_type),
+    INDEX idx_contract_status (contract_status),
+    INDEX idx_effective_date (effective_date)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Appointments/Showings table
+CREATE TABLE IF NOT EXISTS appointments (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    appointment_uuid VARCHAR(36) NOT NULL UNIQUE,
+    
+    -- Appointment details
+    appointment_type ENUM('property_showing', 'consultation', 'signing', 'inspection', 'other') NOT NULL,
+    title VARCHAR(255) NOT NULL,
+    description TEXT,
+    
+    -- Scheduling
+    start_time DATETIME NOT NULL,
+    end_time DATETIME NOT NULL,
+    timezone VARCHAR(50) DEFAULT 'UTC',
+    is_recurring BOOLEAN DEFAULT FALSE,
+    recurrence_pattern JSON,
+    
+    -- Location
+    location_type ENUM('property', 'office', 'virtual', 'other') DEFAULT 'property',
+    location_address TEXT,
+    virtual_meeting_url VARCHAR(500),
+    
+    -- Related entities
+    property_id INT NULL,
+    transaction_id INT NULL,
+    
+    -- Organizer and attendees
+    organizer_user_id INT NOT NULL, -- Usually broker/agent
+    broker_id INT NULL,
+    
+    -- Status
+    status ENUM('scheduled', 'confirmed', 'completed', 'cancelled', 'no_show') DEFAULT 'scheduled',
+    
+    -- Reminders
+    reminder_sent BOOLEAN DEFAULT FALSE,
+    
+    -- Timestamps
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    deleted_at TIMESTAMP NULL,
+    
+    -- Created by
+    created_by_user_id INT NOT NULL,
+    
+    -- Foreign keys
+    FOREIGN KEY (property_id) REFERENCES properties(id) ON DELETE SET NULL,
+    FOREIGN KEY (transaction_id) REFERENCES transactions(id) ON DELETE SET NULL,
+    FOREIGN KEY (organizer_user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (broker_id) REFERENCES users(id) ON DELETE SET NULL,
+    FOREIGN KEY (created_by_user_id) REFERENCES users(id) ON DELETE CASCADE,
+    
+    -- Indexes
+    INDEX idx_appointment_uuid (appointment_uuid),
+    INDEX idx_appointment_type (appointment_type),
+    INDEX idx_start_time (start_time),
+    INDEX idx_organizer_user (organizer_user_id),
+    INDEX idx_broker_id (broker_id),
+    INDEX idx_status (status)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Appointment attendees
+CREATE TABLE IF NOT EXISTS appointment_attendees (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    appointment_id INT NOT NULL,
+    user_id INT NOT NULL,
+    
+    -- Attendee information
+    attendee_role ENUM('client', 'broker', 'agent', 'other') DEFAULT 'client',
+    attendee_status ENUM('invited', 'accepted', 'declined', 'tentative', 'attended', 'no_show') DEFAULT 'invited',
+    
+    -- Notification preferences
+    send_reminder BOOLEAN DEFAULT TRUE,
+    
+    -- Timestamps
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    responded_at TIMESTAMP NULL,
+    
+    -- Foreign keys
+    FOREIGN KEY (appointment_id) REFERENCES appointments(id) ON DELETE CASCADE,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    
+    -- Unique constraint
+    UNIQUE KEY unique_appointment_attendee (appointment_id, user_id),
+    
+    -- Indexes
+    INDEX idx_appointment_id (appointment_id),
+    INDEX idx_user_id (user_id),
+    INDEX idx_attendee_status (attendee_status)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- =============================================
+-- PAYMENT SERVICE TABLES
+-- =============================================
+
+-- Invoices table
+CREATE TABLE IF NOT EXISTS invoices (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    invoice_uuid VARCHAR(36) NOT NULL UNIQUE,
+    invoice_number VARCHAR(50) NOT NULL UNIQUE,
+    
+    -- Invoice details
+    invoice_type ENUM('rent', 'sale', 'commission', 'service_fee', 'subscription', 'other') NOT NULL,
+    invoice_status ENUM('draft', 'sent', 'viewed', 'partial', 'paid', 'overdue', 'cancelled', 'refunded') DEFAULT 'draft',
+    
+    -- Parties involved
+    from_user_id INT NOT NULL, -- Payer
+    to_user_id INT NOT NULL, -- Payee
+    
+    -- Related entities
+    property_id INT NULL,
+    transaction_id INT NULL,
+    
+    -- Financial details
+    amount DECIMAL(15,2) NOT NULL,
+    tax_amount DECIMAL(15,2) DEFAULT 0.00,
+    total_amount DECIMAL(15,2) NOT NULL,
+    currency VARCHAR(3) DEFAULT 'ETB',
+    paid_amount DECIMAL(15,2) DEFAULT 0.00,
+    balance_due DECIMAL(15,2) NOT NULL,
+    
+    -- Dates
+    invoice_date DATE NOT NULL,
+    due_date DATE NOT NULL,
+    paid_date DATE NULL,
+    
+    -- Payment details
+    payment_method VARCHAR(100),
+    payment_reference VARCHAR(255),
+    
+    -- Line items
+    line_items JSON NOT NULL,
+    
+    -- Notes
+    notes TEXT,
+    
+    -- Timestamps
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    deleted_at TIMESTAMP NULL,
+    
+    -- Created by
+    created_by_user_id INT NOT NULL,
+    
+    -- Foreign keys
+    FOREIGN KEY (from_user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (to_user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (property_id) REFERENCES properties(id) ON DELETE SET NULL,
+    FOREIGN KEY (transaction_id) REFERENCES transactions(id) ON DELETE SET NULL,
+    FOREIGN KEY (created_by_user_id) REFERENCES users(id) ON DELETE CASCADE,
+    
+    -- Indexes
+    INDEX idx_invoice_uuid (invoice_uuid),
+    INDEX idx_invoice_number (invoice_number),
+    INDEX idx_invoice_type (invoice_type),
+    INDEX idx_invoice_status (invoice_status),
+    INDEX idx_from_user (from_user_id),
+    INDEX idx_to_user (to_user_id),
+    INDEX idx_due_date (due_date)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Payments table
+CREATE TABLE IF NOT EXISTS payments (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    payment_uuid VARCHAR(36) NOT NULL UNIQUE,
+    
+    -- Payment details
+    payment_type ENUM('rent', 'deposit', 'commission', 'fee', 'subscription', 'refund', 'other') NOT NULL,
+    payment_status ENUM('pending', 'processing', 'completed', 'failed', 'cancelled', 'refunded') DEFAULT 'pending',
+    
+    -- Related invoice
+    invoice_id INT NULL,
+    
+    -- Financial details
+    amount DECIMAL(15,2) NOT NULL,
+    currency VARCHAR(3) DEFAULT 'ETB',
+    processing_fee DECIMAL(15,2) DEFAULT 0.00,
+    net_amount DECIMAL(15,2) NOT NULL,
+    
+    -- Payment method
+    payment_method ENUM('bank_transfer', 'credit_card', 'mobile_money', 'cash', 'check', 'other') NOT NULL,
+    payment_method_details JSON,
+    
+    -- Parties involved
+    from_user_id INT NOT NULL,
+    to_user_id INT NOT NULL,
+    
+    -- Transaction details
+    transaction_id VARCHAR(255), -- External payment processor ID
+    receipt_url VARCHAR(500),
+    
+    -- Dates
+    payment_date DATE NOT NULL,
+    processed_at TIMESTAMP NULL,
+    
+    -- Notes
+    notes TEXT,
+    
+    -- Timestamps
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    deleted_at TIMESTAMP NULL,
+    
+    -- Foreign keys
+    FOREIGN KEY (invoice_id) REFERENCES invoices(id) ON DELETE SET NULL,
+    FOREIGN KEY (from_user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (to_user_id) REFERENCES users(id) ON DELETE CASCADE,
+    
+    -- Indexes
+    INDEX idx_payment_uuid (payment_uuid),
+    INDEX idx_payment_type (payment_type),
+    INDEX idx_payment_status (payment_status),
+    INDEX idx_invoice_id (invoice_id),
+    INDEX idx_from_user (from_user_id),
+    INDEX idx_to_user (to_user_id),
+    INDEX idx_payment_date (payment_date)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- =============================================
+-- TODO SERVICE TABLES
+-- =============================================
+
+-- Enhanced todos table with comprehensive task management
+CREATE TABLE IF NOT EXISTS todos (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    todo_uuid VARCHAR(36) NOT NULL UNIQUE,
+    
+    -- Task ownership
+    user_id INT NOT NULL, -- Owner/creator
+    
+    -- Task details
+    title VARCHAR(255) NOT NULL,
+    description TEXT,
+    
+    -- Task categorization
+    todo_type ENUM('general', 'property', 'transaction', 'client', 'marketing', 'admin', 'maintenance') DEFAULT 'general',
+    category ENUM(
+        'user_management', 
+        'content_moderation', 
+        'system_maintenance', 
+        'security_review', 
+        'support_tickets', 
+        'knowledge_base', 
+        'flagged_content', 
+        'financial_review', 
+        'property_verification', 
+        'report_generation', 
+        'team_coordination', 
+        'training_development',
+        'meeting_preparation',
+        'policy_update',
+        'performance_review',
+        'other'
+    ) DEFAULT 'other',
+    
+    -- Task prioritization
+    priority ENUM('low', 'medium', 'high', 'urgent') DEFAULT 'medium',
+    
+    -- Task lifecycle
+    status ENUM('pending', 'in_progress', 'completed', 'cancelled', 'deferred') DEFAULT 'pending',
+    due_date DATE,
+    completed_at TIMESTAMP NULL,
+    
+    -- Time tracking
+    estimated_hours DECIMAL(4,2),
+    actual_hours DECIMAL(4,2),
+    
+    -- Tags
+    tags JSON DEFAULT '[]',
+    
+    -- Task organization
+    order_index INT DEFAULT 0,
+    parent_todo_id INT NULL, -- For sub-tasks hierarchy
+    
+    -- Related entities
+    related_property_id INT NULL,
+    related_transaction_id INT NULL,
+    related_user_id INT NULL,
+    
+    -- Assignment and creation tracking
+    assigned_to INT NULL, -- Assigned user
+    assigned_by INT NULL, -- Who assigned it
+    assigned_at TIMESTAMP NULL,
+    created_by INT NOT NULL,
+    
+    -- Department/Team assignment
+    department ENUM('administration', 'support', 'brokerage', 'technical', 'financial', 'sales', 'marketing') DEFAULT 'administration',
+    
+    -- Reminders
+    reminder_sent BOOLEAN DEFAULT FALSE,
+    reminder_date DATE,
+    
+    -- Timestamps
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    deleted_at TIMESTAMP NULL,
+    
+    -- Foreign keys and indexes
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (assigned_to) REFERENCES users(id) ON DELETE SET NULL,
+    FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (parent_todo_id) REFERENCES todos(id) ON DELETE CASCADE,
+    FOREIGN KEY (related_property_id) REFERENCES properties(id) ON DELETE SET NULL,
+    FOREIGN KEY (related_transaction_id) REFERENCES transactions(id) ON DELETE SET NULL,
+    FOREIGN KEY (related_user_id) REFERENCES users(id) ON DELETE SET NULL,
+    FOREIGN KEY (assigned_by) REFERENCES users(id) ON DELETE SET NULL,
+    
+    INDEX idx_todo_uuid (todo_uuid),
+    INDEX idx_user_status (user_id, status),
+    INDEX idx_due_date (due_date),
+    INDEX idx_category (category),
+    INDEX idx_priority (priority),
+    INDEX idx_department (department),
+    INDEX idx_assigned_to (assigned_to),
+    INDEX idx_related_property (related_property_id),
+    INDEX idx_related_transaction (related_transaction_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Todo comments table for collaboration
+CREATE TABLE IF NOT EXISTS todo_comments (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    todo_id INT NOT NULL,
+    user_id INT NOT NULL,
+    
+    -- Comment details
+    comment_text TEXT NOT NULL,
+    comment_type ENUM('comment', 'update', 'note', 'reminder') DEFAULT 'comment',
+    
+    -- Comment metadata
+    is_internal_note BOOLEAN DEFAULT FALSE, -- Private team notes
+    mentions JSON DEFAULT '[]', -- User IDs mentioned
+    
+    -- Timestamps
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    deleted_at TIMESTAMP NULL,
+    
+    -- Foreign keys and indexes
+    FOREIGN KEY (todo_id) REFERENCES todos(id) ON DELETE CASCADE,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    INDEX idx_todo_created (todo_id, created_at),
+    INDEX idx_user_id (user_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Todo attachments table for supporting documents
+CREATE TABLE IF NOT EXISTS todo_attachments (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    todo_id INT NOT NULL,
+    user_id INT NOT NULL,
+    
+    -- File information
+    file_name VARCHAR(255) NOT NULL,
+    file_url VARCHAR(500) NOT NULL,
+    file_size INT,
+    file_type VARCHAR(100),
+    file_category ENUM('document', 'image', 'spreadsheet', 'presentation', 'other') DEFAULT 'document',
+    
+    -- Attachment metadata
+    description TEXT,
+    is_public BOOLEAN DEFAULT TRUE, -- Visibility control
+    
+    -- Upload timestamp
+    uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    deleted_at TIMESTAMP NULL,
+    
+    -- Foreign keys and indexes
+    FOREIGN KEY (todo_id) REFERENCES todos(id) ON DELETE CASCADE,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    INDEX idx_todo_id (todo_id),
+    INDEX idx_file_category (file_category)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Todo history table for audit trail
+CREATE TABLE IF NOT EXISTS todo_history (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    todo_id INT NOT NULL,
+    user_id INT NOT NULL,
+    
+    -- History details
+    action_type ENUM('created', 'updated', 'status_changed', 'assigned', 'commented', 'attachment_added', 'due_date_changed', 'priority_changed') NOT NULL,
+    field_changed VARCHAR(100),
+    old_value TEXT,
+    new_value TEXT,
+    change_description TEXT,
+    
+    -- Security metadata
+    ip_address VARCHAR(45),
+    user_agent TEXT,
+    
+    -- Timestamp
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    
+    -- Foreign keys and indexes
+    FOREIGN KEY (todo_id) REFERENCES todos(id) ON DELETE CASCADE,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    INDEX idx_todo_action (todo_id, action_type),
+    INDEX idx_created_at (created_at),
+    INDEX idx_user_id (user_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- =============================================
+-- COMMUNICATION SERVICE TABLES
+-- =============================================
+
+-- Enhanced notifications table
+CREATE TABLE IF NOT EXISTS notifications (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    notification_uuid VARCHAR(36) NOT NULL UNIQUE,
+    
+    -- Recipient information
+    user_id INT NOT NULL,
+    
+    -- Notification content
+    title VARCHAR(255) NOT NULL,
+    message TEXT NOT NULL,
+    notification_type ENUM('info', 'success', 'warning', 'error', 'system', 'transaction', 'property', 'message', 'appointment', 'reminder') DEFAULT 'info',
+    
+    -- Notification metadata
+    is_read BOOLEAN DEFAULT FALSE,
+    is_archived BOOLEAN DEFAULT FALSE,
+    action_url VARCHAR(500),
+    icon VARCHAR(100),
+    
+    -- Related entities
+    related_entity_type ENUM('user', 'property', 'transaction', 'appointment', 'offer', 'contract', 'invoice', 'payment', 'ticket', 'todo') DEFAULT NULL,
+    related_entity_id INT,
+    
+    -- Priority
+    priority ENUM('low', 'medium', 'high', 'urgent') DEFAULT 'medium',
+    
+    -- Notification lifecycle
+    expires_at TIMESTAMP NULL,
+    
+    -- Timestamps
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    read_at TIMESTAMP NULL,
+    sent_at TIMESTAMP NULL,
+    
+    -- Delivery methods
+    delivery_methods JSON DEFAULT '["in_app"]', -- in_app, email, sms, push
     
     -- Foreign key and indexes
-    FOREIGN KEY (broker_id) REFERENCES users(id) ON DELETE SET NULL,
-    INDEX idx_city (city),
-    INDEX idx_property_type (property_type),
-    INDEX idx_property_status (property_status),
-    INDEX idx_price (price),
-    INDEX idx_broker_id (broker_id)
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    INDEX idx_notification_uuid (notification_uuid),
+    INDEX idx_user_read (user_id, is_read, is_archived),
+    INDEX idx_created_at (created_at),
+    INDEX idx_notification_type (notification_type),
+    INDEX idx_priority (priority),
+    INDEX idx_related_entity (related_entity_type, related_entity_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Existing chat_conversations table remains
+CREATE TABLE IF NOT EXISTS chat_conversations (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    
+    -- Conversation identification
+    conversation_uuid VARCHAR(36) NOT NULL UNIQUE,
+    title VARCHAR(255),
+    
+    -- Conversation type classification
+    conversation_type ENUM('direct', 'group', 'support') DEFAULT 'direct',
+    
+    -- Creator information
+    created_by INT NOT NULL,
+    
+    -- Related entities
+    related_property_id INT NULL,
+    related_transaction_id INT NULL,
+    
+    -- Timestamps
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    last_message_at TIMESTAMP NULL,
+    
+    -- Foreign key and indexes
+    FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (related_property_id) REFERENCES properties(id) ON DELETE SET NULL,
+    FOREIGN KEY (related_transaction_id) REFERENCES transactions(id) ON DELETE SET NULL,
+    INDEX idx_conversation_uuid (conversation_uuid),
+    INDEX idx_last_message_at (last_message_at),
+    INDEX idx_related_property (related_property_id),
+    INDEX idx_related_transaction (related_transaction_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Existing conversation_participants table remains
+CREATE TABLE IF NOT EXISTS conversation_participants (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    
+    -- Relationship mapping
+    conversation_id INT NOT NULL,
+    user_id INT NOT NULL,
+    
+    -- Participant role
+    role ENUM('member', 'admin') DEFAULT 'member',
+    
+    -- Participation tracking
+    joined_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    left_at TIMESTAMP NULL,
+    is_active BOOLEAN DEFAULT TRUE,
+    
+    -- Notification preferences
+    mute_notifications BOOLEAN DEFAULT FALSE,
+    
+    -- Foreign keys and constraints
+    FOREIGN KEY (conversation_id) REFERENCES chat_conversations(id) ON DELETE CASCADE,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    UNIQUE KEY unique_participant (conversation_id, user_id),
+    INDEX idx_user_active (user_id, is_active)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Enhanced chat_messages table
+CREATE TABLE IF NOT EXISTS chat_messages (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    message_uuid VARCHAR(36) NOT NULL UNIQUE,
+    
+    -- Message context
+    conversation_id INT NOT NULL,
+    sender_id INT NOT NULL,
+    
+    -- Message type and content
+    message_type ENUM('text', 'image', 'file', 'system', 'notification', 'offer', 'appointment', 'property') DEFAULT 'text',
+    text TEXT,
+    image_url VARCHAR(500),
+    file_url VARCHAR(500),
+    file_name VARCHAR(255),
+    file_size INT,
+    file_type VARCHAR(100),
+    
+    -- Message status tracking
+    status ENUM('sending', 'sent', 'delivered', 'read', 'failed') DEFAULT 'sent',
+    read_by JSON DEFAULT '[]', -- JSON array of user IDs
+    
+    -- Reply functionality
+    reply_to_message_id INT NULL,
+    
+    -- Related entities
+    related_property_id INT NULL,
+    related_offer_id INT NULL,
+    related_appointment_id INT NULL,
+    
+    -- Message metadata
+    metadata JSON,
+    
+    -- Timestamps
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    deleted_at TIMESTAMP NULL,
+    
+    -- Foreign keys and indexes
+    FOREIGN KEY (conversation_id) REFERENCES chat_conversations(id) ON DELETE CASCADE,
+    FOREIGN KEY (sender_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (reply_to_message_id) REFERENCES chat_messages(id) ON DELETE SET NULL,
+    FOREIGN KEY (related_property_id) REFERENCES properties(id) ON DELETE SET NULL,
+    FOREIGN KEY (related_offer_id) REFERENCES offers(id) ON DELETE SET NULL,
+    FOREIGN KEY (related_appointment_id) REFERENCES appointments(id) ON DELETE SET NULL,
+    INDEX idx_message_uuid (message_uuid),
+    INDEX idx_conversation_created (conversation_id, created_at),
+    INDEX idx_sender_created (sender_id, created_at),
+    INDEX idx_message_type (message_type)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- =============================================
@@ -389,10 +1331,15 @@ CREATE TABLE IF NOT EXISTS user_privileges (
     granted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     expires_at TIMESTAMP NULL,
     
+    -- Timestamps
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    
     -- Foreign keys and indexes
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
     FOREIGN KEY (granted_by) REFERENCES users(id) ON DELETE SET NULL,
-    INDEX idx_user_privilege (user_id, privilege_key)
+    INDEX idx_user_privilege (user_id, privilege_key),
+    INDEX idx_expires_at (expires_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- =============================================
@@ -425,342 +1372,6 @@ CREATE TABLE IF NOT EXISTS pending_registrations (
     INDEX idx_token (email_verification_token),
     INDEX idx_email (email),
     INDEX idx_expires (email_verification_expires)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- =============================================
--- COMMUNICATION SERVICE TABLES
--- =============================================
-
--- Chat conversations table
-CREATE TABLE IF NOT EXISTS chat_conversations (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    
-    -- Conversation identification
-    conversation_uuid VARCHAR(36) NOT NULL UNIQUE,
-    title VARCHAR(255),
-    
-    -- Conversation type classification
-    conversation_type ENUM('direct', 'group', 'support') DEFAULT 'direct',
-    
-    -- Creator information
-    created_by INT NOT NULL,
-    
-    -- Timestamps
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    last_message_at TIMESTAMP NULL,
-    
-    -- Foreign key and indexes
-    FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE CASCADE,
-    INDEX idx_conversation_uuid (conversation_uuid),
-    INDEX idx_last_message_at (last_message_at)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- Conversation participants table
-CREATE TABLE IF NOT EXISTS conversation_participants (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    
-    -- Relationship mapping
-    conversation_id INT NOT NULL,
-    user_id INT NOT NULL,
-    
-    -- Participant role
-    role ENUM('member', 'admin') DEFAULT 'member',
-    
-    -- Participation tracking
-    joined_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    left_at TIMESTAMP NULL,
-    is_active BOOLEAN DEFAULT TRUE,
-    
-    -- Foreign keys and constraints
-    FOREIGN KEY (conversation_id) REFERENCES chat_conversations(id) ON DELETE CASCADE,
-    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-    UNIQUE KEY unique_participant (conversation_id, user_id),
-    INDEX idx_user_active (user_id, is_active)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- Enhanced chat_messages table
-CREATE TABLE IF NOT EXISTS chat_messages (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    
-    -- Message context
-    conversation_id INT NOT NULL,
-    sender_id INT NOT NULL,
-    
-    -- Message type and content
-    message_type ENUM('text', 'image', 'file', 'system', 'notification') DEFAULT 'text',
-    text TEXT,
-    image_url VARCHAR(500),
-    file_url VARCHAR(500),
-    file_name VARCHAR(255),
-    file_size INT,
-    file_type VARCHAR(100),
-    
-    -- Message status tracking
-    status ENUM('sent', 'delivered', 'read') DEFAULT 'sent',
-    read_by JSON DEFAULT '[]', -- JSON array of user IDs
-    
-    -- Reply functionality
-    reply_to_message_id INT NULL,
-    
-    -- Message metadata
-    metadata JSON,
-    
-    -- Timestamps
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    
-    -- Foreign keys and indexes
-    FOREIGN KEY (conversation_id) REFERENCES chat_conversations(id) ON DELETE CASCADE,
-    FOREIGN KEY (sender_id) REFERENCES users(id) ON DELETE CASCADE,
-    FOREIGN KEY (reply_to_message_id) REFERENCES chat_messages(id) ON DELETE SET NULL,
-    INDEX idx_conversation_created (conversation_id, created_at),
-    INDEX idx_sender_created (sender_id, created_at),
-    INDEX idx_message_type (message_type)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- Message deletions tracking table
-CREATE TABLE IF NOT EXISTS message_deletions (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    
-    -- Message and user reference
-    message_id INT NOT NULL,
-    user_id INT NOT NULL,
-    
-    -- Deletion scope
-    deleted_for ENUM('self', 'everyone') DEFAULT 'self',
-    
-    -- Deletion timestamp
-    deleted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    
-    -- Foreign keys and constraints
-    FOREIGN KEY (message_id) REFERENCES chat_messages(id) ON DELETE CASCADE,
-    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-    UNIQUE KEY unique_message_deletion (message_id, user_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- User message limits tracking for rate limiting
-CREATE TABLE IF NOT EXISTS user_message_limits (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    
-    -- User and period tracking
-    user_id INT NOT NULL,
-    period_date DATE NOT NULL, -- Daily tracking
-    
-    -- Message statistics
-    message_count INT DEFAULT 0,
-    last_message_at TIMESTAMP NULL,
-    limit_exceeded BOOLEAN DEFAULT FALSE,
-    
-    -- Foreign key and constraints
-    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-    UNIQUE KEY unique_user_period (user_id, period_date),
-    INDEX idx_period_date (period_date)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- =============================================
--- TODO SERVICE TABLES
--- =============================================
-
--- Enhanced todos table with comprehensive task management
-CREATE TABLE IF NOT EXISTS todos (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    
-    -- Task ownership
-    user_id INT NOT NULL,
-    
-    -- Task details
-    title VARCHAR(255) NOT NULL,
-    description TEXT,
-    
-    -- ADMIN/SUPPORT WORK CATEGORIES
-    category ENUM(
-        'user_management', 
-        'content_moderation', 
-        'system_maintenance', 
-        'security_review', 
-        'support_tickets', 
-        'knowledge_base', 
-        'flagged_content', 
-        'financial_review', 
-        'property_verification', 
-        'report_generation', 
-        'team_coordination', 
-        'training_development',
-        'meeting_preparation',
-        'policy_update',
-        'performance_review',
-        'other'
-    ) DEFAULT 'other',
-    
-    -- Task prioritization
-    priority ENUM('low', 'medium', 'high', 'urgent') DEFAULT 'medium',
-    
-    -- Task lifecycle
-    status ENUM('pending', 'in_progress', 'completed', 'cancelled') DEFAULT 'pending',
-    due_date DATE,
-    completed_at TIMESTAMP NULL,
-    
-    -- Time tracking
-    estimated_hours DECIMAL(4,2),
-    actual_hours DECIMAL(4,2),
-    tags JSON DEFAULT '[]',
-    
-    -- Task organization
-    order_index INT DEFAULT 0,
-    parent_todo_id INT NULL, -- For sub-tasks hierarchy
-    
-    -- Assignment and creation tracking
-    assigned_to INT NULL,
-    created_by INT NOT NULL,
-    
-    -- Department/Team assignment
-    department ENUM('administration', 'support', 'moderation', 'technical', 'financial') DEFAULT 'administration',
-    
-    -- Timestamps
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    
-    -- Foreign keys and indexes
-    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-    FOREIGN KEY (assigned_to) REFERENCES users(id) ON DELETE SET NULL,
-    FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE CASCADE,
-    FOREIGN KEY (parent_todo_id) REFERENCES todos(id) ON DELETE CASCADE,
-    INDEX idx_user_status (user_id, status),
-    INDEX idx_due_date (due_date),
-    INDEX idx_category (category),
-    INDEX idx_priority (priority),
-    INDEX idx_department (department),
-    INDEX idx_assigned_to (assigned_to)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- Todo comments table for collaboration
-CREATE TABLE IF NOT EXISTS todo_comments (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    
-    -- Comment context
-    todo_id INT NOT NULL,
-    user_id INT NOT NULL,
-    comment_text TEXT NOT NULL,
-    
-    -- Comment metadata
-    is_internal_note BOOLEAN DEFAULT FALSE, -- Private team notes
-    mentions JSON DEFAULT '[]', -- User IDs mentioned
-    
-    -- Timestamps
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    
-    -- Foreign keys and indexes
-    FOREIGN KEY (todo_id) REFERENCES todos(id) ON DELETE CASCADE,
-    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-    INDEX idx_todo_created (todo_id, created_at),
-    INDEX idx_user_id (user_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- Todo attachments table for supporting documents
-CREATE TABLE IF NOT EXISTS todo_attachments (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    
-    -- Attachment context
-    todo_id INT NOT NULL,
-    user_id INT NOT NULL,
-    
-    -- File information
-    file_name VARCHAR(255) NOT NULL,
-    file_url VARCHAR(500) NOT NULL,
-    file_size INT,
-    file_type VARCHAR(100),
-    file_category ENUM('document', 'image', 'spreadsheet', 'presentation', 'other') DEFAULT 'document',
-    
-    -- Attachment metadata
-    description TEXT,
-    is_public BOOLEAN DEFAULT TRUE, -- Visibility control
-    
-    -- Upload timestamp
-    uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    
-    -- Foreign keys and indexes
-    FOREIGN KEY (todo_id) REFERENCES todos(id) ON DELETE CASCADE,
-    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-    INDEX idx_todo_id (todo_id),
-    INDEX idx_file_category (file_category)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- Todo history table for audit trail
-CREATE TABLE IF NOT EXISTS todo_history (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    
-    -- History context
-    todo_id INT NOT NULL,
-    user_id INT NOT NULL,
-    action_type ENUM('created', 'updated', 'status_changed', 'assigned', 'commented', 'attachment_added') NOT NULL,
-    
-    -- Change tracking
-    field_changed VARCHAR(100),
-    old_value TEXT,
-    new_value TEXT,
-    
-    -- Security metadata
-    ip_address VARCHAR(45),
-    
-    -- Timestamp
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    
-    -- Foreign keys and indexes
-    FOREIGN KEY (todo_id) REFERENCES todos(id) ON DELETE CASCADE,
-    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-    INDEX idx_todo_action (todo_id, action_type),
-    INDEX idx_created_at (created_at)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- Todo templates for recurring tasks
-CREATE TABLE IF NOT EXISTS todo_templates (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    
-    -- Template identification
-    template_name VARCHAR(255) NOT NULL,
-    title VARCHAR(255) NOT NULL,
-    description TEXT,
-    
-    -- Task categorization
-    category ENUM(
-        'user_management', 
-        'content_moderation', 
-        'system_maintenance', 
-        'security_review', 
-        'support_tickets', 
-        'knowledge_base', 
-        'flagged_content', 
-        'financial_review', 
-        'property_verification', 
-        'report_generation', 
-        'team_coordination', 
-        'training_development',
-        'meeting_preparation',
-        'policy_update',
-        'performance_review',
-        'other'
-    ) DEFAULT 'other',
-    
-    -- Template settings
-    priority ENUM('low', 'medium', 'high', 'urgent') DEFAULT 'medium',
-    estimated_hours DECIMAL(4,2),
-    department ENUM('administration', 'support', 'moderation', 'technical', 'financial') DEFAULT 'administration',
-    recurrence_pattern ENUM('none', 'daily', 'weekly', 'monthly', 'quarterly') DEFAULT 'none',
-    is_active BOOLEAN DEFAULT TRUE,
-    
-    -- Creator information
-    created_by INT NOT NULL,
-    
-    -- Timestamps
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    
-    -- Foreign key and indexes
-    FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE CASCADE,
-    INDEX idx_category_department (category, department),
-    INDEX idx_recurrence (recurrence_pattern)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- =============================================
@@ -805,6 +1416,7 @@ CREATE TABLE IF NOT EXISTS support_tickets (
     -- Timestamps
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    deleted_at TIMESTAMP NULL,
     
     -- Foreign keys and indexes
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
@@ -820,8 +1432,6 @@ CREATE TABLE IF NOT EXISTS support_tickets (
 -- Enhanced ticket_responses table
 CREATE TABLE IF NOT EXISTS ticket_responses (
     id INT AUTO_INCREMENT PRIMARY KEY,
-    
-    -- Response context
     ticket_id INT NOT NULL,
     responder_id INT NOT NULL,
     
@@ -839,6 +1449,7 @@ CREATE TABLE IF NOT EXISTS ticket_responses (
     
     -- Timestamp
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     
     -- Foreign keys and indexes
     FOREIGN KEY (ticket_id) REFERENCES support_tickets(id) ON DELETE CASCADE,
@@ -883,6 +1494,7 @@ CREATE TABLE IF NOT EXISTS knowledge_base_articles (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     published_at TIMESTAMP NULL,
+    deleted_at TIMESTAMP NULL,
     
     -- Foreign key and indexes
     FOREIGN KEY (author_id) REFERENCES users(id) ON DELETE CASCADE,
@@ -895,8 +1507,6 @@ CREATE TABLE IF NOT EXISTS knowledge_base_articles (
 -- Article feedback table
 CREATE TABLE IF NOT EXISTS article_feedback (
     id INT AUTO_INCREMENT PRIMARY KEY,
-    
-    -- Feedback context
     article_id INT NOT NULL,
     user_id INT NOT NULL,
     
@@ -944,6 +1554,7 @@ CREATE TABLE IF NOT EXISTS flagged_content (
     -- Timestamps
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    deleted_at TIMESTAMP NULL,
     
     -- Foreign keys and indexes
     FOREIGN KEY (reported_by_user_id) REFERENCES users(id) ON DELETE CASCADE,
@@ -996,7 +1607,7 @@ CREATE TABLE IF NOT EXISTS admin_activities (
     admin_user_id INT NOT NULL,
     
     -- Target information
-    target_type ENUM('user', 'ticket', 'article', 'flag', 'system', 'property') NOT NULL,
+    target_type ENUM('user', 'ticket', 'article', 'flag', 'system', 'property', 'transaction', 'payment', 'invoice', 'offer') NOT NULL,
     target_id INT,
     target_name VARCHAR(255),
     
@@ -1005,6 +1616,7 @@ CREATE TABLE IF NOT EXISTS admin_activities (
     old_values JSON,
     new_values JSON,
     ip_address VARCHAR(45),
+    user_agent TEXT,
     
     -- Activity timestamp
     timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -1105,40 +1717,92 @@ CREATE TABLE IF NOT EXISTS support_agent_activities (
     INDEX idx_activity (activity_type)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- =============================================
--- NOTIFICATION SYSTEM TABLES
--- =============================================
-
--- Notifications table for user alerts
-CREATE TABLE IF NOT EXISTS notifications (
+-- Existing message_deletions table
+CREATE TABLE IF NOT EXISTS message_deletions (
     id INT AUTO_INCREMENT PRIMARY KEY,
     
-    -- Recipient information
+    -- Message and user reference
+    message_id INT NOT NULL,
     user_id INT NOT NULL,
     
-    -- Notification content
+    -- Deletion scope
+    deleted_for ENUM('self', 'everyone') DEFAULT 'self',
+    
+    -- Deletion timestamp
+    deleted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    
+    -- Foreign keys and constraints
+    FOREIGN KEY (message_id) REFERENCES chat_messages(id) ON DELETE CASCADE,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    UNIQUE KEY unique_message_deletion (message_id, user_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Existing user_message_limits table
+CREATE TABLE IF NOT EXISTS user_message_limits (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    
+    -- User and period tracking
+    user_id INT NOT NULL,
+    period_date DATE NOT NULL, -- Daily tracking
+    
+    -- Message statistics
+    message_count INT DEFAULT 0,
+    last_message_at TIMESTAMP NULL,
+    limit_exceeded BOOLEAN DEFAULT FALSE,
+    
+    -- Foreign key and constraints
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    UNIQUE KEY unique_user_period (user_id, period_date),
+    INDEX idx_period_date (period_date)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Existing todo_templates table remains
+CREATE TABLE IF NOT EXISTS todo_templates (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    
+    -- Template identification
+    template_name VARCHAR(255) NOT NULL,
     title VARCHAR(255) NOT NULL,
-    message TEXT NOT NULL,
-    type ENUM('info', 'success', 'warning', 'error', 'system') DEFAULT 'info',
+    description TEXT,
     
-    -- Notification metadata
-    is_read BOOLEAN DEFAULT FALSE,
-    action_url VARCHAR(500),
-    related_entity_type VARCHAR(50),
-    related_entity_id INT,
+    -- Task categorization
+    category ENUM(
+        'user_management', 
+        'content_moderation', 
+        'system_maintenance', 
+        'security_review', 
+        'support_tickets', 
+        'knowledge_base', 
+        'flagged_content', 
+        'financial_review', 
+        'property_verification', 
+        'report_generation', 
+        'team_coordination', 
+        'training_development',
+        'meeting_preparation',
+        'policy_update',
+        'performance_review',
+        'other'
+    ) DEFAULT 'other',
     
-    -- Notification lifecycle
-    expires_at TIMESTAMP NULL,
+    -- Template settings
+    priority ENUM('low', 'medium', 'high', 'urgent') DEFAULT 'medium',
+    estimated_hours DECIMAL(4,2),
+    department ENUM('administration', 'support', 'moderation', 'technical', 'financial') DEFAULT 'administration',
+    recurrence_pattern ENUM('none', 'daily', 'weekly', 'monthly', 'quarterly') DEFAULT 'none',
+    is_active BOOLEAN DEFAULT TRUE,
+    
+    -- Creator information
+    created_by INT NOT NULL,
     
     -- Timestamps
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    read_at TIMESTAMP NULL,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     
     -- Foreign key and indexes
-    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-    INDEX idx_user_read (user_id, is_read),
-    INDEX idx_created_at (created_at),
-    INDEX idx_type (type)
+    FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE CASCADE,
+    INDEX idx_category_department (category, department),
+    INDEX idx_recurrence (recurrence_pattern)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- =============================================
@@ -1159,24 +1823,43 @@ INSERT IGNORE INTO system_configurations (config_key, config_value, data_type, d
 ('user.verification_required', 'true', 'boolean', 'Whether email verification is required', 'user'),
 
 -- System operation settings
-('system.maintenance_mode', 'false', 'boolean', 'System maintenance mode', 'system');
+('system.maintenance_mode', 'false', 'boolean', 'System maintenance mode', 'system'),
+
+-- Property settings
+('property.default_commission_rate', '2.5', 'number', 'Default broker commission rate (%)', 'property'),
+('property.listing_expiry_days', '90', 'number', 'Days before property listing expires', 'property'),
+
+-- Transaction settings
+('transaction.default_deposit_percentage', '10', 'number', 'Default deposit percentage for offers', 'transaction');
 
 -- Insert privilege templates for role-based access control
 INSERT IGNORE INTO privilege_templates (template_name, role_type, tier, privileges, monthly_price, description) VALUES
 -- Premium internal broker template
 ('internal_broker_premium', 'broker', 'premium', 
- '{"properties": {"manage": ["create", "read", "update", "delete", "bulk_upload", "list_directly", "feature"], "limits": {"max_listings": 1000, "max_images": 50, "max_featured": 20}}, "communication": {"chat": ["unlimited_messages", "initiate_chats", "group_chats"], "limits": {"max_active_chats": 100}}, "analytics": ["advanced_reports", "market_trends"]}', 
+ '{"properties": {"manage": ["create", "read", "update", "delete", "bulk_upload", "list_directly", "feature"], "limits": {"max_listings": 1000, "max_images": 50, "max_featured": 20}}, "communication": {"chat": ["unlimited_messages", "initiate_chats", "group_chats"], "limits": {"max_active_chats": 100}}, "analytics": ["advanced_reports", "market_trends"], "transactions": ["create_offers", "manage_contracts", "view_financials"], "payments": ["receive_commissions", "view_payment_history"]}', 
  299.00, 
  'Premium internal broker with full feature access'),
 
 -- Standard external broker template
 ('external_broker_standard', 'broker', 'standard', 
- '{"properties": {"manage": ["create", "read", "update", "delete", "list_directly"], "limits": {"max_listings": 100, "max_images": 20, "max_featured": 5}}, "communication": {"chat": ["unlimited_messages", "initiate_chats"], "limits": {"max_active_chats": 50}}, "analytics": ["basic_reports"]}', 
+ '{"properties": {"manage": ["create", "read", "update", "delete", "list_directly"], "limits": {"max_listings": 100, "max_images": 20, "max_featured": 5}}, "communication": {"chat": ["unlimited_messages", "initiate_chats"], "limits": {"max_active_chats": 50}}, "analytics": ["basic_reports"], "transactions": ["create_offers", "manage_contracts"], "payments": ["receive_commissions"]}', 
  99.00, 
  'Standard external broker with basic features'),
 
 -- Basic support agent template
 ('support_agent_basic', 'support', 'basic', 
- '{"support": ["view_assigned_tickets", "respond", "resolve"], "knowledge_base": ["create", "suggest_updates"], "communication": ["view_assigned_chats", "respond_chats"]}', 
+ '{"support": ["view_assigned_tickets", "respond", "resolve"], "knowledge_base": ["create", "suggest_updates"], "communication": ["view_assigned_chats", "respond_chats"], "users": ["view_basic_info", "reset_passwords"], "properties": ["view_listings", "flag_content"]}', 
  0.00, 
- 'Basic support agent privileges');
+ 'Basic support agent privileges'),
+
+-- Premium seller/landlord template
+('seller_premium', 'client', 'premium', 
+ '{"properties": {"manage": ["create", "read", "update", "delete", "feature"], "limits": {"max_listings": 50, "max_images": 30, "max_featured": 5}}, "communication": {"chat": ["unlimited_messages"], "limits": {"max_active_chats": 20}}, "analytics": ["view_performance"], "transactions": ["view_offers", "accept_offers", "manage_contracts"], "payments": ["receive_payments", "view_invoices"]}', 
+ 49.00, 
+ 'Premium seller/landlord with enhanced features'),
+
+-- Basic buyer/renter template
+('buyer_basic', 'client', 'basic', 
+ '{"properties": {"search": ["advanced_search", "save_searches"], "limits": {"saved_properties": 100, "saved_searches": 10}}, "communication": {"chat": ["limited_messages"], "limits": {"max_active_chats": 5}}, "transactions": ["create_offers", "view_status"]}', 
+ 0.00, 
+ 'Basic buyer/renter privileges');

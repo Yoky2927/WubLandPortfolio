@@ -43,6 +43,7 @@ import toast from "react-hot-toast";
 import EmojiPicker from "emoji-picker-react";
 import { useNavigate } from "react-router-dom";
 import { useTheme } from "../contexts/ThemeContext";
+import ImageEditorModal from "./ImageEditorModal";
 
 // Error Boundary Component
 class ErrorBoundary extends React.Component {
@@ -92,16 +93,16 @@ const MessageInput = ({
   removeFile,
   filePreview,
   fileName,
-  getFileIcon
+  getFileIcon,
 }) => {
   const upgradeMessage = getUpgradeMessage();
 
-  const handleFileInputChange = (e, inputType = 'file') => {
+  const handleFileInputChange = (e, inputType = "file") => {
     const file = e.target.files[0];
     if (file) {
       handleFileSelect(file);
     }
-    e.target.value = '';
+    e.target.value = "";
   };
 
   const handleTextChange = (e) => {
@@ -118,30 +119,36 @@ const MessageInput = ({
     <div className="space-y-2">
       {/* Upgrade Warning/Banner */}
       {upgradeMessage && (
-        <div className={`p-3 rounded-lg flex items-center gap-3 ${
-          upgradeMessage.type === 'blocked' 
-            ? 'bg-red-100 border border-red-300 dark:bg-red-900/20 dark:border-red-800' 
-            : 'bg-amber-100 border border-amber-300 dark:bg-amber-900/20 dark:border-amber-800'
-        }`}>
-          {upgradeMessage.type === 'blocked' ? (
+        <div
+          className={`p-3 rounded-lg flex items-center gap-3 ${
+            upgradeMessage.type === "blocked"
+              ? "bg-red-100 border border-red-300 dark:bg-red-900/20 dark:border-red-800"
+              : "bg-amber-100 border border-amber-300 dark:bg-amber-900/20 dark:border-amber-800"
+          }`}
+        >
+          {upgradeMessage.type === "blocked" ? (
             <AlertTriangle className="w-5 h-5 text-red-500 flex-shrink-0" />
           ) : (
             <Crown className="w-5 h-5 text-amber-500 flex-shrink-0" />
           )}
           <div className="flex-1">
-            <p className={`text-sm font-medium ${
-              upgradeMessage.type === 'blocked' ? 'text-red-800 dark:text-red-200' : 'text-amber-800 dark:text-amber-200'
-            }`}>
+            <p
+              className={`text-sm font-medium ${
+                upgradeMessage.type === "blocked"
+                  ? "text-red-800 dark:text-red-200"
+                  : "text-amber-800 dark:text-amber-200"
+              }`}
+            >
               {upgradeMessage.message}
             </p>
-            {upgradeMessage.type === 'warning' && (
+            {upgradeMessage.type === "warning" && (
               <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
                 {upgradeMessage.remaining} messages remaining today
               </p>
             )}
           </div>
           <button
-            onClick={() => window.open('/premium-upgrade', '_blank')}
+            onClick={() => window.open("/premium-upgrade", "_blank")}
             className="px-3 py-1 bg-amber-500 text-white text-sm rounded-lg hover:bg-amber-600 transition-colors whitespace-nowrap"
           >
             Upgrade
@@ -157,7 +164,7 @@ const MessageInput = ({
           </span>
           {limits.requires_upgrade && (
             <button
-              onClick={() => window.open('/premium-upgrade', '_blank')}
+              onClick={() => window.open("/premium-upgrade", "_blank")}
               className="text-amber-500 hover:text-amber-600 flex items-center gap-1"
             >
               <Crown size={12} />
@@ -169,9 +176,11 @@ const MessageInput = ({
 
       {/* File Preview */}
       {(filePreview || fileType) && (
-        <div className={`mb-3 flex items-center gap-2 p-3 ${
-          theme === "dark" ? "bg-gray-700" : "bg-gray-100"
-        } rounded-lg`}>
+        <div
+          className={`mb-3 flex items-center gap-2 p-3 ${
+            theme === "dark" ? "bg-gray-700" : "bg-gray-100"
+          } rounded-lg`}
+        >
           {filePreview ? (
             <img
               src={filePreview}
@@ -179,16 +188,16 @@ const MessageInput = ({
               className="w-12 h-12 object-cover rounded"
             />
           ) : (
-            <div className={`w-12 h-12 flex items-center justify-center ${
-              theme === "dark" ? "bg-gray-600" : "bg-gray-200"
-            } rounded`}>
+            <div
+              className={`w-12 h-12 flex items-center justify-center ${
+                theme === "dark" ? "bg-gray-600" : "bg-gray-200"
+              } rounded`}
+            >
               {getFileIcon(fileType)}
             </div>
           )}
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium break-words">
-              {fileName}
-            </p>
+            <p className="text-sm font-medium break-words">{fileName}</p>
           </div>
           <button
             onClick={removeFile}
@@ -205,14 +214,14 @@ const MessageInput = ({
       <input
         type="file"
         ref={fileInputRef}
-        onChange={(e) => handleFileInputChange(e, 'file')}
+        onChange={(e) => handleFileInputChange(e, "file")}
         accept="*/*"
         className="hidden"
       />
       <input
         type="file"
         ref={imageInputRef}
-        onChange={(e) => handleFileInputChange(e, 'image')}
+        onChange={(e) => handleFileInputChange(e, "image")}
         accept="image/*"
         className="hidden"
       />
@@ -263,9 +272,7 @@ const MessageInput = ({
         <input
           type="text"
           placeholder={
-            !canSend 
-              ? "Upgrade to send more messages..." 
-              : "Message..."
+            !canSend ? "Upgrade to send more messages..." : "Message..."
           }
           className={`flex-1 p-3 ${
             theme === "dark"
@@ -308,17 +315,21 @@ const GroupManagementModal = ({
   removeUserFromGroup,
   setNewParticipants,
   addUsersToGroup,
-  setShowGroupManagement
+  setShowGroupManagement,
 }) => {
   return (
     <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-[100] backdrop-blur-sm">
-      <div className={`p-6 rounded-xl ${
-        theme === "dark" ? "bg-gray-800" : "bg-white"
-      } shadow-2xl max-w-2xl w-full mx-4 max-h-[80vh] overflow-hidden flex flex-col`}>
+      <div
+        className={`p-6 rounded-xl ${
+          theme === "dark" ? "bg-gray-800" : "bg-white"
+        } shadow-2xl max-w-2xl w-full mx-4 max-h-[80vh] overflow-hidden flex flex-col`}
+      >
         <div className="flex items-center justify-between mb-4">
-          <h3 className={`text-lg font-semibold ${
-            theme === "dark" ? "text-white" : "text-gray-900"
-          }`}>
+          <h3
+            className={`text-lg font-semibold ${
+              theme === "dark" ? "text-white" : "text-gray-900"
+            }`}
+          >
             Manage Group: {selectedGroupForManagement?.name}
           </h3>
           <button
@@ -342,9 +353,11 @@ const GroupManagementModal = ({
           <>
             {/* Current Participants */}
             <div className="mb-6">
-              <h4 className={`text-sm font-medium mb-3 ${
-                theme === "dark" ? "text-gray-300" : "text-gray-700"
-              }`}>
+              <h4
+                className={`text-sm font-medium mb-3 ${
+                  theme === "dark" ? "text-gray-300" : "text-gray-700"
+                }`}
+              >
                 Current Participants ({groupParticipants.length})
               </h4>
               <div className="space-y-2 max-h-32 overflow-y-auto">
@@ -408,9 +421,11 @@ const GroupManagementModal = ({
 
             {/* Add New Participants */}
             <div className="flex-1 overflow-y-auto">
-              <h4 className={`text-sm font-medium mb-3 ${
-                theme === "dark" ? "text-gray-300" : "text-gray-700"
-              }`}>
+              <h4
+                className={`text-sm font-medium mb-3 ${
+                  theme === "dark" ? "text-gray-300" : "text-gray-700"
+                }`}
+              >
                 Add New Participants ({newParticipants.size} selected)
               </h4>
 
@@ -423,8 +438,8 @@ const GroupManagementModal = ({
                         newParticipants.has(userItem.id)
                           ? "bg-amber-500/20 border border-amber-500/30"
                           : theme === "dark"
-                            ? "hover:bg-gray-700 border border-gray-600"
-                            : "hover:bg-gray-100 border border-gray-200"
+                          ? "hover:bg-gray-700 border border-gray-600"
+                          : "hover:bg-gray-100 border border-gray-200"
                       }`}
                       onClick={() => {
                         setNewParticipants((prev) => {
@@ -525,17 +540,21 @@ const CreateGroupModal = ({
   toggleGroupUserSelection,
   createGroup,
   setShowCreateGroup,
-  getInitialsAndColor
+  getInitialsAndColor,
 }) => {
   return (
     <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-[100] backdrop-blur-sm">
-      <div className={`p-6 rounded-xl ${
-        theme === "dark" ? "bg-gray-800" : "bg-white"
-      } shadow-2xl max-w-md w-full mx-4 max-h-[80vh] overflow-hidden flex flex-col`}>
+      <div
+        className={`p-6 rounded-xl ${
+          theme === "dark" ? "bg-gray-800" : "bg-white"
+        } shadow-2xl max-w-md w-full mx-4 max-h-[80vh] overflow-hidden flex flex-col`}
+      >
         <div className="flex items-center justify-between mb-4">
-          <h3 className={`text-lg font-semibold ${
-            theme === "dark" ? "text-white" : "text-gray-900"
-          }`}>
+          <h3
+            className={`text-lg font-semibold ${
+              theme === "dark" ? "text-white" : "text-gray-900"
+            }`}
+          >
             Create New Group
           </h3>
           <button
@@ -563,9 +582,11 @@ const CreateGroupModal = ({
         />
 
         <div className="flex-1 overflow-y-auto mb-4">
-          <h4 className={`text-sm font-medium mb-2 ${
-            theme === "dark" ? "text-gray-300" : "text-gray-700"
-          }`}>
+          <h4
+            className={`text-sm font-medium mb-2 ${
+              theme === "dark" ? "text-gray-300" : "text-gray-700"
+            }`}
+          >
             Select Users ({selectedGroupUsers.size} selected)
           </h4>
           <div className="space-y-2">
@@ -576,8 +597,8 @@ const CreateGroupModal = ({
                   selectedGroupUsers.has(userItem.id)
                     ? "bg-amber-500/20 border border-amber-500/30"
                     : theme === "dark"
-                      ? "hover:bg-gray-700 border border-gray-600"
-                      : "hover:bg-gray-100 border border-gray-200"
+                    ? "hover:bg-gray-700 border border-gray-600"
+                    : "hover:bg-gray-100 border border-gray-200"
                 }`}
                 onClick={() => toggleGroupUserSelection(userItem.id)}
               >
@@ -599,12 +620,8 @@ const CreateGroupModal = ({
                   )}
                 </div>
                 <div className="flex-1">
-                  <div className="text-sm font-medium">
-                    {userItem.fullName}
-                  </div>
-                  <div className="text-xs opacity-70">
-                    {userItem.userType}
-                  </div>
+                  <div className="text-sm font-medium">{userItem.fullName}</div>
+                  <div className="text-xs opacity-70">{userItem.userType}</div>
                 </div>
                 {selectedGroupUsers.has(userItem.id) && (
                   <Check size={16} className="text-amber-500" />
@@ -644,14 +661,16 @@ const ChatMenu = ({
   setShowCreateGroup,
   setIsSelectMode,
   clearSelection,
-  setShowChatMenu
+  setShowChatMenu,
 }) => {
   return (
-    <div className={`absolute top-12 right-4 z-50 ${
-      theme === "dark" ? "bg-gray-800" : "bg-white"
-    } shadow-lg rounded-lg p-2 min-w-48 border ${
-      theme === "dark" ? "border-gray-700" : "border-gray-200"
-    }`}>
+    <div
+      className={`absolute top-12 right-4 z-50 ${
+        theme === "dark" ? "bg-gray-800" : "bg-white"
+      } shadow-lg rounded-lg p-2 min-w-48 border ${
+        theme === "dark" ? "border-gray-700" : "border-gray-200"
+      }`}
+    >
       <button
         onClick={() => {
           setShowCreateGroup(true);
@@ -692,298 +711,6 @@ const ChatMenu = ({
   );
 };
 
-// Image Editor Modal Component
-const ImageEditorModal = ({
-  theme,
-  selectedFile,
-  imageEditMode,
-  setImageEditMode,
-  imageScale,
-  setImageScale,
-  imageRotation,
-  setImageRotation,
-  annotations,
-  setAnnotations,
-  drawingColor,
-  setDrawingColor,
-  drawingWidth,
-  setDrawingWidth,
-  showTextInput,
-  setShowTextInput,
-  textInput,
-  setTextInput,
-  addTextAnnotation,
-  clearAnnotations,
-  saveEditedImage,
-  downloadFile,
-  setShowFileModal,
-  imageCanvasRef,
-  drawingCanvasRef,
-  isDrawing,
-  setIsDrawing,
-  currentAnnotation,
-  setCurrentAnnotation,
-  startDrawing,
-  draw,
-  stopDrawing
-}) => {
-  return (
-    <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
-      <div className="bg-transparent rounded-lg max-w-6xl w-full max-h-[95vh] overflow-hidden flex flex-col">
-        <div className="p-4 flex justify-between items-center border-b border-gray-700 bg-black/50 backdrop-blur-md">
-          <h3 className="font-semibold text-white">
-            {selectedFile?.name || "Image"}
-          </h3>
-          <div className="flex gap-2">
-            {!imageEditMode ? (
-              <>
-                <button
-                  onClick={() => setImageEditMode(true)}
-                  className="flex items-center gap-2 px-3 py-2 bg-amber-500 text-white rounded hover:bg-amber-600 transition-colors"
-                >
-                  <Edit size={16} /> Edit Image
-                </button>
-                <button
-                  onClick={() => {
-                    setImageScale(1);
-                    setImageRotation(0);
-                  }}
-                  className="flex items-center gap-2 px-3 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
-                >
-                  <RotateCw size={16} /> Reset
-                </button>
-              </>
-            ) : (
-              <>
-                <div className="flex items-center gap-2 bg-black/50 rounded-lg px-3 py-2">
-                  <button
-                    onClick={() =>
-                      setImageScale((prev) => Math.max(0.1, prev - 0.1))
-                    }
-                    className="p-1 hover:bg-white/20 rounded transition-colors text-white"
-                    title="Zoom Out"
-                  >
-                    <ZoomOut size={16} />
-                  </button>
-                  <span className="text-sm text-white mx-2">
-                    {Math.round(imageScale * 100)}%
-                  </span>
-                  <button
-                    onClick={() =>
-                      setImageScale((prev) => Math.min(3, prev + 0.1))
-                    }
-                    className="p-1 hover:bg-white/20 rounded transition-colors text-white"
-                    title="Zoom In"
-                  >
-                    <ZoomIn size={16} />
-                  </button>
-                </div>
-                <button
-                  onClick={() =>
-                    setImageRotation((prev) => (prev + 90) % 360)
-                  }
-                  className="flex items-center gap-2 px-3 py-2 bg-purple-500 text-white rounded hover:bg-purple-600 transition-colors"
-                  title="Rotate 90°"
-                >
-                  <RotateCw size={16} /> Rotate
-                </button>
-                <button
-                  onClick={addTextAnnotation}
-                  className="flex items-center gap-2 px-3 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
-                  title="Add Text"
-                >
-                  <Type size={16} /> Add Text
-                </button>
-                <button
-                  onClick={clearAnnotations}
-                  className="flex items-center gap-2 px-3 py-2 bg-red-500 text-white rounded hover:bg-red-600 transition-colors"
-                  title="Clear Annotations"
-                >
-                  <Trash size={16} /> Clear
-                </button>
-                <button
-                  onClick={saveEditedImage}
-                  className="flex items-center gap-2 px-3 py-2 bg-green-500 text-white rounded hover:bg-green-600 transition-colors"
-                  title="Save & Send"
-                >
-                  <Save size={16} /> Save & Send
-                </button>
-              </>
-            )}
-            <button
-              onClick={() => downloadFile(selectedFile?.url, selectedFile?.name)}
-              className="flex items-center gap-2 px-3 py-2 bg-gray-500 text-white rounded hover:bg-gray-600 transition-colors"
-              title="Download"
-            >
-              <Download size={16} /> Download
-            </button>
-            <button
-              onClick={() => {
-                setShowFileModal(false);
-                setImageEditMode(false);
-                setAnnotations([]);
-                setImageScale(1);
-                setImageRotation(0);
-              }}
-              className="p-2 hover:bg-white/20 rounded transition-colors text-white"
-              title="Close"
-            >
-              <X size={20} />
-            </button>
-          </div>
-        </div>
-
-        <div className="flex-1 p-4 overflow-auto flex justify-center items-center bg-transparent">
-          <div className="relative">
-            {selectedFile && (
-              <img
-                ref={imageCanvasRef}
-                src={selectedFile.url}
-                alt={selectedFile.name}
-                className="max-w-full max-h-[70vh] object-contain transition-transform duration-200"
-                style={{
-                  transform: `scale(${imageScale}) rotate(${imageRotation}deg)`,
-                }}
-                onLoad={() => {
-                  if (drawingCanvasRef.current && imageCanvasRef.current) {
-                    drawingCanvasRef.current.width =
-                      imageCanvasRef.current.naturalWidth;
-                    drawingCanvasRef.current.height =
-                      imageCanvasRef.current.naturalHeight;
-                  }
-                }}
-              />
-            )}
-            {imageEditMode && (
-              <canvas
-                ref={drawingCanvasRef}
-                className="absolute top-0 left-0 cursor-crosshair"
-                style={{
-                  width: imageCanvasRef.current?.naturalWidth || "100%",
-                  height: imageCanvasRef.current?.naturalHeight || "100%",
-                }}
-                onMouseDown={startDrawing}
-                onMouseMove={draw}
-                onMouseUp={stopDrawing}
-                onMouseLeave={stopDrawing}
-              />
-            )}
-          </div>
-        </div>
-
-        {imageEditMode && (
-          <div className="p-4 border-t border-gray-700 bg-black/50 backdrop-blur-md">
-            <div className="flex items-center gap-6 justify-center">
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-white">Color:</span>
-                <input
-                  type="color"
-                  value={drawingColor}
-                  onChange={(e) => setDrawingColor(e.target.value)}
-                  className="w-8 h-8 rounded cursor-pointer border border-gray-600"
-                />
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-white">Brush Size:</span>
-                <input
-                  type="range"
-                  min="1"
-                  max="20"
-                  value={drawingWidth}
-                  onChange={(e) =>
-                    setDrawingWidth(parseInt(e.target.value))
-                  }
-                  className="w-32"
-                />
-                <span className="text-sm text-white w-8">
-                  {drawingWidth}px
-                </span>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-white">Zoom:</span>
-                <span className="text-sm text-white w-12">
-                  {Math.round(imageScale * 100)}%
-                </span>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-white">Rotation:</span>
-                <span className="text-sm text-white w-12">
-                  {imageRotation}°
-                </span>
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-};
-
-// Text Input Modal Component
-const TextInputModal = ({
-  theme,
-  showTextInput,
-  textInput,
-  setTextInput,
-  handleTextSubmit,
-  setShowTextInput
-}) => {
-  if (!showTextInput) return null;
-
-  return (
-    <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-60 backdrop-blur-sm">
-      <div className={`p-6 rounded-xl ${
-        theme === "dark" ? "bg-gray-800" : "bg-white"
-      } shadow-2xl max-w-md w-full mx-4`}>
-        <h3 className={`text-lg font-semibold mb-4 ${
-          theme === "dark" ? "text-white" : "text-gray-900"
-        }`}>
-          Add Text to Image
-        </h3>
-        <input
-          type="text"
-          value={textInput}
-          onChange={(e) => setTextInput(e.target.value)}
-          placeholder="Enter your text here..."
-          className={`w-full px-4 py-3 border rounded-lg mb-4 focus:outline-none focus:ring-2 focus:ring-amber-500 ${
-            theme === "dark"
-              ? "bg-gray-700 border-gray-600 text-white placeholder-gray-400"
-              : "bg-white border-gray-300 text-gray-900 placeholder-gray-500"
-          }`}
-          autoFocus
-          onKeyPress={(e) => {
-            if (e.key === "Enter") {
-              handleTextSubmit();
-            }
-          }}
-        />
-        <div className="flex gap-3 justify-end">
-          <button
-            onClick={() => {
-              setShowTextInput(false);
-              setTextInput("");
-            }}
-            className={`px-4 py-2 rounded-lg transition-colors ${
-              theme === "dark"
-                ? "bg-gray-700 text-white hover:bg-gray-600"
-                : "bg-gray-200 text-gray-800 hover:bg-gray-300"
-            }`}
-          >
-            Cancel
-          </button>
-          <button
-            onClick={handleTextSubmit}
-            disabled={!textInput.trim()}
-            className="px-4 py-2 bg-amber-500 text-white rounded-lg hover:bg-amber-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-          >
-            Add Text
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-};
-
 // Main ChatApp Component
 const ChatApp = ({
   user,
@@ -1012,7 +739,10 @@ const ChatApp = ({
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [userRole, setUserRole] = useState("");
   const [showContextMenu, setShowContextMenu] = useState(false);
-  const [contextMenuPosition, setContextMenuPosition] = useState({ x: 0, y: 0 });
+  const [contextMenuPosition, setContextMenuPosition] = useState({
+    x: 0,
+    y: 0,
+  });
   const [contextMessageId, setContextMessageId] = useState(null);
   const [showFileModal, setShowFileModal] = useState(false);
   const [selectedFile, setSelectedFile] = useState(null);
@@ -1020,8 +750,7 @@ const ChatApp = ({
   const [isSelectMode, setIsSelectMode] = useState(false);
   const [copiedMessageId, setCopiedMessageId] = useState(null);
   const [hasFetchedUsers, setHasFetchedUsers] = useState(false);
-  const [showTextInput, setShowTextInput] = useState(false);
-  const [textInput, setTextInput] = useState("");
+
   const [isDragging, setIsDragging] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
   const [showCreateGroup, setShowCreateGroup] = useState(false);
@@ -1032,21 +761,14 @@ const ChatApp = ({
   const [activeTab, setActiveTab] = useState("users");
   const [selectedGroup, setSelectedGroup] = useState(null);
   const [showGroupManagement, setShowGroupManagement] = useState(false);
-  const [selectedGroupForManagement, setSelectedGroupForManagement] = useState(null);
+  const [selectedGroupForManagement, setSelectedGroupForManagement] =
+    useState(null);
   const [groupParticipants, setGroupParticipants] = useState([]);
   const [availableUsersForGroup, setAvailableUsersForGroup] = useState([]);
   const [newParticipants, setNewParticipants] = useState(new Set());
   const [isLoadingGroupDetails, setIsLoadingGroupDetails] = useState(false);
   const [userPrivileges, setUserPrivileges] = useState(null);
   const [messageCount, setMessageCount] = useState(0);
-  const [imageEditMode, setImageEditMode] = useState(false);
-  const [imageScale, setImageScale] = useState(1);
-  const [imageRotation, setImageRotation] = useState(0);
-  const [isDrawing, setIsDrawing] = useState(false);
-  const [drawingColor, setDrawingColor] = useState("#ff0000");
-  const [drawingWidth, setDrawingWidth] = useState(3);
-  const [annotations, setAnnotations] = useState([]);
-  const [currentAnnotation, setCurrentAnnotation] = useState(null);
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   const [showSidebar, setShowSidebar] = useState(!isMobile);
 
@@ -1058,53 +780,100 @@ const ChatApp = ({
   const typingTimeoutRef = useRef(null);
   const contextMenuRef = useRef(null);
   const dropZoneRef = useRef(null);
-  const imageCanvasRef = useRef(null);
-  const drawingCanvasRef = useRef(null);
+
   const chatMenuRef = useRef(null);
   const socket = useRef(null);
 
   // Constants
   const MAX_FILE_SIZE = 50 * 1024 * 1024;
-  const amberGradient = "bg-gradient-to-r from-amber-400 via-amber-500 to-amber-600";
-  const amberGradientText = "bg-gradient-to-r from-amber-400 via-amber-500 to-amber-600 bg-clip-text text-transparent";
+  const amberGradient =
+    "bg-gradient-to-r from-amber-400 via-amber-500 to-amber-600";
+  const amberGradientText =
+    "bg-gradient-to-r from-amber-400 via-amber-500 to-amber-600 bg-clip-text text-transparent";
 
   // Chat limit configuration
   const chatLimitConfig = {
-    premium: { free_messages: null, max_active_chats: null, requires_upgrade: false },
-    enterprise: { free_messages: null, max_active_chats: null, requires_upgrade: false },
-    admin: { free_messages: null, max_active_chats: null, requires_upgrade: false },
-    super_admin: { free_messages: null, max_active_chats: null, requires_upgrade: false },
-    internal_broker: { free_messages: null, max_active_chats: 100, requires_upgrade: false },
-    external_broker: { free_messages: null, max_active_chats: 50, requires_upgrade: false },
-    support_admin: { free_messages: null, max_active_chats: null, requires_upgrade: false },
-    support_lead: { free_messages: null, max_active_chats: null, requires_upgrade: false },
-    support_agent: { free_messages: null, max_active_chats: null, requires_upgrade: false },
+    premium: {
+      free_messages: null,
+      max_active_chats: null,
+      requires_upgrade: false,
+    },
+    enterprise: {
+      free_messages: null,
+      max_active_chats: null,
+      requires_upgrade: false,
+    },
+    admin: {
+      free_messages: null,
+      max_active_chats: null,
+      requires_upgrade: false,
+    },
+    super_admin: {
+      free_messages: null,
+      max_active_chats: null,
+      requires_upgrade: false,
+    },
+    internal_broker: {
+      free_messages: null,
+      max_active_chats: 100,
+      requires_upgrade: false,
+    },
+    external_broker: {
+      free_messages: null,
+      max_active_chats: 50,
+      requires_upgrade: false,
+    },
+    support_admin: {
+      free_messages: null,
+      max_active_chats: null,
+      requires_upgrade: false,
+    },
+    support_lead: {
+      free_messages: null,
+      max_active_chats: null,
+      requires_upgrade: false,
+    },
+    support_agent: {
+      free_messages: null,
+      max_active_chats: null,
+      requires_upgrade: false,
+    },
     seller: { free_messages: 10, max_active_chats: 3, requires_upgrade: true },
     buyer: { free_messages: 10, max_active_chats: 3, requires_upgrade: true },
     renter: { free_messages: 10, max_active_chats: 3, requires_upgrade: true },
-    landlord: { free_messages: 10, max_active_chats: 5, requires_upgrade: true },
-    user: { free_messages: 5, max_active_chats: 2, requires_upgrade: true }
+    landlord: {
+      free_messages: 10,
+      max_active_chats: 5,
+      requires_upgrade: true,
+    },
+    user: { free_messages: 5, max_active_chats: 2, requires_upgrade: true },
   };
 
   // Utility Functions
   const validateFileUrl = (url) => {
     if (!url) return null;
-    
-    if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('blob:')) {
+
+    if (
+      url.startsWith("http://") ||
+      url.startsWith("https://") ||
+      url.startsWith("blob:")
+    ) {
       return url;
     }
-    
-    if (url.startsWith('/')) {
+
+    if (url.startsWith("/")) {
       return `http://localhost:5001${url}`;
     }
-    
+
     return `http://localhost:5001/uploads/${url}`;
   };
 
   const getInitialsAndColor = (userItem) => {
     const name = userItem?.fullName || userItem?.full_name || "Unknown User";
     const [firstName, lastName] = name.split(" ");
-    const initials = `${firstName?.[0] || ""}${lastName?.[0] || ""}`.toUpperCase();
+    const initials = `${firstName?.[0] || ""}${
+      lastName?.[0] || ""
+    }`.toUpperCase();
 
     const colors = {
       admin: "bg-red-500",
@@ -1123,7 +892,8 @@ const ChatApp = ({
 
     return {
       initials,
-      colorClass: colors[userItem?.userType || userItem?.role] || colors.default,
+      colorClass:
+        colors[userItem?.userType || userItem?.role] || colors.default,
     };
   };
 
@@ -1154,52 +924,52 @@ const ChatApp = ({
 
   const canSendMessage = useCallback(() => {
     if (!userPrivileges) return true;
-    
+
     const role = userRole;
     const privilegeTier = userPrivileges.privilege_tier;
-    
-    if (['premium', 'enterprise'].includes(privilegeTier)) {
+
+    if (["premium", "enterprise"].includes(privilegeTier)) {
       return true;
     }
-    
+
     const limits = chatLimitConfig[role] || chatLimitConfig.user;
-    
+
     if (limits.free_messages === null) {
       return true;
     }
-    
+
     return messageCount < limits.free_messages;
   }, [userPrivileges, userRole, messageCount]);
 
   const getUpgradeMessage = useCallback(() => {
     if (!userPrivileges) return null;
-    
+
     const role = userRole;
     const privilegeTier = userPrivileges.privilege_tier;
     const limits = chatLimitConfig[role] || chatLimitConfig.user;
-    
+
     if (!limits.requires_upgrade || limits.free_messages === null) {
       return null;
     }
-    
+
     const remaining = limits.free_messages - messageCount;
-    
+
     if (remaining <= 0) {
       return {
-        type: 'blocked',
+        type: "blocked",
         message: `You've used all your ${limits.free_messages} free messages. Upgrade to premium for unlimited chatting.`,
-        remaining: 0
+        remaining: 0,
       };
     }
-    
+
     if (remaining <= 3) {
       return {
-        type: 'warning',
+        type: "warning",
         message: `You have ${remaining} free messages left. Upgrade to premium for unlimited chatting.`,
-        remaining
+        remaining,
       };
     }
-    
+
     return null;
   }, [userPrivileges, userRole, messageCount]);
 
@@ -1248,19 +1018,19 @@ const ChatApp = ({
   const fetchUserPrivileges = async () => {
     try {
       const token = localStorage.getItem("token");
-      
+
       const authResponse = await axios.get(
         "http://localhost:5000/api/auth/check",
         {
           headers: { Authorization: `Bearer ${token}` },
         }
       );
-      
+
       const currentUser = authResponse.data;
       setUserRole(currentUser.role || "user");
       setUserPrivileges({
         role: currentUser.role,
-        privilege_tier: currentUser.privilege_tier || 'basic'
+        privilege_tier: currentUser.privilege_tier || "basic",
       });
 
       try {
@@ -1331,7 +1101,9 @@ const ChatApp = ({
         file_name: msg.file_name,
         status: msg.status || "sent",
         created_at: msg.created_at,
-        sender_name: `${msg.first_name || ""} ${msg.last_name || ""}`.trim() || "Unknown User",
+        sender_name:
+          `${msg.first_name || ""} ${msg.last_name || ""}`.trim() ||
+          "Unknown User",
         sender_profile_pic: msg.profile_pic,
         isGroup: true,
         groupId: groupId,
@@ -1414,7 +1186,11 @@ const ChatApp = ({
   };
 
   const removeUserFromGroup = async (userId) => {
-    if (!window.confirm("Are you sure you want to remove this user from the group?")) {
+    if (
+      !window.confirm(
+        "Are you sure you want to remove this user from the group?"
+      )
+    ) {
       return;
     }
 
@@ -1546,7 +1322,8 @@ const ChatApp = ({
 
   const handleSendMessage = async (e) => {
     e.preventDefault();
-    
+
+    // Check privilege limits
     if (!canSendMessage()) {
       const upgradeMessage = getUpgradeMessage();
       if (upgradeMessage) {
@@ -1554,7 +1331,7 @@ const ChatApp = ({
         return;
       }
     }
-    
+
     if (!text.trim() && !fileType) {
       toast.error("Please enter a message or select a file");
       return;
@@ -1573,6 +1350,16 @@ const ChatApp = ({
       return;
     }
 
+    console.log("📤 Preparing to send message:", {
+      receiverId,
+      text: text.trim(),
+      hasFile: !!fileType,
+      fileName,
+      filePreviewExists: !!filePreview,
+      isGroupMessage,
+    });
+
+    // Create optimistic message
     const tempId = `temp-${Date.now()}`;
     const optimisticMessage = {
       id: tempId,
@@ -1587,46 +1374,134 @@ const ChatApp = ({
       sender_name: user?.firstName || user?.fullName || "You",
       sender_profile_pic: user?.profilePic || null,
       isGroup: isGroupMessage,
+      isOptimistic: true, // Mark as optimistic
     };
 
     setMessages((prev) => [...prev, optimisticMessage]);
 
+    // Store original values
     const originalText = text;
     const originalFileType = fileType;
     const originalFileName = fileName;
     const originalFilePreview = filePreview;
 
+    // Clear UI state immediately for better UX
     setText("");
-    removeFile();
+    setFilePreview(null);
+    setFileType(null);
+    setFileName("");
 
     try {
       const token = localStorage.getItem("token");
+
+      // Create FormData
       const formData = new FormData();
       formData.append("text", originalText.trim());
 
+      console.log("📦 Creating FormData:", {
+        text: originalText.trim(),
+        hasFileType: !!originalFileType,
+        fileName: originalFileName,
+      });
+
+      // Get file from inputs - CRITICAL FIX
       let fileToSend = null;
-      
-      if (originalFilePreview && originalFilePreview.startsWith('data:image')) {
-        console.log("📤 Converting base64 to file...");
-        
-        const base64Response = await fetch(originalFilePreview);
-        const blob = await base64Response.blob();
-        fileToSend = new File([blob], originalFileName || 'image.png', {
-          type: blob.type,
-          lastModified: Date.now()
-        });
-      }
-      else if (fileInputRef.current?.files?.[0]) {
-        fileToSend = fileInputRef.current.files[0];
-      }
-      else if (imageInputRef.current?.files?.[0]) {
-        fileToSend = imageInputRef.current.files[0];
-      }
 
-      if (fileToSend) {
+      // Check ALL possible sources
+      const checkFileInputs = () => {
+        if (fileInputRef.current?.files?.[0]) {
+          return fileInputRef.current.files[0];
+        }
+        if (imageInputRef.current?.files?.[0]) {
+          return imageInputRef.current.files[0];
+        }
+        return null;
+      };
+
+      fileToSend = checkFileInputs();
+
+      if (!fileToSend && originalFileType) {
+        console.log(
+          "⚠️ No file found in inputs, checking if we can create from base64"
+        );
+
+        // If we have base64 preview for image, try to create blob
+        if (
+          originalFilePreview &&
+          originalFilePreview.startsWith("data:image")
+        ) {
+          try {
+            console.log("🔄 Creating blob from base64 preview");
+
+            // Convert base64 to blob (SIMPLIFIED - no File constructor)
+            const base64Data = originalFilePreview.split(",")[1];
+            const mimeType = originalFilePreview.split(";")[0].split(":")[1];
+
+            const byteCharacters = atob(base64Data);
+            const byteArrays = [];
+
+            for (
+              let offset = 0;
+              offset < byteCharacters.length;
+              offset += 512
+            ) {
+              const slice = byteCharacters.slice(offset, offset + 512);
+              const byteNumbers = new Array(slice.length);
+
+              for (let i = 0; i < slice.length; i++) {
+                byteNumbers[i] = slice.charCodeAt(i);
+              }
+
+              const byteArray = new Uint8Array(byteNumbers);
+              byteArrays.push(byteArray);
+            }
+
+            const blob = new Blob(byteArrays, { type: mimeType });
+
+            // Append blob directly (not as File object)
+            formData.append(
+              "file",
+              blob,
+              originalFileName || `image_${Date.now()}.png`
+            );
+            console.log("✅ Created blob from base64 preview");
+          } catch (blobError) {
+            console.error("❌ Failed to create blob:", blobError);
+            toast.error("Failed to process image. Please try again.");
+
+            // Restore state and show error
+            setMessages((prev) => prev.filter((msg) => msg.id !== tempId));
+            setText(originalText);
+            return;
+          }
+        } else {
+          console.warn("❌ No file available to send");
+          toast.error("File not found. Please select the file again.");
+
+          // Restore state
+          setMessages((prev) => prev.filter((msg) => msg.id !== tempId));
+          setText(originalText);
+          return;
+        }
+      } else if (fileToSend) {
+        // We have a file from inputs
         formData.append("file", fileToSend);
+        console.log("✅ Using file from input:", fileToSend.name);
       }
 
+      // Debug FormData
+      console.log("🔍 FormData entries:");
+      for (let pair of formData.entries()) {
+        const [key, value] = pair;
+        console.log(
+          `${key}:`,
+          value instanceof Blob
+            ? `[Blob: ${value.type}, ${value.size} bytes]`
+            : `"${value}"`
+        );
+      }
+
+      // Determine endpoint
       let endpoint = "";
       if (isGroupMessage) {
         endpoint = `http://localhost:5001/api/messages/groups/${receiverId}/send`;
@@ -1634,17 +1509,36 @@ const ChatApp = ({
         endpoint = `http://localhost:5001/api/messages/send/${receiverId}`;
       }
 
+      console.log("📡 Sending to:", endpoint);
+
+      // Send request
       const response = await axios.post(endpoint, formData, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
-        timeout: 30000,
+        timeout: 60000,
         onUploadProgress: (progressEvent) => {
-          const progress = Math.round((progressEvent.loaded * 100) / progressEvent.total);
-          console.log(`📤 Upload progress: ${progress}%`);
-        }
+          if (progressEvent.total) {
+            const progress = Math.round(
+              (progressEvent.loaded * 100) / progressEvent.total
+            );
+            console.log(`📤 Upload progress: ${progress}%`);
+
+            // Update optimistic message with progress
+            setMessages((prev) =>
+              prev.map((msg) =>
+                msg.id === tempId
+                  ? { ...msg, progress, status: "uploading" }
+                  : msg
+              )
+            );
+          }
+        },
       });
 
+      console.log("✅ Server response:", response.data);
+
+      // Replace optimistic message with real one
       const newMessage = {
         ...response.data,
         id: response.data.id,
@@ -1660,42 +1554,44 @@ const ChatApp = ({
         prev.map((msg) => (msg.id === tempId ? newMessage : msg))
       );
 
-      setMessageCount(prev => prev + 1);
+      // Update message count
+      setMessageCount((prev) => prev + 1);
 
+      // Emit via socket
       if (socket.current) {
         socket.current.emit("newMessage", newMessage);
       }
 
+      // Update user list for direct messages
       if (!isGroupMessage) {
-        const updatedUsers = users.map((u) =>
-          u.id === receiverId ? { ...u, lastMessageTime: new Date() } : u
+        setUsers((prev) =>
+          prev
+            .map((u) =>
+              u.id === receiverId ? { ...u, lastMessageTime: new Date() } : u
+            )
+            .sort((a, b) => (b.lastMessageTime || 0) - (a.lastMessageTime || 0))
         );
-        const sortedUsers = updatedUsers.sort((a, b) => {
-          if (a.lastMessageTime && b.lastMessageTime) {
-            return b.lastMessageTime - a.lastMessageTime;
-          }
-          if (a.lastMessageTime) return -1;
-          if (b.lastMessageTime) return 1;
-          return a.fullName.localeCompare(b.fullName);
-        });
-        setUsers(sortedUsers);
       }
 
       toast.success("Message sent!");
+
+      // Scroll to bottom
+      setTimeout(() => {
+        if (messageEndRef.current) {
+          messageEndRef.current.scrollIntoView({ behavior: "smooth" });
+        }
+      }, 100);
     } catch (error) {
       console.error("❌ Error sending message:", error);
-      console.error("❌ Error details:", {
-        message: error.message,
-        response: error.response?.data,
-        status: error.response?.status,
-      });
 
+      // Update optimistic message to error state
       setMessages((prev) =>
         prev.map((msg) =>
           msg.id === tempId ? { ...msg, status: "error", error: true } : msg
         )
       );
 
+      // Restore input state for retry
       setText(originalText);
       if (originalFileType) {
         setFileType(originalFileType);
@@ -1703,14 +1599,15 @@ const ChatApp = ({
         setFilePreview(originalFilePreview);
       }
 
-      if (error.message === "Request timeout") {
-        toast.error("Message sending timed out. Please try again.");
+      // Show appropriate error
+      if (error.response?.status === 431) {
+        toast.error("Request too large. Try sending a smaller file.");
+      } else if (error.code === "ECONNABORTED") {
+        toast.error("Upload timed out. Please try again.");
       } else if (error.response?.data?.error) {
-        toast.error(`Send failed: ${error.response.data.error}`);
-      } else if (error.code === 'ECONNABORTED') {
-        toast.error("Upload timeout. File might be too large.");
+        toast.error(`Failed: ${error.response.data.error}`);
       } else {
-        toast.error("Failed to send message");
+        toast.error("Failed to send message. Please try again.");
       }
     }
   };
@@ -1826,15 +1723,40 @@ const ChatApp = ({
   };
 
   const handleOpenFile = (fileUrl, fileType, fileName) => {
+    console.log("🔗 Opening file:", {
+      originalUrl: fileUrl,
+      validatedUrl: validateFileUrl(fileUrl),
+      fileType,
+      fileName,
+    });
+
     const validatedUrl = validateFileUrl(fileUrl);
+
     if (fileType === "image") {
-      setSelectedFile({ url: validatedUrl, type: "image", name: fileName });
+      console.log("🖼️ Opening image modal with URL:", validatedUrl);
+
+      // Open modal immediately
+      setSelectedFile({
+        url: validatedUrl,
+        type: "image",
+        name: fileName,
+      });
       setShowFileModal(true);
-      setImageEditMode(false);
-      setImageScale(1);
-      setImageRotation(0);
-      setAnnotations([]);
+
+      // Test the image in background to see if it loads
+      const testImg = new Image();
+      testImg.onerror = () => {
+        console.log("⚠️ Image may not load properly, trying alternative URL");
+        // Try alternative URL if the original fails
+        const altUrl = validatedUrl.replace(/.jfif$/i, ".jpg");
+        setSelectedFile((prev) => ({
+          ...prev,
+          url: altUrl,
+        }));
+      };
+      testImg.src = validatedUrl;
     } else {
+      console.log("📥 Downloading non-image file");
       downloadFile(validatedUrl, fileName);
     }
   };
@@ -1850,32 +1772,133 @@ const ChatApp = ({
 
   const handleFileSelect = useCallback(
     (file) => {
-      if (!file) return;
-
-      if (file.size > MAX_FILE_SIZE) {
-        toast.error(`File size exceeds ${MAX_FILE_SIZE / 1024 / 1024}MB`);
+      if (!file) {
+        console.log("❌ No file provided to handleFileSelect");
         return;
       }
 
-      const extension = file.name.split(".").pop().toLowerCase();
-      const imageExtensions = [
-        "jpg", "jpeg", "png", "gif", "webp", "svg", "jfif", "pjpeg", "pjp", "bmp", "ico", "tiff", "tif",
-      ];
-      const documentExtensions = ["pdf", "doc", "docx", "txt", "rtf"];
-      const archiveExtensions = ["zip", "rar", "7z", "tar", "gz"];
+      console.log("📁 File selected:", {
+        name: file.name,
+        type: file.type,
+        size: file.size,
+      });
 
+      if (file.size > MAX_FILE_SIZE) {
+        toast.error(`File size exceeds ${MAX_FILE_SIZE / 1024 / 1024}MB limit`);
+        return;
+      }
+
+      // Determine file type based on extension AND mime type
+      const extension = file.name.split(".").pop().toLowerCase();
+      const fileTypeLower = file.type.toLowerCase();
+
+      // Extended image extensions list including JFIF
+      const imageExtensions = [
+        "jpg",
+        "jpeg",
+        "png",
+        "gif",
+        "webp",
+        "svg",
+        "bmp",
+        "ico",
+        "tiff",
+        "tif",
+        "jfif",
+        "jpe",
+        "jif",
+        "jfi", // JFIF formats
+        "pjpeg",
+        "pjp",
+        "heic",
+        "heif",
+        "avif",
+        "apng",
+        "raw",
+        "arw",
+        "cr2",
+        "nef",
+        "orf",
+        "sr2",
+      ];
+
+      // Image MIME types including JFIF
+      const imageMimeTypes = [
+        "image/jpeg",
+        "image/jpg",
+        "image/pjpeg",
+        "image/png",
+        "image/gif",
+        "image/webp",
+        "image/svg+xml",
+        "image/bmp",
+        "image/x-icon",
+        "image/tiff",
+        "image/x-tiff",
+        "image/jfif", // JFIF MIME type
+        "image/pipeg", // JFIF alternative
+        "image/heic",
+        "image/heif",
+        "image/avif",
+        "image/apng",
+      ];
+
+      const documentExtensions = [
+        "pdf",
+        "doc",
+        "docx",
+        "txt",
+        "rtf",
+        "odt",
+        "pages",
+      ];
+      const archiveExtensions = ["zip", "rar", "7z", "tar", "gz", "bz2", "xz"];
+
+      // Check if it's an image by extension OR mime type
       let detectedFileType = "other";
-      if (imageExtensions.includes(extension)) detectedFileType = "image";
-      else if (documentExtensions.includes(extension)) detectedFileType = "document";
-      else if (archiveExtensions.includes(extension)) detectedFileType = "archive";
+
+      // First check by extension
+      if (imageExtensions.includes(extension)) {
+        detectedFileType = "image";
+        console.log("✅ Detected as image by extension:", extension);
+      }
+      // Then check by MIME type
+      else if (imageMimeTypes.includes(fileTypeLower)) {
+        detectedFileType = "image";
+        console.log("✅ Detected as image by MIME type:", fileTypeLower);
+      }
+      // Special handling for JFIF files without proper MIME type
+      else if (
+        fileTypeLower === "" &&
+        (extension === "jfif" || extension === "jfi")
+      ) {
+        detectedFileType = "image";
+        console.log("✅ Detected as JFIF image by extension");
+      } else if (documentExtensions.includes(extension)) {
+        detectedFileType = "document";
+      } else if (archiveExtensions.includes(extension)) {
+        detectedFileType = "archive";
+      }
+
+      console.log("📁 File type detected:", {
+        extension,
+        mimeType: file.type,
+        detectedFileType,
+      });
 
       setFileType(detectedFileType);
       setFileName(file.name);
 
       if (detectedFileType === "image") {
         const reader = new FileReader();
-        reader.onloadend = () => {
-          setFilePreview(reader.result);
+        reader.onload = (e) => {
+          console.log("✅ Image preview generated");
+          setFilePreview(e.target.result);
+        };
+        reader.onerror = (error) => {
+          console.error("❌ Error reading image file:", error);
+          toast.error("Failed to preview image");
+          setFilePreview(null);
         };
         reader.readAsDataURL(file);
       } else {
@@ -1886,211 +1909,17 @@ const ChatApp = ({
   );
 
   const removeFile = () => {
+    console.log("🗑️ Removing file from UI");
     setFilePreview(null);
     setFileType(null);
     setFileName("");
-    if (fileInputRef.current) fileInputRef.current.value = "";
-    if (imageInputRef.current) imageInputRef.current.value = "";
-  };
 
-  const startDrawing = (e) => {
-    if (!imageEditMode || !drawingCanvasRef.current) return;
-
-    const canvas = drawingCanvasRef.current;
-    const rect = canvas.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-
-    setIsDrawing(true);
-    setCurrentAnnotation({
-      type: "drawing",
-      points: [{ x, y }],
-      color: drawingColor,
-      width: drawingWidth,
-    });
-  };
-
-  const draw = (e) => {
-    if (!isDrawing || !currentAnnotation || !drawingCanvasRef.current) return;
-
-    const canvas = drawingCanvasRef.current;
-    const rect = canvas.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-
-    setCurrentAnnotation((prev) => ({
-      ...prev,
-      points: [...prev.points, { x, y }],
-    }));
-
-    const ctx = canvas.getContext("2d");
-    ctx.strokeStyle = currentAnnotation.color;
-    ctx.lineWidth = currentAnnotation.width;
-    ctx.lineCap = "round";
-    ctx.lineJoin = "round";
-
-    const points = currentAnnotation.points;
-    if (points.length > 1) {
-      ctx.beginPath();
-      ctx.moveTo(points[points.length - 2].x, points[points.length - 2].y);
-      ctx.lineTo(x, y);
-      ctx.stroke();
+    // Clear file inputs
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
     }
-  };
-
-  const stopDrawing = () => {
-    if (isDrawing && currentAnnotation) {
-      setAnnotations((prev) => [...prev, currentAnnotation]);
-      setCurrentAnnotation(null);
-    }
-    setIsDrawing(false);
-  };
-
-  const addTextAnnotation = () => {
-    setShowTextInput(true);
-  };
-
-  const handleTextSubmit = () => {
-    if (textInput.trim() && drawingCanvasRef.current) {
-      const canvas = drawingCanvasRef.current;
-      const newTextAnnotation = {
-        type: "text",
-        text: textInput.trim(),
-        x: 50,
-        y: 50,
-        color: drawingColor,
-        fontSize: 20,
-      };
-
-      setAnnotations((prev) => [...prev, newTextAnnotation]);
-
-      const ctx = canvas.getContext("2d");
-      ctx.fillStyle = newTextAnnotation.color;
-      ctx.font = `${newTextAnnotation.fontSize}px Arial`;
-      ctx.fillText(
-        newTextAnnotation.text,
-        newTextAnnotation.x,
-        newTextAnnotation.y
-      );
-
-      setTextInput("");
-      setShowTextInput(false);
-    }
-  };
-
-  const saveEditedImage = async () => {
-    if (!selectedFile || (!selectedUser && !selectedGroup)) {
-      toast.error("No file or recipient selected");
-      return;
-    }
-
-    try {
-      const token = localStorage.getItem("token");
-
-      const canvas = document.createElement("canvas");
-      const ctx = canvas.getContext("2d");
-
-      const originalImg = new Image();
-      originalImg.crossOrigin = "anonymous";
-
-      await new Promise((resolve, reject) => {
-        originalImg.onload = resolve;
-        originalImg.onerror = reject;
-        originalImg.src = selectedFile.url;
-      });
-
-      canvas.width = originalImg.naturalWidth;
-      canvas.height = originalImg.naturalHeight;
-
-      ctx.save();
-      ctx.translate(canvas.width / 2, canvas.height / 2);
-      ctx.rotate((imageRotation * Math.PI) / 180);
-      ctx.scale(imageScale, imageScale);
-      ctx.drawImage(
-        originalImg,
-        -originalImg.naturalWidth / 2,
-        -originalImg.naturalHeight / 2,
-        originalImg.naturalWidth,
-        originalImg.naturalHeight
-      );
-      ctx.restore();
-
-      annotations.forEach((annotation) => {
-        if (annotation.type === "drawing" && annotation.points.length > 1) {
-          ctx.strokeStyle = annotation.color;
-          ctx.lineWidth = annotation.width;
-          ctx.lineCap = "round";
-          ctx.lineJoin = "round";
-          ctx.beginPath();
-          ctx.moveTo(annotation.points[0].x, annotation.points[0].y);
-          for (let i = 1; i < annotation.points.length; i++) {
-            ctx.lineTo(annotation.points[i].x, annotation.points[i].y);
-          }
-          ctx.stroke();
-        } else if (annotation.type === "text") {
-          ctx.fillStyle = annotation.color;
-          ctx.font = `${annotation.fontSize || 20}px Arial`;
-          ctx.fillText(annotation.text, annotation.x, annotation.y);
-        }
-      });
-
-      canvas.toBlob(
-        async (blob) => {
-          if (!blob) {
-            toast.error("Failed to create image");
-            return;
-          }
-
-          const file = new File([blob], `edited-${selectedFile.name}`, {
-            type: "image/png",
-            lastModified: new Date().getTime(),
-          });
-
-          const formData = new FormData();
-          formData.append("file", file);
-          formData.append("text", "Edited image");
-
-          let endpoint = "";
-          if (selectedGroup) {
-            endpoint = `http://localhost:5001/api/messages/groups/${selectedGroup.id}/send`;
-          } else {
-            endpoint = `http://localhost:5001/api/messages/send/${selectedUser.id}`;
-          }
-
-          const uploadResponse = await axios.post(endpoint, formData, {
-            headers: {
-              Authorization: `Bearer ${token}`,
-              "Content-Type": "multipart/form-data",
-            },
-            timeout: 30000,
-          });
-
-          toast.success("Edited image sent successfully!");
-          setShowFileModal(false);
-          setImageEditMode(false);
-          setAnnotations([]);
-          setImageScale(1);
-          setImageRotation(0);
-        },
-        "image/png",
-        0.95
-      );
-    } catch (error) {
-      console.error("❌ Error saving edited image:", error);
-      toast.error("Failed to save edited image");
-    }
-  };
-
-  const clearAnnotations = () => {
-    setAnnotations([]);
-    if (drawingCanvasRef.current) {
-      const ctx = drawingCanvasRef.current.getContext("2d");
-      ctx.clearRect(
-        0,
-        0,
-        drawingCanvasRef.current.width,
-        drawingCanvasRef.current.height
-      );
+    if (imageInputRef.current) {
+      imageInputRef.current.value = "";
     }
   };
 
@@ -2104,91 +1933,157 @@ const ChatApp = ({
     const fileUrl = validateFileUrl(rawFileUrl);
     const fileType = message.file_type;
     const fileName = message.file_name || "File";
+    const isOptimistic = message.isOptimistic;
 
-    if (!fileUrl) {
+    if (!fileUrl && !isOptimistic) {
       return (
-        <div className={`flex items-center gap-3 p-3 ${
-          theme === "dark" ? "bg-red-900/20" : "bg-red-100"
-        } rounded-lg mb-2`}>
+        <div
+          className={`flex items-center gap-3 p-3 ${
+            theme === "dark" ? "bg-red-900/20" : "bg-red-100"
+          } rounded-lg mb-2`}
+        >
           <File size={20} />
           <div className="flex-1 min-w-0">
             <p className="text-sm font-medium break-words">{fileName}</p>
-            <p className="text-xs opacity-70">File unavailable - invalid URL</p>
+            <p className="text-xs opacity-70">File unavailable</p>
           </div>
         </div>
       );
     }
 
+    // For optimistic messages or when we have a preview
+    const displayUrl = isOptimistic ? message.file : fileUrl;
+
     if (fileType === "image") {
       return (
-        <div
-          className="mb-2 cursor-pointer"
-          onClick={() => handleOpenFile(fileUrl, fileType, fileName)}
-        >
-          <img
-            src={fileUrl}
-            alt={fileName}
-            className="max-w-48 max-h-48 rounded-lg object-cover hover:opacity-90 transition-opacity shadow-md"
-            onError={(e) => {
-              e.target.style.display = "none";
-              const fallbackElement = e.target.nextSibling;
-              if (fallbackElement) {
-                fallbackElement.style.display = 'block';
-              }
-            }}
-          />
-          <div
-            className="hidden flex items-center gap-3 p-3 bg-gray-100 dark:bg-gray-700 rounded-lg"
-            style={{ display: 'none' }}
-          >
-            <Image size={20} />
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium break-words">{fileName}</p>
-              <p className="text-xs opacity-70">Image failed to load</p>
+        <div className="mb-2">
+          {/* Thumbnail image - shows as small preview */}
+          <div className="relative inline-block group">
+            <img
+              src={displayUrl}
+              alt={fileName}
+              className="max-w-32 max-h-32 rounded-lg object-cover hover:opacity-90 transition-opacity cursor-pointer shadow-sm"
+              onClick={(e) => {
+                e.stopPropagation(); // CRITICAL: Stop event from bubbling up
+                if (!isOptimistic) {
+                  console.log("🖼️ Image clicked:", {
+                    fileUrl,
+                    fileType,
+                    fileName,
+                  });
+                  handleOpenFile(fileUrl, fileType, fileName);
+                }
+              }}
+              onError={(e) => {
+                console.error("❌ Image failed to load:", displayUrl);
+                e.target.style.display = "none";
+                const fallback = e.target.nextElementSibling;
+                if (fallback) fallback.style.display = "flex";
+              }}
+            />
+
+            {/* Fallback when image fails */}
+            <div
+              className="hidden items-center gap-3 p-3 bg-gray-100 dark:bg-gray-700 rounded-lg cursor-pointer"
+              onClick={(e) => {
+                e.stopPropagation(); // CRITICAL: Stop event from bubbling up
+                if (!isOptimistic) {
+                  handleOpenFile(fileUrl, fileType, fileName);
+                }
+              }}
+            >
+              <Image size={20} />
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium break-words">{fileName}</p>
+                <p className="text-xs opacity-70">Click to view</p>
+              </div>
             </div>
+
+            {/* Image overlay on hover */}
+            {!isOptimistic && (
+              <div
+                className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-all rounded-lg flex items-center justify-center opacity-0 group-hover:opacity-100"
+                onClick={(e) => {
+                  e.stopPropagation(); // CRITICAL: Stop event from bubbling up
+                  if (!isOptimistic) {
+                    console.log("🖼️ Overlay clicked");
+                    handleOpenFile(fileUrl, fileType, fileName);
+                  }
+                }}
+              >
+                <div className="bg-black/70 text-white text-xs px-2 py-1 rounded cursor-pointer">
+                  Click to view
+                </div>
+              </div>
+            )}
           </div>
+
+          {/* File name below image */}
           {!message.text && (
-            <p className="text-xs opacity-70 mt-1">
+            <p className="text-xs opacity-70 mt-1 truncate max-w-32">
               {fileName}
             </p>
+          )}
+
+          {/* Upload progress for optimistic messages */}
+          {isOptimistic && message.progress && (
+            <div className="mt-1">
+              <div className="h-1 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-amber-500 transition-all duration-300"
+                  style={{ width: `${message.progress}%` }}
+                />
+              </div>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                Uploading {message.progress}%
+              </p>
+            </div>
           )}
         </div>
       );
     }
 
+    // Non-image files
     return (
       <div
-        className={`flex items-center gap-3 p-3 ${
-          theme === "dark" ? "bg-white/10" : "bg-black/10"
-        } rounded-lg mb-2 cursor-pointer`}
-        onClick={() => handleOpenFile(fileUrl, fileType, fileName)}
+        className={`flex items-center gap-3 p-3 rounded-lg mb-2 cursor-pointer ${
+          theme === "dark"
+            ? "bg-white/10 hover:bg-white/15"
+            : "bg-black/5 hover:bg-black/10"
+        } transition-colors`}
+        onClick={(e) => {
+          e.stopPropagation(); // CRITICAL: Stop event from bubbling up
+          if (!isOptimistic) {
+            handleOpenFile(fileUrl, fileType, fileName);
+          }
+        }}
       >
         {getFileIcon(fileType || "other")}
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-medium break-words">
-            {fileName}
-          </p>
+          <p className="text-sm font-medium break-words">{fileName}</p>
           <p className="text-xs opacity-70">
-            {fileType || "File"} • Click to {fileType === "image" ? "view" : "download"}
+            {fileType || "File"} •{" "}
+            {!isOptimistic ? "Click to download" : "Uploading..."}
           </p>
         </div>
-        <Download size={16} />
+        {!isOptimistic && <Download size={16} />}
       </div>
     );
   };
-
   const renderMessageContent = (message) => {
     const isOwn = message.senderId === user?.id;
-    const isSystem = message.message_type === 'system';
+    const isSystem = message.message_type === "system";
 
     if (isSystem) {
       return (
         <div className="flex justify-center my-2">
-          <div className={`inline-block px-4 py-2 rounded-full text-sm ${
-            theme === "dark"
-              ? "bg-gray-700 text-gray-300"
-              : "bg-gray-200 text-gray-600"
-          }`}>
+          <div
+            className={`inline-block px-4 py-2 rounded-full text-sm ${
+              theme === "dark"
+                ? "bg-gray-700 text-gray-300"
+                : "bg-gray-200 text-gray-600"
+            }`}
+          >
             {message.text}
           </div>
         </div>
@@ -2200,18 +2095,20 @@ const ChatApp = ({
 
     return (
       <div
-        className={`max-w-[70%] p-3 rounded-xl ${
-          getMessageStyle(message)
-        } transition-all ${
+        className={`max-w-[70%] p-3 rounded-xl ${getMessageStyle(
+          message
+        )} transition-all ${
           selectedMessages.has(message.id) ? "ring-2 ring-amber-500" : ""
-        } ${
-          message.status === "sending" ? "opacity-70" : ""
-        } ${
+        } ${message.status === "sending" ? "opacity-70" : ""} ${
           message.error ? "ring-2 ring-red-500" : ""
-        } ${
-          isSelectMode ? "cursor-pointer" : ""
         }`}
-        onClick={() => isSelectMode && toggleMessageSelection(message.id)}
+        onClick={(e) => {
+          // Only trigger selection mode if clicking on the message background
+          // Not if clicking on the image or other interactive elements
+          if (isSelectMode && !e.target.closest(".file-interactive")) {
+            toggleMessageSelection(message.id);
+          }
+        }}
         onContextMenu={(e) => handleRightClick(e, message.id)}
       >
         {!isOwn && message.sender_name && (
@@ -2220,7 +2117,9 @@ const ChatApp = ({
           </div>
         )}
 
-        {hasFile && renderFileMessage(message)}
+        <div className="file-interactive">
+          {hasFile && renderFileMessage(message)}
+        </div>
 
         {hasRealText && (
           <div className="relative">
@@ -2288,7 +2187,10 @@ const ChatApp = ({
 
   useEffect(() => {
     const handleClickOutside = (event) => {
-      if (contextMenuRef.current && !contextMenuRef.current.contains(event.target)) {
+      if (
+        contextMenuRef.current &&
+        !contextMenuRef.current.contains(event.target)
+      ) {
         setShowContextMenu(false);
       }
       if (showFilters && !event.target.closest(".filters-container")) {
@@ -2502,11 +2404,13 @@ const ChatApp = ({
 
   return (
     <ErrorBoundary>
-      <div className={`flex h-[875px] relative ${
-        theme === "dark"
-          ? "bg-gray-900 text-white"
-          : "bg-gray-50 text-gray-900"
-      }`}>
+      <div
+        className={`flex h-[875px] relative ${
+          theme === "dark"
+            ? "bg-gray-900 text-white"
+            : "bg-gray-50 text-gray-900"
+        }`}
+      >
         {/* Modals */}
         {showCreateGroup && (
           <CreateGroupModal
@@ -2521,7 +2425,6 @@ const ChatApp = ({
             getInitialsAndColor={getInitialsAndColor}
           />
         )}
-
         {showGroupManagement && (
           <GroupManagementModal
             theme={theme}
@@ -2543,47 +2446,48 @@ const ChatApp = ({
           <ImageEditorModal
             theme={theme}
             selectedFile={selectedFile}
-            imageEditMode={imageEditMode}
-            setImageEditMode={setImageEditMode}
-            imageScale={imageScale}
-            setImageScale={setImageScale}
-            imageRotation={imageRotation}
-            setImageRotation={setImageRotation}
-            annotations={annotations}
-            setAnnotations={setAnnotations}
-            drawingColor={drawingColor}
-            setDrawingColor={setDrawingColor}
-            drawingWidth={drawingWidth}
-            setDrawingWidth={setDrawingWidth}
-            showTextInput={showTextInput}
-            setShowTextInput={setShowTextInput}
-            textInput={textInput}
-            setTextInput={setTextInput}
-            addTextAnnotation={addTextAnnotation}
-            clearAnnotations={clearAnnotations}
-            saveEditedImage={saveEditedImage}
-            downloadFile={downloadFile}
-            setShowFileModal={setShowFileModal}
-            imageCanvasRef={imageCanvasRef}
-            drawingCanvasRef={drawingCanvasRef}
-            isDrawing={isDrawing}
-            setIsDrawing={setIsDrawing}
-            currentAnnotation={currentAnnotation}
-            setCurrentAnnotation={setCurrentAnnotation}
-            startDrawing={startDrawing}
-            draw={draw}
-            stopDrawing={stopDrawing}
+            onClose={() => {
+              setShowFileModal(false);
+              setSelectedFile(null);
+            }}
+            onSave={async (blob) => {
+              try {
+                const token = localStorage.getItem("token");
+                const file = new File([blob], `edited-${selectedFile.name}`, {
+                  type: "image/png",
+                });
+
+                const formData = new FormData();
+                formData.append("file", file);
+                formData.append("text", "Edited image");
+
+                let endpoint = "";
+                if (selectedGroup) {
+                  endpoint = `http://localhost:5001/api/messages/groups/${selectedGroup.id}/send`;
+                } else {
+                  endpoint = `http://localhost:5001/api/messages/send/${selectedUser.id}`;
+                }
+
+                await axios.post(endpoint, formData, {
+                  headers: {
+                    Authorization: `Bearer ${token}`,
+                    "Content-Type": "multipart/form-data",
+                  },
+                });
+
+                toast.success("Edited image sent successfully!");
+                setShowFileModal(false);
+                setSelectedFile(null);
+              } catch (error) {
+                console.error("❌ Error sending edited image:", error);
+                toast.error("Failed to send edited image");
+              }
+            }}
+            onDownload={() => {
+              downloadFile(selectedFile.url, selectedFile.name);
+            }}
           />
         )}
-
-        <TextInputModal
-          theme={theme}
-          showTextInput={showTextInput}
-          textInput={textInput}
-          setTextInput={setTextInput}
-          handleTextSubmit={handleTextSubmit}
-          setShowTextInput={setShowTextInput}
-        />
 
         {/* Mobile sidebar toggle */}
         {isMobile && !showSidebar && (
@@ -2594,16 +2498,19 @@ const ChatApp = ({
             <Users size={20} />
           </button>
         )}
-
         {/* Sidebar */}
-        <aside className={`${
-          showSidebar ? "translate-x-0" : "-translate-x-full"
-        } md:translate-x-0 fixed md:relative w-80 ${
-          theme === "dark" ? "bg-gray-800" : "bg-white"
-        } shadow-lg transition-transform duration-300 flex flex-col z-30 h-full`}>
-          <div className={`p-4 border-b flex-shrink-0 ${
-            theme === "dark" ? "border-gray-700" : "border-gray-200"
-          }`}>
+        <aside
+          className={`${
+            showSidebar ? "translate-x-0" : "-translate-x-full"
+          } md:translate-x-0 fixed md:relative w-80 ${
+            theme === "dark" ? "bg-gray-800" : "bg-white"
+          } shadow-lg transition-transform duration-300 flex flex-col z-30 h-full`}
+        >
+          <div
+            className={`p-4 border-b flex-shrink-0 ${
+              theme === "dark" ? "border-gray-700" : "border-gray-200"
+            }`}
+          >
             <div className="flex items-center justify-between">
               <h1 className={`text-4xl font-bold ${amberGradientText}`}>
                 Chatter
@@ -2695,8 +2602,8 @@ const ChatApp = ({
                     showOnlineOnly
                       ? "bg-amber-500 text-white"
                       : theme === "dark"
-                        ? "bg-gray-700 hover:bg-gray-600"
-                        : "bg-gray-100 hover:bg-gray-200"
+                      ? "bg-gray-700 hover:bg-gray-600"
+                      : "bg-gray-100 hover:bg-gray-200"
                   }`}
                 >
                   Online
@@ -2708,9 +2615,11 @@ const ChatApp = ({
             </div>
 
             {showFilters && userCategories.length > 1 && (
-              <div className={`mt-2 p-2 ${
-                theme === "dark" ? "bg-gray-700" : "bg-white"
-              } rounded-lg shadow-lg filters-container`}>
+              <div
+                className={`mt-2 p-2 ${
+                  theme === "dark" ? "bg-gray-700" : "bg-white"
+                } rounded-lg shadow-lg filters-container`}
+              >
                 <div className="flex flex-wrap gap-1">
                   {userCategories.map((category) => (
                     <button
@@ -2720,8 +2629,8 @@ const ChatApp = ({
                         selectedCategory === category
                           ? "bg-amber-500 text-white"
                           : theme === "dark"
-                            ? "bg-gray-600 hover:bg-gray-500"
-                            : "bg-gray-100 hover:bg-gray-200"
+                          ? "bg-gray-600 hover:bg-gray-500"
+                          : "bg-gray-100 hover:bg-gray-200"
                       }`}
                     >
                       {category === "support_agent" ? "Support" : category}
@@ -2759,33 +2668,37 @@ const ChatApp = ({
                     {filteredUsers.length} user
                     {filteredUsers.length !== 1 ? "s" : ""}
                     {selectedCategory !== "all" &&
-                      ` in ${selectedCategory === "support_agent"
-                        ? "Support"
-                        : selectedCategory
+                      ` in ${
+                        selectedCategory === "support_agent"
+                          ? "Support"
+                          : selectedCategory
                       }`}
                     {showOnlineOnly && " (online)"}
                   </div>
                   {filteredUsers.map((userItem) => {
                     const isOnline = onlineUsers.includes(userItem.id);
-                    const { initials, colorClass } = getInitialsAndColor(userItem);
+                    const { initials, colorClass } =
+                      getInitialsAndColor(userItem);
                     const isSelected = selectedUser?.id === userItem.id;
 
                     return (
                       <button
                         key={userItem.id}
-                        onClick={() => handleUserOrGroupSelect(userItem, "user")}
+                        onClick={() =>
+                          handleUserOrGroupSelect(userItem, "user")
+                        }
                         className={`w-full p-3 flex items-center gap-3 rounded-lg mb-1 ${
                           isSelected
                             ? "bg-amber-500/20 border border-amber-500/30"
                             : theme === "dark"
-                              ? "hover:bg-gray-700"
-                              : "hover:bg-gray-100"
+                            ? "hover:bg-gray-700"
+                            : "hover:bg-gray-100"
                         } transition-colors border ${
                           isSelected
                             ? "border-amber-500/30"
                             : theme === "dark"
-                              ? "border-gray-700"
-                              : "border-transparent"
+                            ? "border-gray-700"
+                            : "border-transparent"
                         }`}
                       >
                         <div className="relative">
@@ -2827,94 +2740,95 @@ const ChatApp = ({
                 </div>
               )
             ) : /* Groups Tab */
-              groups.length === 0 ? (
-                <div className="text-center py-8 opacity-70 px-4">
-                  <GroupIcon className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                  <p>No groups yet</p>
-                  <p className="text-sm mt-2">
-                    Create a group to start group messaging
-                  </p>
-                  <button
-                    onClick={() => setShowCreateGroup(true)}
-                    className="mt-4 px-4 py-2 bg-amber-500 text-white rounded-lg hover:bg-amber-600 transition-colors"
-                  >
-                    Create Group
-                  </button>
+            groups.length === 0 ? (
+              <div className="text-center py-8 opacity-70 px-4">
+                <GroupIcon className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                <p>No groups yet</p>
+                <p className="text-sm mt-2">
+                  Create a group to start group messaging
+                </p>
+                <button
+                  onClick={() => setShowCreateGroup(true)}
+                  className="mt-4 px-4 py-2 bg-amber-500 text-white rounded-lg hover:bg-amber-600 transition-colors"
+                >
+                  Create Group
+                </button>
+              </div>
+            ) : (
+              <div className="p-2">
+                <div className="text-xs opacity-70 px-3 py-2 sticky top-0 bg-inherit z-10">
+                  {groups.length} group{groups.length !== 1 ? "s" : ""}
                 </div>
-              ) : (
-                <div className="p-2">
-                  <div className="text-xs opacity-70 px-3 py-2 sticky top-0 bg-inherit z-10">
-                    {groups.length} group{groups.length !== 1 ? "s" : ""}
-                  </div>
-                  {groups.map((group) => {
-                    const isSelected = selectedGroup?.id === group.id;
+                {groups.map((group) => {
+                  const isSelected = selectedGroup?.id === group.id;
 
-                    return (
-                      <div key={group.id} className="relative">
-                        <button
-                          onClick={() => handleUserOrGroupSelect(group, "group")}
-                          className={`w-full p-3 flex items-center gap-3 rounded-lg mb-1 ${
-                            isSelected
-                              ? "bg-amber-500/20 border border-amber-500/30"
-                              : theme === "dark"
-                                ? "hover:bg-gray-700"
-                                : "hover:bg-gray-100"
-                          } transition-colors border ${
-                            isSelected
-                              ? "border-amber-500/30"
-                              : theme === "dark"
-                                ? "border-gray-700"
-                                : "border-transparent"
-                          }`}
-                        >
-                          <div className="w-12 h-12 rounded-full bg-amber-500 flex items-center justify-center flex-shrink-0">
-                            <GroupIcon size={20} className="text-white" />
+                  return (
+                    <div key={group.id} className="relative">
+                      <button
+                        onClick={() => handleUserOrGroupSelect(group, "group")}
+                        className={`w-full p-3 flex items-center gap-3 rounded-lg mb-1 ${
+                          isSelected
+                            ? "bg-amber-500/20 border border-amber-500/30"
+                            : theme === "dark"
+                            ? "hover:bg-gray-700"
+                            : "hover:bg-gray-100"
+                        } transition-colors border ${
+                          isSelected
+                            ? "border-amber-500/30"
+                            : theme === "dark"
+                            ? "border-gray-700"
+                            : "border-transparent"
+                        }`}
+                      >
+                        <div className="w-12 h-12 rounded-full bg-amber-500 flex items-center justify-center flex-shrink-0">
+                          <GroupIcon size={20} className="text-white" />
+                        </div>
+                        <div className="text-left flex-1 min-w-0">
+                          <div className="font-medium truncate">
+                            {group.name}
                           </div>
-                          <div className="text-left flex-1 min-w-0">
-                            <div className="font-medium truncate">
-                              {group.name}
-                            </div>
-                            <div className="text-sm opacity-70 truncate">
-                              {group.participant_count ||
-                                group.participants_count ||
-                                groupParticipants.length ||
-                                0}{" "}
-                              members
-                            </div>
+                          <div className="text-sm opacity-70 truncate">
+                            {group.participant_count ||
+                              group.participants_count ||
+                              groupParticipants.length ||
+                              0}{" "}
+                            members
                           </div>
-                        </button>
+                        </div>
+                      </button>
 
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            openGroupManagement(group);
-                          }}
-                          className={`absolute right-3 top-1/2 transform -translate-y-1/2 p-2 rounded-full ${
-                            theme === "dark"
-                              ? "text-gray-400 hover:text-white hover:bg-gray-600"
-                              : "text-gray-500 hover:text-gray-700 hover:bg-gray-200"
-                          } transition-colors`}
-                          title="Manage Group"
-                        >
-                          <Settings size={16} />
-                        </button>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          openGroupManagement(group);
+                        }}
+                        className={`absolute right-3 top-1/2 transform -translate-y-1/2 p-2 rounded-full ${
+                          theme === "dark"
+                            ? "text-gray-400 hover:text-white hover:bg-gray-600"
+                            : "text-gray-500 hover:text-gray-700 hover:bg-gray-200"
+                        } transition-colors`}
+                        title="Manage Group"
+                      >
+                        <Settings size={16} />
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         </aside>
-
         {/* Main Chat Area */}
         <div className="flex-1 flex flex-col relative">
           {selectedUser || selectedGroup ? (
             <>
-              <div className={`p-4 ${
-                theme === "dark" ? "bg-gray-800" : "bg-white"
-              } border-b ${
-                theme === "dark" ? "border-gray-700" : "border-gray-200"
-              } flex items-center justify-between flex-shrink-0`}>
+              <div
+                className={`p-4 ${
+                  theme === "dark" ? "bg-gray-800" : "bg-white"
+                } border-b ${
+                  theme === "dark" ? "border-gray-700" : "border-gray-200"
+                } flex items-center justify-between flex-shrink-0`}
+              >
                 <div className="flex items-center gap-3">
                   {isMobile && (
                     <button
@@ -3003,8 +2917,8 @@ const ChatApp = ({
                       isSelectMode
                         ? "bg-amber-500 text-white"
                         : theme === "dark"
-                          ? "hover:bg-gray-700"
-                          : "hover:bg-gray-200"
+                        ? "hover:bg-gray-700"
+                        : "hover:bg-gray-200"
                     }`}
                   >
                     <Check size={20} />
@@ -3105,9 +3019,11 @@ const ChatApp = ({
               </div>
             </>
           ) : (
-            <div className={`flex-1 flex items-center justify-center ${
-              theme === "dark" ? "bg-gray-900" : "bg-gray-50"
-            }`}>
+            <div
+              className={`flex-1 flex items-center justify-center ${
+                theme === "dark" ? "bg-gray-900" : "bg-gray-50"
+              }`}
+            >
               <div className="text-center p-8 max-w-md">
                 <div
                   className={`w-20 h-20 ${amberGradient} rounded-full flex items-center justify-center mx-auto mb-6`}

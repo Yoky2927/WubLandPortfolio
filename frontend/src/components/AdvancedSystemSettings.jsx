@@ -456,128 +456,8 @@ const AdvancedSystemSettings = ({ theme }) => {
     </div>
   );
 
-  // NEW: System Metrics Dashboard
-  const SystemMetricsDashboard = () => (
-    <div className={`p-6 rounded-2xl border-2 backdrop-blur-lg ${
-      theme === 'dark' 
-        ? 'bg-gradient-to-br from-gray-800 to-gray-900 border-gray-700' 
-        : 'bg-gradient-to-br from-white to-gray-50 border-gray-200'
-    }`}>
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center gap-3">
-          <div className={`p-3 rounded-xl ${
-            theme === 'dark' ? 'bg-green-900/30' : 'bg-green-100'
-          }`}>
-            <Activity className="w-6 h-6 text-green-500" />
-          </div>
-          <div>
-            <h3 className={`text-xl font-bold ${
-              theme === 'dark' ? 'text-white' : 'text-gray-900'
-            }`}>
-              System Metrics
-            </h3>
-            <p className={`text-sm ${
-              theme === 'dark' ? 'text-gray-400' : 'text-gray-600'
-            }`}>
-              Real-time performance monitoring
-            </p>
-          </div>
-        </div>
-        <button
-          onClick={runSystemDiagnostics}
-          disabled={isLoading.diagnostics}
-          className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all duration-200 ${
-            theme === 'dark'
-              ? 'bg-blue-600 hover:bg-blue-700 text-white'
-              : 'bg-blue-500 hover:bg-blue-600 text-white'
-          } disabled:opacity-50`}
-        >
-          <RotateCw className={`w-4 h-4 ${isLoading.diagnostics ? 'animate-spin' : ''}`} />
-          {isLoading.diagnostics ? 'Running...' : 'Run Diagnostics'}
-        </button>
-      </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className={`p-4 rounded-xl border-2 ${
-          theme === 'dark' ? 'bg-gray-700/50 border-gray-600' : 'bg-gray-50 border-gray-200'
-        }`}>
-          <div className="flex items-center justify-between mb-2">
-            <Cpu className={`w-5 h-5 ${
-              systemMetrics.cpu > 80 ? 'text-red-500' : 
-              systemMetrics.cpu > 60 ? 'text-yellow-500' : 'text-green-500'
-            }`} />
-            <span className={`text-sm ${
-              theme === 'dark' ? 'text-gray-400' : 'text-gray-600'
-            }`}>CPU</span>
-          </div>
-          <div className={`text-2xl font-bold ${
-            systemMetrics.cpu > 80 ? 'text-red-500' : 
-            systemMetrics.cpu > 60 ? 'text-yellow-500' : 'text-green-500'
-          }`}>
-            {systemMetrics.cpu}%
-          </div>
-        </div>
 
-        <div className={`p-4 rounded-xl border-2 ${
-          theme === 'dark' ? 'bg-gray-700/50 border-gray-600' : 'bg-gray-50 border-gray-200'
-        }`}>
-          <div className="flex items-center justify-between mb-2">
-            <MemoryStick className={`w-5 h-5 ${
-              systemMetrics.memory > 90 ? 'text-red-500' : 
-              systemMetrics.memory > 75 ? 'text-yellow-500' : 'text-green-500'
-            }`} />
-            <span className={`text-sm ${
-              theme === 'dark' ? 'text-gray-400' : 'text-gray-600'
-            }`}>Memory</span>
-          </div>
-          <div className={`text-2xl font-bold ${
-            systemMetrics.memory > 90 ? 'text-red-500' : 
-            systemMetrics.memory > 75 ? 'text-yellow-500' : 'text-green-500'
-          }`}>
-            {systemMetrics.memory}%
-          </div>
-        </div>
-
-        <div className={`p-4 rounded-xl border-2 ${
-          theme === 'dark' ? 'bg-gray-700/50 border-gray-600' : 'bg-gray-50 border-gray-200'
-        }`}>
-          <div className="flex items-center justify-between mb-2">
-            <HardDrive className={`w-5 h-5 ${
-              systemMetrics.storage > 90 ? 'text-red-500' : 
-              systemMetrics.storage > 80 ? 'text-yellow-500' : 'text-green-500'
-            }`} />
-            <span className={`text-sm ${
-              theme === 'dark' ? 'text-gray-400' : 'text-gray-600'
-            }`}>Storage</span>
-          </div>
-          <div className={`text-2xl font-bold ${
-            systemMetrics.storage > 90 ? 'text-red-500' : 
-            systemMetrics.storage > 80 ? 'text-yellow-500' : 'text-green-500'
-          }`}>
-            {systemMetrics.storage}%
-          </div>
-        </div>
-
-        <div className={`p-4 rounded-xl border-2 ${
-          theme === 'dark' ? 'bg-gray-700/50 border-gray-600' : 'bg-gray-50 border-gray-200'
-        }`}>
-          <div className="flex items-center justify-between mb-2">
-            <NetworkIcon className={`w-5 h-5 ${
-              systemMetrics.network > 80 ? 'text-yellow-500' : 'text-green-500'
-            }`} />
-            <span className={`text-sm ${
-              theme === 'dark' ? 'text-gray-400' : 'text-gray-600'
-            }`}>Network</span>
-          </div>
-          <div className={`text-2xl font-bold ${
-            systemMetrics.network > 80 ? 'text-yellow-500' : 'text-green-500'
-          }`}>
-            {systemMetrics.network}%
-          </div>
-        </div>
-      </div>
-    </div>
-  );
 
   // Server monitoring section
   const ServerMonitor = () => (
@@ -856,8 +736,7 @@ const AdvancedSystemSettings = ({ theme }) => {
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
-      {/* System Metrics Dashboard */}
-      <SystemMetricsDashboard />
+
 
       {/* Server Monitoring */}
       <ServerMonitor />

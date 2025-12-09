@@ -2,8 +2,17 @@
 import { sampleProperties } from './sampleProperties.js';
 import { sampleBrokers } from './sampleBroker.js';
 
+// Helper function to generate UUIDs
+const generateUUID = () => {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    const r = Math.random() * 16 | 0;
+    const v = c === 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
+};
+
 // =============================================
-// CORE USER DATA
+// CORE USER DATA (Updated with new schema fields)
 // =============================================
 
 export const users = [
@@ -42,6 +51,8 @@ export const users = [
     stripe_customer_id: null,
     message_count: 0,
     last_message_time: null,
+    created_by_user_id: 1,
+    last_modified_by_user_id: 1,
   },
   // Saron Tesfaye - Admin
   {
@@ -78,6 +89,8 @@ export const users = [
     stripe_customer_id: null,
     message_count: 0,
     last_message_time: null,
+    created_by_user_id: 1,
+    last_modified_by_user_id: 1,
   },
   // Beza Hilemariam - Internal Broker (matches sampleBrokers[0])
   {
@@ -114,6 +127,8 @@ export const users = [
     stripe_customer_id: null,
     message_count: 5,
     last_message_time: "2024-10-18 10:25:00",
+    created_by_user_id: 1,
+    last_modified_by_user_id: 1,
   },
   // Birtukan Yemataw - Support Agent
   {
@@ -150,6 +165,8 @@ export const users = [
     stripe_customer_id: null,
     message_count: 12,
     last_message_time: "2024-10-18 12:15:00",
+    created_by_user_id: 1,
+    last_modified_by_user_id: 1,
   },
   // Beletu Wolde - Seller
   {
@@ -186,6 +203,8 @@ export const users = [
     stripe_customer_id: null,
     message_count: 3,
     last_message_time: "2024-10-17 16:30:00",
+    created_by_user_id: 1,
+    last_modified_by_user_id: 1,
   },
   // Mikias Girma - Admin
   {
@@ -222,6 +241,8 @@ export const users = [
     stripe_customer_id: null,
     message_count: 8,
     last_message_time: "2024-10-18 11:10:00",
+    created_by_user_id: 1,
+    last_modified_by_user_id: 1,
   },
   // Hana Solomon - Support Lead
   {
@@ -258,6 +279,8 @@ export const users = [
     stripe_customer_id: null,
     message_count: 15,
     last_message_time: "2024-10-18 13:00:00",
+    created_by_user_id: 1,
+    last_modified_by_user_id: 1,
   },
   // Daniel Mekonnen - Support Admin
   {
@@ -294,6 +317,8 @@ export const users = [
     stripe_customer_id: null,
     message_count: 20,
     last_message_time: "2024-10-18 13:45:00",
+    created_by_user_id: 1,
+    last_modified_by_user_id: 1,
   },
   // Elias Kebede - External Broker (matches sampleBrokers[1])
   {
@@ -330,6 +355,8 @@ export const users = [
     stripe_customer_id: null,
     message_count: 25,
     last_message_time: "2024-10-18 12:30:00",
+    created_by_user_id: 1,
+    last_modified_by_user_id: 1,
   },
   // Meron Teshome - Buyer
   {
@@ -366,6 +393,8 @@ export const users = [
     stripe_customer_id: null,
     message_count: 7,
     last_message_time: "2024-10-17 18:15:00",
+    created_by_user_id: 1,
+    last_modified_by_user_id: 1,
   },
   // Samuel Alemu - Landlord
   {
@@ -402,6 +431,8 @@ export const users = [
     stripe_customer_id: null,
     message_count: 4,
     last_message_time: "2024-10-16 13:30:00",
+    created_by_user_id: 1,
+    last_modified_by_user_id: 1,
   },
   // Liya Gebre - Renter
   {
@@ -438,6 +469,8 @@ export const users = [
     stripe_customer_id: null,
     message_count: 6,
     last_message_time: "2024-10-18 12:00:00",
+    created_by_user_id: 1,
+    last_modified_by_user_id: 1,
   },
   // Tigist Assefa - Regular User
   {
@@ -474,6 +507,8 @@ export const users = [
     stripe_customer_id: null,
     message_count: 2,
     last_message_time: "2024-10-17 17:10:00",
+    created_by_user_id: 1,
+    last_modified_by_user_id: 1,
   },
 ];
 
@@ -653,151 +688,313 @@ export const brokerReviews = [
 ];
 
 // =============================================
-// PROPERTIES DATA (from sampleProperties)
+// PROPERTIES DATA (Updated for new schema)
 // =============================================
 
-export const properties = sampleProperties.map(property => ({
-  title: property.title,
-  price: property.price,
-  address: property.address,
-  city: property.city,
-  region: property.region,
-  beds: property.beds,
-  baths: property.baths,
-  sqft: property.sqft,
-  garage: property.garage,
-  property_type: property.propertyType,
-  property_status: property.propertyStatus,
-  price_per_sqft: property.pricePerSqft,
-  year_built: property.yearBuilt,
-  lot_size: property.lotSize,
-  description: property.description,
-  images: JSON.stringify(property.images),
-  features: JSON.stringify(property.features),
-  coordinates: JSON.stringify(property.coordinates),
-  listed_date: new Date(Date.now() - property.listedDate * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-  views: property.views,
-  saves: property.saves,
-  mls_number: property.mlsNumber,
-  source: property.source,
-  est_payment: property.estPayment,
-  premium: property.premium,
-  broker_id: property.broker.id, // Map to user ID from sampleBrokers
-  price_history: JSON.stringify(property.priceHistory),
-  tax_history: JSON.stringify(property.taxHistory),
-  nearby_schools: JSON.stringify(property.nearbySchools),
-  floor_plans: JSON.stringify(property.floorPlans),
-}));
+export const properties = sampleProperties.map(property => {
+  // Map old property type to new ENUM values
+  const propertyTypeMap = {
+    'Single Family Residence': 'house',
+    'Apartment': 'apartment',
+    'Cottage': 'house',
+    'Penthouse': 'apartment',
+    'Villa': 'house',
+    'Loft': 'apartment'
+  };
+
+  // Map property status
+  const propertyStatusMap = {
+    'for sale': 'active',
+    'for rent': 'active'
+  };
+
+  // Determine owner user ID (use seller/landlord users)
+  let ownerUserId;
+  if (property.title.includes('Villa') || property.title.includes('Penthouse')) {
+    ownerUserId = 5; // Beletu Wolde (seller)
+  } else if (property.title.includes('Apartment') || property.title.includes('Cottage')) {
+    ownerUserId = 11; // Samuel Alemu (landlord)
+  } else {
+    ownerUserId = 5; // Default to Beletu Wolde
+  }
+
+  // Determine listing type
+  const listingType = property.propertyStatus === 'for rent' ? 'rent' : 'sale';
+
+  // Determine created by user ID (same as owner for now)
+  const createdByUserId = ownerUserId;
+
+  // Determine assigned broker ID from sampleBrokers
+  const assignedBrokerId = property.broker.id;
+
+  return {
+    property_uuid: generateUUID(),
+    title: property.title,
+    description: property.description,
+    property_type: propertyTypeMap[property.propertyType] || 'house',
+    property_status: propertyStatusMap[property.propertyStatus] || 'active',
+    address: property.address,
+    city: property.city,
+    state: property.region,
+    country: 'Ethiopia',
+    zip_code: property.city === 'Addis Ababa' ? '1000' : 
+              property.city === 'Gondar' ? '2000' : 
+              property.city === 'Mekelle' ? '6000' : '3000',
+    neighborhood: property.region,
+    // coordinates: `POINT(${property.coordinates[1]} ${property.coordinates[0]})`, // MySQL POINT format
+    beds: property.beds,
+    baths: property.baths,
+    sqft: property.sqft,
+    lot_size: property.lotSize || 0,
+    year_built: property.yearBuilt,
+    garage_spaces: property.garage,
+    parking_spaces: property.garage,
+    price: property.price,
+    currency: 'ETB',
+    price_per_sqft: property.pricePerSqft,
+    is_negotiable: true,
+    deposit_amount: property.price * 0.1, // 10% deposit
+    monthly_rent: property.propertyStatus === 'for rent' ? property.price : 0,
+    listing_type: listingType,
+    mls_number: property.mlsNumber,
+    listing_date: new Date(Date.now() - property.listedDate * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+    expiration_date: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 90 days from now
+    owner_user_id: ownerUserId,
+    created_by_user_id: createdByUserId,
+    assigned_broker_id: assignedBrokerId,
+    is_exclusive: property.premium,
+    features: JSON.stringify(property.features),
+    amenities: JSON.stringify(['Water', 'Electricity', 'Security']),
+    property_tags: JSON.stringify([property.propertyType, property.region]),
+    views_count: property.views,
+    saves_count: property.saves,
+    inquiries_count: Math.floor(property.views * 0.1), // 10% of views
+    is_featured: property.premium,
+    is_premium: property.premium,
+    tax_amount: property.price * 0.01, // 1% tax
+    hoa_fees: 0,
+    insurance_amount: property.price * 0.005, // 0.5% insurance
+    price_history: JSON.stringify(property.priceHistory),
+    status_history: JSON.stringify([
+      {
+        status: 'draft',
+        changed_at: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
+        changed_by: createdByUserId
+      },
+      {
+        status: 'active',
+        changed_at: new Date(Date.now() - property.listedDate * 24 * 60 * 60 * 1000).toISOString(),
+        changed_by: createdByUserId
+      }
+    ]),
+    published_at: new Date(Date.now() - property.listedDate * 24 * 60 * 60 * 1000).toISOString(),
+    last_modified_by_user_id: createdByUserId,
+  };
+});
 
 // =============================================
-// TODO SERVICE DATA
+// PROPERTY IMAGES DATA
+// =============================================
+
+export const propertyImages = sampleProperties.flatMap((property, index) => {
+  const propertyId = index + 1; // Assuming properties will have sequential IDs
+  return property.images.map((imageUrl, imgIndex) => ({
+    property_id: propertyId,
+    image_url: imageUrl,
+    thumbnail_url: imageUrl,
+    image_order: imgIndex,
+    caption: `${property.title} - Image ${imgIndex + 1}`,
+    alt_text: `${property.title} in ${property.city}`,
+    file_size: 1024 * 500, // 500KB
+    mime_type: 'image/jpeg',
+    width: 800,
+    height: 600,
+    is_primary: imgIndex === 0,
+    uploaded_by_user_id: property.owner_user_id || 5,
+  }));
+});
+
+// =============================================
+// TODO SERVICE DATA (Updated with new schema)
 // =============================================
 
 export const todos = [
   {
+    todo_uuid: generateUUID(),
     user_id: 2, // Saron Tesfaye
     title: "Review pending user verifications",
     description: "Check and verify 15 pending user account applications that require manual review",
+    todo_type: "admin",
     category: "user_management",
     priority: "high",
     status: "pending",
-    due_date: "2025-10-20",
+    due_date: "2024-10-20",
     estimated_hours: 3.5,
     assigned_to: 2,
+    assigned_by: 1,
+    assigned_at: "2024-10-18 09:00:00",
     created_by: 1,
     department: "administration",
+    reminder_sent: false,
+    reminder_date: "2024-10-19",
   },
   {
+    todo_uuid: generateUUID(),
     user_id: 7, // Hana Solomon
     title: "Handle escalated support tickets",
     description: "Resolve 5 high-priority escalated support tickets from VIP customers",
+    todo_type: "admin",
     category: "support_tickets",
     priority: "urgent",
     status: "in_progress",
-    due_date: "2025-10-19",
+    due_date: "2024-10-19",
     estimated_hours: 4.0,
     assigned_to: 7,
+    assigned_by: 1,
+    assigned_at: "2024-10-18 10:00:00",
     created_by: 1,
     department: "support",
+    reminder_sent: true,
+    reminder_date: "2024-10-18",
   },
   {
+    todo_uuid: generateUUID(),
     user_id: 6, // Mikias Girma
     title: "Monthly security audit",
     description: "Conduct comprehensive system security review and generate security report",
+    todo_type: "admin",
     category: "security_review",
     priority: "high",
     status: "pending",
-    due_date: "2025-10-25",
+    due_date: "2024-10-25",
     estimated_hours: 6.0,
     assigned_to: 6,
+    assigned_by: 1,
+    assigned_at: "2024-10-18 11:00:00",
     created_by: 1,
     department: "technical",
+    reminder_sent: false,
+    reminder_date: "2024-10-24",
+  },
+];
+
+// =============================================
+// TRANSACTIONS DATA (New for schema)
+// =============================================
+
+export const transactions = [
+  {
+    transaction_uuid: generateUUID(),
+    transaction_type: "sale",
+    transaction_status: "closed",
+    property_id: 1, // Luxury Villa
+    buyer_user_id: 10, // Meron Teshome
+    seller_user_id: 5, // Beletu Wolde
+    broker_id: 3, // Beza Hilemariam
+    offer_price: 26000000,
+    final_price: 26000000,
+    deposit_amount: 2600000,
+    commission_amount: 650000,
+    commission_rate: 2.5,
+    tax_amount: 260000,
+    fees_amount: 50000,
+    currency: "ETB",
+    offer_date: "2024-08-01",
+    acceptance_date: "2024-08-05",
+    closing_date: "2024-08-15",
+    occupancy_date: "2024-09-01",
+    terms: JSON.stringify({}),
+    special_conditions: "Furniture included",
+    created_by_user_id: 3,
+    last_modified_by_user_id: 3,
+    status_changed_at: "2024-08-15 14:00:00",
   },
   {
-    user_id: 4, // Birtukan Yemataw
-    title: "Update knowledge base for new features",
-    description: "Create documentation and help articles for recently launched property search features",
-    category: "knowledge_base",
-    priority: "medium",
-    status: "pending",
-    due_date: "2025-10-22",
-    estimated_hours: 5.0,
-    assigned_to: 4,
-    created_by: 2,
-    department: "support",
+    transaction_uuid: generateUUID(),
+    transaction_type: "rental",
+    transaction_status: "approved",
+    property_id: 2, // Modern Apartment
+    buyer_user_id: 12, // Liya Gebre
+    seller_user_id: 11, // Samuel Alemu
+    broker_id: 9, // Elias Kebede
+    offer_price: 20000,
+    final_price: 20000,
+    deposit_amount: 40000,
+    commission_amount: 2000,
+    commission_rate: 2.0,
+    tax_amount: 200,
+    fees_amount: 500,
+    currency: "ETB",
+    offer_date: "2024-09-25",
+    acceptance_date: "2024-09-28",
+    lease_start_date: "2024-10-01",
+    lease_end_date: "2025-10-01",
+    terms: JSON.stringify({}),
+    special_conditions: "Utilities included",
+    created_by_user_id: 9,
+    last_modified_by_user_id: 9,
+    status_changed_at: "2024-10-01 10:00:00",
+  },
+];
+
+// =============================================
+// OFFERS DATA (New for schema)
+// =============================================
+
+export const offers = [
+  {
+    offer_type: "purchase",
+    offer_status: "accepted",
+    property_id: 1,
+    transaction_id: 1,
+    offered_price: 26000000,
+    offered_deposit: 2600000,
+    offer_terms: "Standard purchase agreement with 30-day closing",
+    expiration_date: "2024-08-10",
+    offered_by_user_id: 10,
+    owner_user_id: 5,
+    response_notes: "Offer accepted as is",
+    responded_at: "2024-08-05 15:30:00",
   },
   {
-    user_id: 2, // Saron Tesfaye
-    title: "Review flagged property listings",
-    description: "Investigate 8 flagged property listings for potential policy violations",
-    category: "flagged_content",
-    priority: "medium",
-    status: "in_progress",
-    due_date: "2025-10-18",
-    estimated_hours: 2.5,
-    assigned_to: 2,
-    created_by: 1,
-    department: "moderation",
+    offer_type: "rental",
+    offer_status: "accepted",
+    property_id: 2,
+    transaction_id: 2,
+    offered_price: 20000,
+    offered_deposit: 40000,
+    offer_terms: "12-month lease, utilities included",
+    expiration_date: "2024-09-30",
+    offered_by_user_id: 12,
+    owner_user_id: 11,
+    response_notes: "Offer accepted with utilities included",
+    responded_at: "2024-09-28 11:45:00",
   },
+];
+
+// =============================================
+// APPOINTMENTS DATA (New for schema)
+// =============================================
+
+export const appointments = [
   {
-    user_id: 8, // Daniel Mekonnen
-    title: "Prepare monthly performance report",
-    description: "Compile support team performance metrics and generate monthly report for stakeholders",
-    category: "report_generation",
-    priority: "medium",
-    status: "pending",
-    due_date: "2025-10-28",
-    estimated_hours: 3.0,
-    assigned_to: 8,
-    created_by: 1,
-    department: "administration",
-  },
-  {
-    user_id: 7, // Hana Solomon
-    title: "Team training: New ticket system features",
-    description: "Prepare and conduct training session on new ticket management system features",
-    category: "training_development",
-    priority: "low",
-    status: "pending",
-    due_date: "2025-10-30",
-    estimated_hours: 4.0,
-    assigned_to: 7,
-    created_by: 8,
-    department: "support",
-  },
-  {
-    user_id: 6, // Mikias Girma
-    title: "System backup verification",
-    description: "Verify all system backups are completed successfully and test restoration process",
-    category: "system_maintenance",
-    priority: "high",
+    appointment_uuid: generateUUID(),
+    appointment_type: "property_showing",
+    title: "Luxury Villa Viewing",
+    description: "Initial property viewing for interested buyer",
+    start_time: "2024-08-03 10:00:00",
+    end_time: "2024-08-03 11:00:00",
+    timezone: "Africa/Addis_Ababa",
+    is_recurring: false,
+    location_type: "property",
+    location_address: "Summit St. George, Bole, Addis Ababa",
+    property_id: 1,
+    transaction_id: 1,
+    organizer_user_id: 3,
+    broker_id: 3,
     status: "completed",
-    due_date: "2025-10-15",
-    estimated_hours: 2.0,
-    actual_hours: 1.5,
-    assigned_to: 6,
-    created_by: 1,
-    department: "technical",
+    reminder_sent: true,
+    created_by_user_id: 3,
   },
 ];
 
@@ -816,44 +1013,7 @@ export const supportTickets = [
     priority: "medium",
     status: "open",
     assigned_to: 4, // Birtukan Yemataw
-    source: "web",
-  },
-  {
-    ticket_number: "TKT-2024-002",
-    user_id: 11, // Samuel Alemu
-    subject: "Payment not processed",
-    description: "Payment made 3 days ago for premium listing still showing as pending. Need urgent resolution.",
-    category: "payment",
-    subcategory: "transaction_issue",
-    priority: "high",
-    status: "in_progress",
-    assigned_to: 2, // Saron Tesfaye
-    source: "web",
-  },
-  {
-    ticket_number: "TKT-2024-003",
-    user_id: 12, // Liya Gebre
-    subject: "Account verification issue",
-    description: "Email verification link not working. Tried multiple times but cannot verify account.",
-    category: "account",
-    subcategory: "verification",
-    priority: "medium",
-    status: "resolved",
-    assigned_to: 4, // Birtukan Yemataw
-    source: "web",
-    resolved_at: "2024-10-15 10:30:00",
-    customer_rating: 5,
-  },
-  {
-    ticket_number: "TKT-2024-004",
-    user_id: 13, // Tigist Assefa
-    subject: "Property search filters not working",
-    description: "When applying multiple filters to property search, results are not accurate or show no properties.",
-    category: "technical",
-    subcategory: "search_functionality",
-    priority: "medium",
-    status: "open",
-    assigned_to: 4, // Birtukan Yemataw
+    assigned_at: "2024-10-18 09:00:00",
     source: "web",
   },
 ];
@@ -866,29 +1026,7 @@ export const knowledgeBaseArticles = [
   {
     article_number: "KB-001",
     title: "How to Reset Your Password",
-    content: `# How to Reset Your Password
-
-If you've forgotten your password or need to reset it for security reasons, follow these steps:
-
-## Step-by-Step Guide
-
-1. Go to the login page
-2. Click on "Forgot Password" link
-3. Enter your registered email address
-4. Check your email for the password reset link
-5. Click the link and create a new password
-6. Log in with your new password
-
-## Requirements
-- New password must be at least 8 characters long
-- Include uppercase and lowercase letters
-- Include at least one number
-- Include at least one special character
-
-## Troubleshooting
-- If you don't receive the email, check your spam folder
-- Ensure you're using the correct email address
-- Contact support if issues persist`,
+    content: `# How to Reset Your Password\n\nIf you've forgotten your password or need to reset it for security reasons, follow these steps...`,
     excerpt: "Complete guide to resetting your password if you forget it",
     category: "account",
     author_id: 4, // Birtukan Yemataw
@@ -898,76 +1036,6 @@ If you've forgotten your password or need to reset it for security reasons, foll
     views: 1245,
     helpful_votes: 89,
     published_at: "2024-09-01 09:00:00",
-  },
-  {
-    article_number: "KB-002",
-    title: "Understanding Payment Processing",
-    content: `# Understanding Payment Processing
-
-Learn how payments are processed on our platform and typical timelines for different transaction types.
-
-## Payment Methods
-We accept the following payment methods:
-- Credit/Debit Cards (Visa, MasterCard)
-- Bank Transfers
-- Mobile Money
-- Digital Wallets
-
-## Processing Times
-- Credit Card: 1-2 business days
-- Bank Transfer: 2-3 business days
-- Mobile Money: Instant to 24 hours
-
-## Common Issues
-- Failed transactions
-- Pending payments
-- Refund processing
-- Currency conversion`,
-    excerpt: "Learn how payments are processed on our platform and typical timelines",
-    category: "payment",
-    author_id: 2, // Saron Tesfaye
-    status: "published",
-    slug: "understanding-payment-processing",
-    is_featured: true,
-    views: 876,
-    helpful_votes: 67,
-    published_at: "2024-09-05 10:00:00",
-  },
-  {
-    article_number: "KB-003",
-    title: "Property Listing Guidelines",
-    content: `# Property Listing Guidelines
-
-Complete guide to creating and managing property listings on our platform.
-
-## Required Information
-- Property title and description
-- Location details
-- Price information
-- Property specifications
-- High-quality images
-- Contact information
-
-## Image Requirements
-- Minimum 3 photos, maximum 20
-- File size: Up to 5MB per image
-- Supported formats: JPG, PNG, WebP
-- No watermarks or logos
-
-## Prohibited Content
-- False or misleading information
-- Duplicate listings
-- Inappropriate content
-- Personal contact information in descriptions`,
-    excerpt: "Complete guide to creating and managing property listings",
-    category: "property",
-    author_id: 3, // Beza Hilemariam
-    status: "published",
-    slug: "property-listing-guidelines",
-    is_featured: true,
-    views: 1543,
-    helpful_votes: 112,
-    published_at: "2024-09-10 11:00:00",
   },
 ];
 
@@ -996,76 +1064,6 @@ export const systemConfigurations = [
     is_public: false,
     updated_by: 1,
   },
-  {
-    config_key: "support.sla_first_response",
-    config_value: "1440",
-    data_type: "number",
-    description: "SLA for first response in minutes",
-    category: "support",
-    is_editable: true,
-    is_public: false,
-    updated_by: 1,
-  },
-  {
-    config_key: "support.sla_resolution",
-    config_value: "10080",
-    data_type: "number",
-    description: "SLA for ticket resolution in minutes",
-    category: "support",
-    is_editable: true,
-    is_public: false,
-    updated_by: 1,
-  },
-  {
-    config_key: "user.verification_required",
-    config_value: "true",
-    data_type: "boolean",
-    description: "Whether email verification is required",
-    category: "user",
-    is_editable: true,
-    is_public: false,
-    updated_by: 1,
-  },
-  {
-    config_key: "system.maintenance_mode",
-    config_value: "false",
-    data_type: "boolean",
-    description: "System maintenance mode",
-    category: "system",
-    is_editable: true,
-    is_public: true,
-    updated_by: 1,
-  },
-  {
-    config_key: "user.auto_verification_threshold",
-    config_value: "100",
-    data_type: "number",
-    description: "Minimum transaction amount for automatic user verification",
-    category: "user",
-    is_editable: true,
-    is_public: false,
-    updated_by: 1,
-  },
-  {
-    config_key: "support.working_hours",
-    config_value: JSON.stringify({ start: "08:00", end: "18:00", timezone: "Africa/Addis_Ababa" }),
-    data_type: "object",
-    description: "Support team working hours",
-    category: "support",
-    is_editable: true,
-    is_public: false,
-    updated_by: 1,
-  },
-  {
-    config_key: "broker.commission_rate",
-    config_value: "2.5",
-    data_type: "number",
-    description: "Default commission rate for brokers",
-    category: "financial",
-    is_editable: true,
-    is_public: false,
-    updated_by: 1,
-  },
 ];
 
 // =============================================
@@ -1086,185 +1084,129 @@ export const privilegeTemplates = [
         chat: ["unlimited_messages", "initiate_chats", "group_chats"],
         limits: { max_active_chats: 100 }
       },
-      analytics: ["advanced_reports", "market_trends"]
+      analytics: ["advanced_reports", "market_trends"],
+      transactions: ["create_offers", "manage_contracts", "view_financials"],
+      payments: ["receive_commissions", "view_payment_history"]
     }),
     monthly_price: 299.00,
     is_active: true,
     description: "Premium internal broker with full feature access",
   },
-  {
-    template_name: "external_broker_standard",
-    role_type: "broker",
-    tier: "standard",
-    privileges: JSON.stringify({
-      properties: {
-        manage: ["create", "read", "update", "delete", "list_directly"],
-        limits: { max_listings: 100, max_images: 20, max_featured: 5 }
-      },
-      communication: {
-        chat: ["unlimited_messages", "initiate_chats"],
-        limits: { max_active_chats: 50 }
-      },
-      analytics: ["basic_reports"]
-    }),
-    monthly_price: 99.00,
-    is_active: true,
-    description: "Standard external broker with basic features",
-  },
-  {
-    template_name: "support_agent_basic",
-    role_type: "support",
-    tier: "basic",
-    privileges: JSON.stringify({
-      support: ["view_assigned_tickets", "respond", "resolve"],
-      knowledge_base: ["create", "suggest_updates"],
-      communication: ["view_assigned_chats", "respond_chats"]
-    }),
-    monthly_price: 0.00,
-    is_active: true,
-    description: "Basic support agent privileges",
-  },
 ];
 
 // =============================================
-// NOTIFICATIONS DATA
+// NOTIFICATIONS DATA (COMPLETE VERSION)
 // =============================================
 
 export const notifications = [
+  // Notification for Beza Hilemariam (user_id: 3)
   {
-    user_id: 3, // Beza Hilemariam
+    notification_uuid: generateUUID(),
+    user_id: 3,
     title: "New Property Inquiry",
     message: "Meron Teshome has inquired about your Luxury Villa listing",
-    type: "info",
+    notification_type: "property",
     is_read: false,
+    is_archived: false,
     action_url: "/messages",
+    icon: "home",
     related_entity_type: "property",
     related_entity_id: 1,
-    expires_at: "2024-10-25 23:59:59",
+    priority: "medium",
+    expires_at: "2024-12-31 23:59:59",
+    delivery_methods: JSON.stringify(["in_app", "email"]),
+    sent_at: "2024-10-18 09:00:00",
   },
+  // Notification for Yokabd (user_id: 1)
   {
-    user_id: 9, // Elias Kebede
-    title: "Rental Application Received",
-    message: "Liya Gebre has submitted a rental application for your Modern Apartment",
-    type: "success",
-    is_read: true,
-    action_url: "/applications",
-    related_entity_type: "property",
-    related_entity_id: 2,
-    read_at: "2024-10-18 11:30:00",
-  },
-  {
-    user_id: 10, // Meron Teshome
-    title: "Welcome to WubLand!",
-    message: "Your account has been successfully created. Start browsing properties now!",
-    type: "success",
-    is_read: true,
-    action_url: "/properties",
+    notification_uuid: generateUUID(),
+    user_id: 1,
+    title: "Welcome to WubLand",
+    message: "Welcome to the WubLand platform! Your account has been created successfully.",
+    notification_type: "info",
+    is_read: false,
+    is_archived: false,
+    action_url: "/dashboard",
+    icon: "welcome",
     related_entity_type: "user",
-    related_entity_id: 10,
-    read_at: "2024-10-17 16:10:00",
+    related_entity_id: 1,
+    priority: "low",
+    expires_at: "2024-12-31 23:59:59",
+    delivery_methods: JSON.stringify(["in_app"]),
+    sent_at: "2024-10-18 08:00:00",
   },
-];
-
-// =============================================
-// SUPPORT AGENT ACTIVITIES DATA
-// =============================================
-
-export const supportAgentActivities = [
+  // Notification for Saron (user_id: 2)
   {
-    agent_username: "birtukan_support",
-    activity_type: "ticket_resolved",
-    target_id: 3,
-    target_type: "ticket",
-    details: "Resolved account verification issue for user liya_renter",
+    notification_uuid: generateUUID(),
+    user_id: 2,
+    title: "System Update Available",
+    message: "A new system update is available. Please review the changes.",
+    notification_type: "system",
+    is_read: true,
+    is_archived: false,
+    action_url: "/admin/updates",
+    icon: "system",
+    related_entity_type: "system",
+    related_entity_id: null,
+    priority: "medium",
+    expires_at: "2024-10-25 23:59:59",
+    delivery_methods: JSON.stringify(["in_app", "email"]),
+    sent_at: "2024-10-18 07:30:00",
+    read_at: "2024-10-18 08:15:00",
   },
+  // Notification for Birtukan (user_id: 4)
   {
-    agent_username: "saron_admin",
-    activity_type: "ticket_assigned",
-    target_id: 2,
-    target_type: "ticket",
-    details: "Assigned to high priority payment issue ticket",
+    notification_uuid: generateUUID(),
+    user_id: 4,
+    title: "New Support Ticket Assigned",
+    message: "You have been assigned to support ticket TKT-2024-001",
+    notification_type: "info",
+    is_read: false,
+    is_archived: false,
+    action_url: "/support/tickets/TKT-2024-001",
+    icon: "support",
+    related_entity_type: "ticket",
+    related_entity_id: 1,
+    priority: "high",
+    expires_at: "2024-10-20 23:59:59",
+    delivery_methods: JSON.stringify(["in_app"]),
+    sent_at: "2024-10-18 09:15:00",
   },
+  // Notification for Elias (user_id: 9)
   {
-    agent_username: "birtukan_support",
-    activity_type: "article_created",
-    target_id: 1,
-    target_type: "article",
-    details: "Created new knowledge base article about password reset",
+    notification_uuid: generateUUID(),
+    user_id: 9,
+    title: "New Client Message",
+    message: "Liya Gebre has sent you a new message regarding the apartment.",
+    notification_type: "message",
+    is_read: false,
+    is_archived: false,
+    action_url: "/messages",
+    icon: "message",
+    related_entity_type: "message",
+    related_entity_id: 1,
+    priority: "medium",
+    expires_at: "2024-10-19 23:59:59",
+    delivery_methods: JSON.stringify(["in_app", "email"]),
+    sent_at: "2024-10-18 10:30:00",
   },
-];
-
-// =============================================
-// FLAGGED CONTENT DATA
-// =============================================
-
-export const flaggedContent = [
+  // Notification for Meron (user_id: 10)
   {
-    flag_number: "FLG-2024-001",
-    content_type: "property_listing",
-    content_id: "8",
-    content_url: "/properties/8",
-    reported_by_user_id: 10, // Meron Teshome
-    reason: "Suspicious price - seems too low for the location",
-    additional_details: "Property in prime area listed at 50% below market value",
-    severity: "medium",
-    status: "pending",
-  },
-  {
-    flag_number: "FLG-2024-002",
-    content_type: "user_message",
-    content_id: "45",
-    content_url: "/messages/45",
-    reported_by_user_id: 11, // Samuel Alemu
-    reason: "Inappropriate language in chat",
-    additional_details: "User used offensive language during property discussion",
-    severity: "high",
-    status: "under_review",
-    assigned_to: 2, // Saron Tesfaye
-    assigned_at: "2024-10-18 10:00:00",
-  },
-];
-
-// =============================================
-// PENDING REGISTRATIONS DATA
-// =============================================
-
-export const pendingRegistrations = [
-  {
-    first_name: "sindu",
-    last_name: "tadese",
-    username: "sindutadese",
-    email: "yokabdbi@gmail.com",
-    password: "$2b$10$EUwQv7kAO0TThvOjAcEySOwyGgSYTjIlE58YBvaD2OvRfIexGYrNO",
-    role: "user",
-    broker_type: null,
-    email_verification_token: "test_token_123",
-    email_verification_expires: "2024-10-25 23:59:59",
-  },
-];
-
-// =============================================
-// ARTICLE FEEDBACK DATA
-// =============================================
-
-export const articleFeedback = [
-  {
-    article_id: 1,
+    notification_uuid: generateUUID(),
     user_id: 10,
-    was_helpful: true,
-    feedback_comment: "Very clear instructions, helped me reset my password quickly!",
-  },
-  {
-    article_id: 2,
-    user_id: 11,
-    was_helpful: true,
-    feedback_comment: "Good overview of payment processing times",
-  },
-  {
-    article_id: 3,
-    user_id: 12,
-    was_helpful: false,
-    feedback_comment: "Could use more examples of good vs bad property photos",
+    title: "Payment Reminder",
+    message: "Your payment of ETB 2,600,000 is due in 3 days",
+    notification_type: "reminder",
+    is_read: false,
+    is_archived: false,
+    action_url: "/payments",
+    icon: "payment",
+    related_entity_type: "payment",
+    related_entity_id: 1,
+    priority: "high",
+    expires_at: "2024-10-21 23:59:59",
+    delivery_methods: JSON.stringify(["in_app", "email", "sms"]),
+    sent_at: "2024-10-18 11:00:00",
   },
 ];
 
@@ -1279,14 +1221,14 @@ export default {
   brokerAvailability,
   brokerReviews,
   properties,
+  propertyImages,
+  transactions,
+  offers,
+  appointments,
   todos,
   supportTickets,
   knowledgeBaseArticles,
   systemConfigurations,
   privilegeTemplates,
   notifications,
-  supportAgentActivities,
-  flaggedContent,
-  pendingRegistrations,
-  articleFeedback,
 };

@@ -7,43 +7,54 @@ import db from "../../shared/db.js";
 import path from "path";
 import fs from "fs";
 import crypto from "crypto";
+import axios from "axios"; // Added for inter-service communication
 
-// Simple fallback email service
-const FallbackEmailService = {
-  sendVerificationEmail: async () =>
-    console.log(
-      "📧 Email service not configured - verification email would be sent"
-    ),
-  sendPasswordChangeRequired: async () =>
-    console.log(
-      "📧 Email service not configured - password change email would be sent"
-    ),
-  sendSecurityAlert: async () =>
-    console.log(
-      "📧 Email service not configured - security alert would be sent"
-    ),
-};
+// Email Service interface - will call Communication-Service API instead of direct import
+class EmailServiceClient {
+  constructor() {
+    this.baseURL = process.env.COMMUNICATION_SERVICE_URL || "http://localhost:5003";
+  }
 
-let EmailService = FallbackEmailService;
-
-// Function to initialize email service (will be called when needed)
-const initializeEmailService = async () => {
-  if (EmailService === FallbackEmailService) {
+  async sendVerificationEmail(emailData, token) {
     try {
-      const emailModule = await import(
-        "../../communication-service/utils/emailService.js"
-      );
-      EmailService = emailModule.default || FallbackEmailService;
-      console.log("✅ Email service initialized successfully");
+      const response = await axios.post(`${this.baseURL}/api/email/send-verification`, {
+        email: emailData.email,
+        fullName: emailData.fullName,
+        token: token
+      });
+      return response.data;
     } catch (error) {
-      console.warn(
-        "⚠️ Email service not available, using fallback:",
-        error.message
-      );
-      EmailService = FallbackEmailService;
+      console.warn("Failed to send verification email via API:", error.message);
+      return null;
     }
   }
-};
+
+  async sendPasswordChangeRequired(emailData) {
+    try {
+      const response = await axios.post(`${this.baseURL}/api/email/send-password-change`, {
+        email: emailData.email,
+        fullName: emailData.fullName
+      });
+      return response.data;
+    } catch (error) {
+      console.warn("Failed to send password change email via API:", error.message);
+      return null;
+    }
+  }
+
+  async sendSecurityAlert(alertData) {
+    try {
+      const response = await axios.post(`${this.baseURL}/api/email/send-security-alert`, alertData);
+      return response.data;
+    } catch (error) {
+      console.warn("Failed to send security alert via API:", error.message);
+      return null;
+    }
+  }
+}
+
+// Initialize email service client
+const emailService = new EmailServiceClient();
 
 // Helper to get broker_type from broker_profiles
 async function getBrokerType(userId) {
@@ -75,6 +86,38 @@ async function isInternalEmployee(userId, role) {
   return true;
 }
 
+// Helper function to get resource usage via API calls instead of direct DB queries
+async function getCurrentResourceUsage(userId, resourceType) {
+  switch(resourceType) {
+    case 'listings':
+      // Call Property-Service API
+      try {
+        const response = await axios.get(
+          `${process.env.PROPERTY_SERVICE_URL || "http://localhost:5002"}/api/properties/user/${userId}/count`
+        );
+        return response.data.count || 0;
+      } catch (error) {
+        console.warn("Failed to get listing count via API:", error.message);
+        return 0;
+      }
+    
+    case 'messages':
+      // Call Communication-Service API
+      try {
+        const response = await axios.get(
+          `${process.env.COMMUNICATION_SERVICE_URL || "http://localhost:5003"}/api/messages/user/${userId}/count`
+        );
+        return response.data.count || 0;
+      } catch (error) {
+        console.warn("Failed to get message count via API:", error.message);
+        return 0;
+      }
+    
+    default:
+      return 0;
+  }
+}
+
 export const signup = async (req, res) => {
   const { firstName, lastName, username, email, password, role, broker_type } =
     req.body;
@@ -89,8 +132,6 @@ export const signup = async (req, res) => {
   });
 
   try {
-    await initializeEmailService();
-
     if (!firstName || !lastName || !username || !email || !password || !role) {
       console.log("❌ Missing fields:", {
         firstName,
@@ -225,7 +266,8 @@ export const signup = async (req, res) => {
         emailVerificationExpires
       );
 
-      await EmailService.sendVerificationEmail(
+      // Use API call instead of direct import
+      await emailService.sendVerificationEmail(
         { email, fullName: `${firstName} ${lastName}` },
         emailVerificationToken
       );
@@ -316,8 +358,6 @@ export const login = async (req, res) => {
   console.log("🔍 LOGIN ATTEMPT:", { username, ip, userAgent });
 
   try {
-    await initializeEmailService();
-
     const user = await User.findByUsername(username);
     console.log("🔍 User found:", user ? {
       id: user.id,
@@ -377,7 +417,7 @@ export const login = async (req, res) => {
 
       if (locked) {
         try {
-          await EmailService.sendSecurityAlert({
+          await emailService.sendSecurityAlert({
             type: "Account Locked Due to Failed Login Attempts",
             severity: "high",
             description: `Account ${user.email} locked after multiple failed login attempts from IP ${ip}`,
@@ -418,7 +458,7 @@ export const login = async (req, res) => {
       );
 
       try {
-        await EmailService.sendPasswordChangeRequired({
+        await emailService.sendPasswordChangeRequired({
           email: user.email,
           fullName: `${user.first_name} ${user.last_name}`,
         });
@@ -673,8 +713,6 @@ export const resendVerificationEmail = async (req, res) => {
       });
     }
 
-    await initializeEmailService();
-
     const user = await User.findByEmail(email);
     if (!user) {
       return res.status(404).json({
@@ -704,7 +742,7 @@ export const resendVerificationEmail = async (req, res) => {
     );
 
     try {
-      await EmailService.sendVerificationEmail(
+      await emailService.sendVerificationEmail(
         { email: user.email, fullName: `${user.first_name} ${user.last_name}` },
         emailVerificationToken
       );

@@ -84,10 +84,12 @@ const ChatMessage = {
         fileType: data.fileType,
       });
 
+      const messageUuid = generateUUID(); 
+
       const [result] = await db.execute(
         `INSERT INTO chat_messages 
-                 (conversation_id, sender_id, message_type, text, file_url, file_name, file_size, file_type, status, created_at) 
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
+                 (conversation_id, sender_id, message_type, text, file_url, file_name, file_size, file_type, status, message_uuid, created_at) 
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`, // ✅ ADD placeholder for message_uuid
         [
           data.conversationId,
           data.senderId,
@@ -98,6 +100,7 @@ const ChatMessage = {
           data.fileSize || null,
           data.fileType || null,
           data.status || "sent",
+          messageUuid, 
         ]
       );
 

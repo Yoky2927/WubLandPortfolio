@@ -22,7 +22,7 @@ import {
 } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import PropertyDetailsPopup from "./PropertyDetailsPopup";
-import { sampleProperties } from "../data/sampleProperties";
+// REMOVE THIS: import { sampleProperties } from "../data/sampleProperties";
 
 // Fix for default markers
 import L from "leaflet";
@@ -66,9 +66,8 @@ const EthiopiaPropertyMap = ({
 
   const ethiopiaCenter = [3.0245, 40.489673];
 
-  // Use passed properties or sampleProperties
-  const displayProperties =
-    properties.length > 0 ? properties : sampleProperties;
+  // Use passed properties - NO MORE sampleProperties
+  const displayProperties = properties;
 
   const tileLayers = {
     light: {
@@ -234,9 +233,10 @@ const EthiopiaPropertyMap = ({
     const { theme } = useTheme();
 
     const formatCurrency = (amount) => {
+      if (!amount) return "ETB 0";
       if (amount >= 1000000) return `ETB ${(amount / 1000000).toFixed(1)}M`;
       if (amount >= 1000) return `ETB ${(amount / 1000).toFixed(0)}K`;
-      return `ETB ${amount}`;
+      return `ETB ${amount.toLocaleString()}`;
     };
 
     return (
@@ -273,9 +273,9 @@ const EthiopiaPropertyMap = ({
             </span>
           </div>
           <div className="flex items-center space-x-4 text-xs opacity-75">
-            <span>{property.beds} beds</span>
-            <span>{property.baths} baths</span>
-            <span>{property.sqft?.toLocaleString()} sqft</span>
+            <span>{property.beds || 0} beds</span>
+            <span>{property.baths || 0} baths</span>
+            <span>{(property.sqft || 0)?.toLocaleString()} sqft</span>
           </div>
           <div className="flex items-center justify-between pt-1">
             <span
@@ -315,6 +315,22 @@ const EthiopiaPropertyMap = ({
     }
   }, [activePopup]);
 
+  // Add coordinates fallback for properties without coordinates
+  const getPropertyCoordinates = (property) => {
+    // Use latitude/longitude if available
+    if (property.latitude && property.longitude) {
+      return [parseFloat(property.latitude), parseFloat(property.longitude)];
+    }
+    
+    // Fallback to coordinates property if available
+    if (property.coordinates && Array.isArray(property.coordinates)) {
+      return property.coordinates;
+    }
+    
+    // Default to Ethiopia center
+    return ethiopiaCenter;
+  };
+
   return (
     <>
       <div className="h-full w-full relative ">
@@ -345,7 +361,7 @@ const EthiopiaPropertyMap = ({
             {filteredProperties.map((property) => (
               <Marker
                 key={property.id}
-                position={property.coordinates}
+                position={getPropertyCoordinates(property)}
                 icon={createPriceIcon(property)}
                 eventHandlers={{
                   click: (e) => {

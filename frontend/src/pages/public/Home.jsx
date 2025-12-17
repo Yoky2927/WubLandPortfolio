@@ -83,17 +83,20 @@ function Home() {
 
       if (userRole) {
         const roleRedirects = {
-          super_admin: "/super-admin-dashboard",
-          admin: "/admin-dashboard",
-          support_agent: "/support-dashboard",
-          support_lead: "/support-dashboard",
-          support_admin: "/support-dashboard",
-          broker: "/user-dashboard",
-          buyer: "/user-dashboard",
-          seller: "/seller-leaser", // ← CHANGED: Redirect sellers to seller-leaser
-          renter: "/seller-leaser", // ← CHANGED: Redirect renters to seller-leaser
-          user: "/user-dashboard",
-        };
+  super_admin: "/super-admin-dashboard",
+  admin: "/admin-dashboard",
+  support_agent: "/support-dashboard",
+  support_lead: "/support-dashboard",
+  support_admin: "/support-dashboard",
+  internal_broker: "/internal-broker-dashboard", // ← ADD THIS
+  external_broker: "/external-broker-dashboard", // ← ADD THIS
+  broker: "/user-dashboard", // Keep as fallback
+  buyer: "/user-dashboard",
+  seller: "/seller-leaser",
+  renter: "/seller-leaser",
+  leaser: "/seller-leaser", // ← Also add this if your system uses "leaser"
+  user: "/user-dashboard",
+};
 
         const redirectPath = roleRedirects[userRole];
         console.log("🏠 Home.jsx - Redirect Decision:", {

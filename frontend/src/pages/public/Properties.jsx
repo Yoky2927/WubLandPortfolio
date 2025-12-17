@@ -3,8 +3,6 @@ import { useTheme } from "../../contexts/ThemeContext";
 import { useNavigation } from "../../contexts/NavigationContext";
 import EthiopiaPropertyMap from "../../components/EthiopiaPropertyMap";
 import PropertyDetailsPopup from "../../components/PropertyDetailsPopup";
-import { sampleProperties } from "../../data/sampleProperties.js";
-import { sampleBrokers } from "../../data/sampleBroker.js";
 import Loader from "../../components/Loader";
 import ThemeToggle from "../../components/ThemeToggle.jsx";
 import Footer from "../../components/Footer";
@@ -34,6 +32,10 @@ import {
   Ruler,
 } from "lucide-react";
 
+// API Service imports
+import { httpClient } from "../../services/http.service";
+import { API_CONFIG } from "../../config/api.config";
+
 const Properties = () => {
   const { theme, toggleTheme } = useTheme();
   const { isNavigating } = useNavigation();
@@ -46,8 +48,8 @@ const Properties = () => {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [mobileView, setMobileView] = useState("list"); // 'list' or 'map'
-  const [brokers, setBrokers] = useState(sampleBrokers);
+  const [mobileView, setMobileView] = useState("list");
+  const [brokers, setBrokers] = useState([]);
 
   // Filter states
   const [filters, setFilters] = useState({
@@ -61,51 +63,216 @@ const Properties = () => {
     maxSqft: "",
   });
 
-  // Use seed data
+  // Helper function to parse JSON strings
+  const parseJSONField = (field) => {
+    if (!field) return [];
+    if (typeof field === 'string') {
+      try {
+        return JSON.parse(field);
+      } catch (e) {
+        console.error('Error parsing JSON:', e);
+        return [];
+      }
+    }
+    return field || [];
+  };
+
+  // Fetch properties from API - NO SAMPLE DATA
   useEffect(() => {
     const fetchProperties = async () => {
       setLoading(true);
+      console.log('🔄 Fetching properties from property-service API...');
+      
       try {
-        // Simulate API delay
-        await new Promise((resolve) => setTimeout(resolve, 1500));
+        let url;
+        let params = {
+          page: 1,
+          limit: 100,
+          property_status: 'active'
+        };
 
-        // Enhance properties with full broker data
-        const enhancedProperties = sampleProperties.map((property) => {
-          // Find the full broker data from sampleBrokers
-          const fullBrokerData = sampleBrokers.find(
-            (broker) => broker.id === property.broker?.id
-          );
+        // If there's a search term or filters, use search endpoint
+        if (searchTerm || Object.values(filters).some(f => f)) {
+          url = API_CONFIG.getUrl('PROPERTY_SEARCH');
+          
+          // Add search term
+          if (searchTerm) {
+            params.q = searchTerm;
+          }
+          
+          // Add filters
+          if (filters.propertyStatus) {
+            params.listing_type = filters.propertyStatus === 'for rent' ? 'rent' : 'sale';
+          }
+          if (filters.type) {
+            params.property_type = filters.type;
+          }
+          if (filters.beds) {
+            params.beds = filters.beds;
+          }
+          if (filters.baths) {
+            params.baths = filters.baths;
+          }
+          if (filters.city) {
+            params.city = filters.city;
+          }
+          if (filters.priceRange[0] > 0 || filters.priceRange[1] < 50000000) {
+            params.min_price = filters.priceRange[0];
+            params.max_price = filters.priceRange[1];
+          }
+          if (filters.minSqft > 0) {
+            params.min_sqft = filters.minSqft;
+          }
+          
+          console.log('🔍 Using search endpoint with filters:', params);
+        } else {
+          // Use general properties endpoint
+          url = API_CONFIG.getUrl('PROPERTIES');
+          console.log('🏠 Using general properties endpoint');
+        }
 
-          return {
-            ...property,
-            broker: fullBrokerData || property.broker, // Use full broker data if available
-          };
-        });
+        console.log(`📡 API Call: ${url}`);
+        const response = await httpClient.get(url, { params });
 
-        setProperties(enhancedProperties);
-        setFilteredProperties(enhancedProperties);
+        if (response.data?.success) {
+          let propertiesData = [];
+          
+          // Handle different response structures
+          if (response.data.data?.properties && Array.isArray(response.data.data.properties)) {
+            propertiesData = response.data.data.properties;
+          } else if (Array.isArray(response.data.data)) {
+            propertiesData = response.data.data;
+          } else if (response.data.properties && Array.isArray(response.data.properties)) {
+            propertiesData = response.data.properties;
+          } else if (Array.isArray(response.data)) {
+            propertiesData = response.data;
+          }
+          
+          console.log(`✅ Fetched ${propertiesData.length} properties from API`);
+
+          // Transform API data to match frontend structure
+          // In the transform function in Properties.jsx
+const transformedProperties = propertiesData.map(property => {
+  const parseJSONField = (field) => {
+    if (!field) return [];
+    if (typeof field === 'string') {
+      try {
+        return JSON.parse(field);
+      } catch (e) {
+        console.error('Error parsing JSON:', field, e);
+        return [];
+      }
+    }
+    return field || [];
+  };
+
+  return {
+    id: property.id,
+    title: property.title,
+    description: property.description,
+    propertyType: property.property_type,
+    propertyStatus: property.listing_type === 'rent' ? 'for rent' : 'for sale',
+    price: parseFloat(property.price) || 0,
+    pricePerSqft: parseFloat(property.price_per_sqft) || 0,
+    address: property.address,
+    city: property.city,
+    state: property.state,
+    region: property.region || property.neighborhood || '',
+    beds: property.beds || 0,
+    baths: property.baths || 0,
+    sqft: parseFloat(property.sqft) || 0,
+    lotSize: property.lot_size ? parseFloat(property.lot_size) : 0,
+    yearBuilt: property.year_built,
+    garage: property.garage_spaces || property.parking_spaces || 0,
+    images: ['/images/default-property.jpg'],
+    amenities: parseJSONField(property.amenities),
+    features: parseJSONField(property.features),
+    
+    // Broker information
+    broker: property.assigned_broker_id ? {
+      id: property.assigned_broker_id,
+      name: property.broker_username || 'Broker',
+      email: property.broker_email || '',
+      phone: '',
+      profilePicture: ''
+    } : null,
+    
+    // Location coordinates
+    latitude: parseFloat(property.latitude) || 9.1450,
+    longitude: parseFloat(property.longitude) || 40.4897,
+    
+    // Metadata
+    created_at: property.created_at,
+    updated_at: property.updated_at,
+    is_featured: property.is_featured || false,
+    is_premium: property.is_premium || false,
+    
+    // Frontend-specific fields
+    mlsNumber: property.mls_number || 'N/A',
+    source: property.mls_source || 'WubLand',
+    listedDate: property.created_at ? Math.floor((Date.now() - new Date(property.created_at).getTime()) / (1000 * 60 * 60 * 24)) : 0,
+    views: property.views_count || 0,
+    saves: property.saves_count || 0,
+    estPayment: property.est_payment || null,
+    averageRating: parseFloat(property.average_rating) || 0,
+    totalReviews: property.total_reviews || 0,
+    
+    // ✅ NOW USING REAL DATA FROM DATABASE
+    priceHistory: parseJSONField(property.price_history) || [],
+    taxHistory: parseJSONField(property.tax_history) || [],
+    nearbySchools: parseJSONField(property.nearby_schools) || [],
+    floorPlans: parseJSONField(property.floor_plans) || []
+  };
+});
+
+          setProperties(transformedProperties);
+          setFilteredProperties(transformedProperties);
+          
+          if (transformedProperties.length > 0) {
+            console.log('📋 First property:', transformedProperties[0]);
+            console.log('📍 Coordinates:', transformedProperties[0].latitude, transformedProperties[0].longitude);
+          }
+        } else {
+          console.warn('⚠️ API response not successful');
+          // NO SAMPLE DATA - empty arrays
+          setProperties([]);
+          setFilteredProperties([]);
+        }
       } catch (error) {
-        console.error("Error fetching properties:", error);
-        setProperties(sampleProperties);
-        setFilteredProperties(sampleProperties);
+        console.error("❌ Error fetching properties:", error);
+        // NO SAMPLE DATA - empty arrays
+        setProperties([]);
+        setFilteredProperties([]);
       } finally {
         setLoading(false);
       }
     };
+
     fetchProperties();
+  }, [searchTerm, filters]);
+
+  // Fetch brokers from API
+  useEffect(() => {
+    const fetchBrokers = async () => {
+      try {
+        const url = API_CONFIG.getUrl('BROKER_PROFILES');
+        const response = await httpClient.get(url);
+        
+        if (response.data?.success) {
+          setBrokers(response.data.data || []);
+        } else {
+          setBrokers([]);
+        }
+      } catch (error) {
+        console.log('⚠️ Could not fetch brokers');
+        setBrokers([]);
+      }
+    };
+
+    fetchBrokers();
   }, []);
 
-  // Add scrollToSection function
-  const scrollToSection = (sectionId) => {
-    const element = document.getElementById(sectionId);
-    if (element) {
-      element.scrollIntoView({
-        behavior: "smooth",
-        block: "start",
-      });
-    }
-  };
-
+  // Filter properties when filters or search changes
   useEffect(() => {
     let filtered = properties.filter((property) => {
       const matchesSearch =
@@ -113,23 +280,32 @@ const Properties = () => {
         property.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
         property.city.toLowerCase().includes(searchTerm.toLowerCase()) ||
         property.address.toLowerCase().includes(searchTerm.toLowerCase());
+      
       const matchesType =
         !filters.type || property.propertyType === filters.type;
+      
       const matchesStatus =
         !filters.propertyStatus ||
         property.propertyStatus === filters.propertyStatus;
+      
       const matchesCity = !filters.city || property.city === filters.city;
+      
       const matchesBeds =
         !filters.beds || property.beds >= parseInt(filters.beds);
+      
       const matchesBaths =
         !filters.baths || property.baths >= parseInt(filters.baths);
+      
       const matchesPrice =
         property.price >= filters.priceRange[0] &&
         property.price <= filters.priceRange[1];
+      
       const matchesMinSqft =
         !filters.minSqft || property.sqft >= parseInt(filters.minSqft);
+      
       const matchesMaxSqft =
         !filters.maxSqft || property.sqft <= parseInt(filters.maxSqft);
+      
       return (
         matchesSearch &&
         matchesType &&
@@ -142,6 +318,7 @@ const Properties = () => {
         matchesMaxSqft
       );
     });
+    
     setFilteredProperties(filtered);
   }, [properties, filters, searchTerm]);
 
@@ -165,10 +342,17 @@ const Properties = () => {
   };
 
   const formatCurrency = (amount) => {
-    if (amount >= 1000000) return `ETB ${(amount / 1000000).toFixed(1)}M`;
-    if (amount >= 1000) return `ETB ${(amount / 1000).toFixed(0)}K`;
-    return `ETB ${amount}`;
+    if (!amount) return "ETB 0";
+    if (amount >= 1000000) {
+      return `ETB ${(amount / 1000000).toFixed(1)}M`;
+    } else if (amount >= 1000) {
+      return `ETB ${(amount / 1000).toFixed(0)}K`;
+    }
+    return `ETB ${amount.toLocaleString()}`;
   };
+
+  // Get unique cities from properties for filter dropdown
+  const cities = [...new Set(properties.map(p => p.city).filter(Boolean))];
 
   // Top Navigation Component
   const TopNavigation = () => {
@@ -477,6 +661,14 @@ const Properties = () => {
     </div>
   );
 
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader message="Loading properties from database..." />
+      </div>
+    );
+  }
+
   return (
     <div
       className={`min-h-screen ${
@@ -534,8 +726,7 @@ const Properties = () => {
                       theme === "dark" ? "text-gray-400" : "text-gray-600"
                     }`}
                   >
-                    Discover your next home from {properties.length} verified
-                    listings
+                    Discover your next home from {properties.length} verified listings
                   </p>
                 </div>
                 <div className="hidden lg:flex items-center space-x-4">
@@ -620,6 +811,7 @@ const Properties = () => {
                     } backdrop-blur-sm`}
                   >
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                      {/* Property Type */}
                       <div>
                         <label className="block text-xs font-medium mb-2 text-gray-600 dark:text-gray-300">
                           Property Type
@@ -636,13 +828,14 @@ const Properties = () => {
                           } focus:ring-2 focus:ring-amber-500`}
                         >
                           <option value="">All Types</option>
-                          <option value="Villa">Villa</option>
-                          <option value="Apartment">Apartment</option>
-                          <option value="Penthouse">Penthouse</option>
-                          <option value="Cottage">Cottage</option>
-                          <option value="Loft">Loft</option>
+                          <option value="villa">Villa</option>
+                          <option value="apartment">Apartment</option>
+                          <option value="house">House</option>
+                          <option value="commercial">Commercial</option>
                         </select>
                       </div>
+                      
+                      {/* Beds */}
                       <div>
                         <label className="block text-xs font-medium mb-2 text-gray-600 dark:text-gray-300">
                           Beds
@@ -666,6 +859,8 @@ const Properties = () => {
                           <option value="5">5+</option>
                         </select>
                       </div>
+                      
+                      {/* Baths */}
                       <div>
                         <label className="block text-xs font-medium mb-2 text-gray-600 dark:text-gray-300">
                           Baths
@@ -688,6 +883,8 @@ const Properties = () => {
                           <option value="4">4+</option>
                         </select>
                       </div>
+                      
+                      {/* Status */}
                       <div>
                         <label className="block text-xs font-medium mb-2 text-gray-600 dark:text-gray-300">
                           Status
@@ -711,6 +908,8 @@ const Properties = () => {
                           <option value="for rent">For Rent</option>
                         </select>
                       </div>
+                      
+                      {/* City */}
                       <div>
                         <label className="block text-xs font-medium mb-2 text-gray-600 dark:text-gray-300">
                           City
@@ -727,12 +926,13 @@ const Properties = () => {
                           } focus:ring-2 focus:ring-amber-500`}
                         >
                           <option value="">All Cities</option>
-                          <option value="Addis Ababa">Addis Ababa</option>
-                          <option value="Mekelle">Mekelle</option>
-                          <option value="Bahir Dar">Bahir Dar</option>
-                          <option value="Adama">Adama</option>
+                          {cities.map(city => (
+                            <option key={city} value={city}>{city}</option>
+                          ))}
                         </select>
                       </div>
+                      
+                      {/* Min Sqft */}
                       <div>
                         <label className="block text-xs font-medium mb-2 text-gray-600 dark:text-gray-300">
                           Min Sqft
@@ -751,6 +951,8 @@ const Properties = () => {
                           placeholder="Min"
                         />
                       </div>
+                      
+                      {/* Max Sqft */}
                       <div>
                         <label className="block text-xs font-medium mb-2 text-gray-600 dark:text-gray-300">
                           Max Sqft
@@ -769,6 +971,8 @@ const Properties = () => {
                           placeholder="Max"
                         />
                       </div>
+                      
+                      {/* Price Range */}
                       <div>
                         <label className="block text-xs font-medium mb-2 text-gray-600 dark:text-gray-300">
                           Price Range
@@ -844,10 +1048,10 @@ const Properties = () => {
                         theme === "dark" ? "text-gray-300" : "text-gray-600"
                       }`}
                     >
-                      Showing {filteredProperties.length} of {properties.length}{" "}
-                      properties
+                      Showing {filteredProperties.length} of {properties.length} properties
                     </p>
                   </div>
+                  
                   {viewMode === "grid" ? (
                     <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
                       {filteredProperties.map((property) => (
@@ -873,6 +1077,7 @@ const Properties = () => {
                       ))}
                     </div>
                   )}
+                  
                   {filteredProperties.length === 0 && (
                     <div
                       className={`text-center py-12 rounded-xl ${
@@ -895,8 +1100,7 @@ const Properties = () => {
                           theme === "dark" ? "text-gray-400" : "text-gray-600"
                         }`}
                       >
-                        Try adjusting your search or filters to find more
-                        properties.
+                        Try adjusting your search or filters to find more properties.
                       </p>
                     </div>
                   )}
@@ -923,13 +1127,13 @@ const Properties = () => {
         property={selectedProperty}
         isOpen={isPopupOpen}
         onClose={() => setIsPopupOpen(false)}
-        brokers={brokers} // Pass brokers data to the popup
+        brokers={brokers}
       />
     </div>
   );
 };
 
-// Property Card (Grid View) - Improved
+// Property Card (Grid View)
 const PropertyCard = ({ property, theme, onPropertyClick, formatCurrency }) => (
   <div
     onClick={() => onPropertyClick(property)}
@@ -988,11 +1192,11 @@ const PropertyCard = ({ property, theme, onPropertyClick, formatCurrency }) => (
           {property.title}
         </h3>
         <p className="flex items-center text-sm mb-3 text-gray-500 dark:text-gray-400">
-          <MapPin size={14}  className={`mr-1 flex-shrink-0  ${
-            theme === "dark" ? "text-white" : " text-gray-600"
+          <MapPin size={14} className={`mr-1 flex-shrink-0 ${
+            theme === "dark" ? "text-white" : "text-gray-600"
           }`}/>
-          <span  className={`line-clamp-1  ${
-            theme === "dark" ? "text-white" : " text-gray-600"
+          <span className={`line-clamp-1 ${
+            theme === "dark" ? "text-white" : "text-gray-600"
           }`}>{property.address}, {property.city}</span>
         </p>
       </div>
@@ -1002,7 +1206,7 @@ const PropertyCard = ({ property, theme, onPropertyClick, formatCurrency }) => (
         <p className="text-amber-600 font-bold text-xl">
           {formatCurrency(property.price)}
         </p>
-        {property.pricePerSqft && (
+        {property.pricePerSqft && property.pricePerSqft > 0 && (
           <p className="text-xs text-gray-500 dark:text-gray-400">
             {formatCurrency(property.pricePerSqft)}/sqft
           </p>
@@ -1013,38 +1217,38 @@ const PropertyCard = ({ property, theme, onPropertyClick, formatCurrency }) => (
       <div className="flex justify-between text-sm text-gray-600 dark:text-gray-400 border-t border-gray-200 dark:border-gray-700 pt-4">
         <div className="flex flex-col items-center">
           <Bed size={18} className="mb-1 text-amber-600" />
-          <span className={`font-medium  ${
+          <span className={`font-medium ${
             theme === "dark" ? "text-white" : "text-gray-600"
           }`}>{property.beds}</span>
           <span className={`text-xs ${
-            theme === "dark" ? "text-white" : " text-gray-600"
+            theme === "dark" ? "text-white" : "text-gray-600"
           }`}>Beds</span>
         </div>
         <div className="flex flex-col items-center">
           <Bath size={18} className="mb-1 text-amber-600" />
-          <span className={`font-medium  ${
+          <span className={`font-medium ${
             theme === "dark" ? "text-white" : "text-gray-600"
           }`}>{property.baths}</span>
           <span className={`text-xs ${
-            theme === "dark" ? "text-white" : " text-gray-600"
+            theme === "dark" ? "text-white" : "text-gray-600"
           }`}>Baths</span>
         </div>
         <div className="flex flex-col items-center">
           <Ruler size={18} className="mb-1 text-amber-600" />
-          <span className={`font-medium  ${
+          <span className={`font-medium ${
             theme === "dark" ? "text-white" : "text-gray-600"
           }`}>{(property.sqft / 1000).toFixed(1)}K</span>
           <span className={`text-xs ${
-            theme === "dark" ? "text-white" : " text-gray-600"
+            theme === "dark" ? "text-white" : "text-gray-600"
           }`}>Sqft</span>
         </div>
         <div className="flex flex-col items-center">
           <Car size={18} className="mb-1 text-amber-600" />
-          <span className={`font-medium  ${
+          <span className={`font-medium ${
             theme === "dark" ? "text-white" : "text-gray-600"
           }`}>{property.garage || 0}</span>
           <span className={`text-xs ${
-            theme === "dark" ? "text-white" : " text-gray-600"
+            theme === "dark" ? "text-white" : "text-gray-600"
           }`}>Garage</span>
         </div>
       </div>
@@ -1052,13 +1256,8 @@ const PropertyCard = ({ property, theme, onPropertyClick, formatCurrency }) => (
   </div>
 );
 
-// Property Card (List View) - Improved
-const PropertyListCard = ({
-  property,
-  theme,
-  onPropertyClick,
-  formatCurrency,
-}) => (
+// Property Card (List View)
+const PropertyListCard = ({ property, theme, onPropertyClick, formatCurrency }) => (
   <div
     onClick={() => onPropertyClick(property)}
     className={`group rounded-xl overflow-hidden transition-all duration-300 hover:shadow-2xl cursor-pointer ${
@@ -1105,10 +1304,11 @@ const PropertyListCard = ({
                     <Home size={12} className="inline mr-1" />
                     {property.propertyType}
                   </span>
-                  <span className="text-xs text-gray-500 flex items-center">
-                    <Star size={12} className="mr-1" fill="currentColor" />
-                    {property.rating || "New"}
-                  </span>
+                  {property.is_featured && (
+                    <span className="text-xs bg-blue-500 text-white px-2 py-1 rounded-full">
+                      Featured
+                    </span>
+                  )}
                 </div>
                 <h3
                   className={`text-xl font-bold ${
@@ -1122,7 +1322,7 @@ const PropertyListCard = ({
                 <p className="text-amber-500 font-bold text-2xl">
                   {formatCurrency(property.price)}
                 </p>
-                {property.pricePerSqft && (
+                {property.pricePerSqft && property.pricePerSqft > 0 && (
                   <p className="text-sm text-gray-500 dark:text-gray-400">
                     {formatCurrency(property.pricePerSqft)}/sqft
                   </p>
@@ -1146,7 +1346,7 @@ const PropertyListCard = ({
                 theme === "dark" ? "text-gray-300" : "text-gray-600"
               }`}
             >
-              {property.description}
+              {property.description || "No description available"}
             </p>
           </div>
 

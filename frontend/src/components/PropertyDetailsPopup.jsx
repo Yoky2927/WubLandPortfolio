@@ -1058,7 +1058,7 @@ const FloorPlansSection = ({ floorPlans, selectedFloorPlan, setSelectedFloorPlan
 );
 
 // Main Popup Component
-const PropertyDetailsPopup = ({ property, isOpen, onClose, onNavigateToProperties }) => {
+const PropertyDetailsPopup = ({ property, isOpen, onClose, onNavigateToProperties, brokers = [] }) => {
   const { theme } = useTheme();
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
   const [activeTab, setActiveTab] = useState("overview");

@@ -169,7 +169,7 @@ CREATE TABLE IF NOT EXISTS password_reset_tokens (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- =============================================
--- BROKER MANAGEMENT TABLES (EXCEPT broker_reviews)
+-- BROKER MANAGEMENT TABLES
 -- =============================================
 
 -- Broker profiles table for broker-specific information
@@ -250,10 +250,10 @@ CREATE TABLE IF NOT EXISTS broker_availability (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- =============================================
--- PROPERTY SERVICE TABLES (CREATED BEFORE BROKER_REVIEWS)
+-- PROPERTY SERVICE TABLES (UPDATED WITH ALL FIELDS)
 -- =============================================
 
--- Main properties table for real estate listings
+-- Main properties table for real estate listings (UPDATED)
 CREATE TABLE IF NOT EXISTS properties (
     id INT AUTO_INCREMENT PRIMARY KEY,
     
@@ -263,18 +263,20 @@ CREATE TABLE IF NOT EXISTS properties (
     -- Property basic information
     title VARCHAR(255) NOT NULL,
     description TEXT,
-    property_type ENUM('residential', 'commercial', 'industrial', 'land', 'apartment', 'house', 'condo', 'townhouse') NOT NULL,
+    property_type ENUM('residential', 'commercial', 'industrial', 'land', 'apartment', 'house', 'condo', 'townhouse', 'villa', 'penthouse', 'cottage', 'loft') NOT NULL,
     property_status ENUM('active', 'pending', 'sold', 'rented', 'inactive', 'draft') DEFAULT 'draft',
     
-    -- Location information
+    -- Location information (UPDATED)
     address TEXT NOT NULL,
     city VARCHAR(100) NOT NULL,
     state VARCHAR(100),
     country VARCHAR(100) DEFAULT 'Ethiopia',
     zip_code VARCHAR(20),
     neighborhood VARCHAR(100),
-    -- coordinates POINT SRID 4326, -- For geographical queries (commented out for now)
+    latitude DECIMAL(10, 8),
+    longitude DECIMAL(11, 8),
     google_place_id VARCHAR(255),
+    region VARCHAR(100), -- Added for frontend
     
     -- Property specifications
     beds INT,
@@ -293,9 +295,10 @@ CREATE TABLE IF NOT EXISTS properties (
     deposit_amount DECIMAL(15,2),
     monthly_rent DECIMAL(15,2),
     
-    -- Listing information
+    -- Listing information (UPDATED)
     listing_type ENUM('sale', 'rent', 'lease') NOT NULL,
     mls_number VARCHAR(100),
+    mls_source VARCHAR(100), -- Added for frontend
     listing_date DATE,
     expiration_date DATE,
     
@@ -310,21 +313,30 @@ CREATE TABLE IF NOT EXISTS properties (
     amenities JSON DEFAULT '[]',
     property_tags JSON DEFAULT '[]',
     
-    -- Status tracking
+    -- Status tracking (UPDATED)
     views_count INT DEFAULT 0,
     saves_count INT DEFAULT 0,
     inquiries_count INT DEFAULT 0,
     is_featured BOOLEAN DEFAULT FALSE,
     is_premium BOOLEAN DEFAULT FALSE,
+    average_rating DECIMAL(3,2) DEFAULT 0.00, -- Added for frontend
+    total_reviews INT DEFAULT 0, -- Added for frontend
     
     -- Financial details
     tax_amount DECIMAL(10,2),
     hoa_fees DECIMAL(10,2),
     insurance_amount DECIMAL(10,2),
+    est_payment DECIMAL(15,2), -- Added for frontend
     
     -- Historical data
     price_history JSON DEFAULT '[]',
-    status_history JSON DEFAULT '[]',
+tax_history JSON DEFAULT '[]',
+nearby_schools JSON DEFAULT '[]',
+floor_plans JSON DEFAULT '[]',
+
+-- Social metrics (for frontend compatibility)
+average_rating DECIMAL(3,2) DEFAULT 0.00,
+total_reviews INT DEFAULT 0,
     
     -- Timestamps with audit trail
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -348,136 +360,9 @@ CREATE TABLE IF NOT EXISTS properties (
     INDEX idx_price (price),
     INDEX idx_owner_user (owner_user_id),
     INDEX idx_assigned_broker (assigned_broker_id),
-    INDEX idx_created_at (created_at)
-    -- SPATIAL INDEX idx_coordinates (coordinates) -- commented out for now
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- =============================================
--- TRANSACTION SERVICE TABLES (CREATED BEFORE BROKER_REVIEWS)
--- =============================================
-
--- Main transactions table
-CREATE TABLE IF NOT EXISTS transactions (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    transaction_uuid VARCHAR(36) NOT NULL UNIQUE,
-    
-    -- Transaction identification
-    transaction_type ENUM('sale', 'rental', 'lease') NOT NULL,
-    transaction_status ENUM('draft', 'offer_pending', 'offer_accepted', 'offer_rejected', 
-                           'under_contract', 'pending_approval', 'approved', 'closed', 
-                           'cancelled', 'expired') DEFAULT 'draft',
-    
-    -- Property information
-    property_id INT NOT NULL,
-    
-    -- Parties involved
-    buyer_user_id INT, -- For sales/rentals
-    seller_user_id INT NOT NULL, -- Property owner
-    broker_id INT, -- Assigned broker
-    
-    -- Financial details
-    offer_price DECIMAL(15,2),
-    final_price DECIMAL(15,2),
-    deposit_amount DECIMAL(15,2),
-    commission_amount DECIMAL(15,2),
-    commission_rate DECIMAL(5,2),
-    tax_amount DECIMAL(15,2),
-    fees_amount DECIMAL(15,2),
-    currency VARCHAR(3) DEFAULT 'ETB',
-    
-    -- Dates
-    offer_date DATE,
-    acceptance_date DATE,
-    closing_date DATE,
-    occupancy_date DATE,
-    lease_start_date DATE,
-    lease_end_date DATE,
-    
-    -- Terms and conditions
-    terms JSON,
-    special_conditions TEXT,
-    
-    -- Audit trail
-    created_by_user_id INT NOT NULL,
-    last_modified_by_user_id INT NULL,
-    
-    -- Timestamps
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    deleted_at TIMESTAMP NULL,
-    status_changed_at TIMESTAMP NULL,
-    
-    -- Foreign keys
-    FOREIGN KEY (property_id) REFERENCES properties(id) ON DELETE CASCADE,
-    FOREIGN KEY (buyer_user_id) REFERENCES users(id) ON DELETE SET NULL,
-    FOREIGN KEY (seller_user_id) REFERENCES users(id) ON DELETE CASCADE,
-    FOREIGN KEY (broker_id) REFERENCES users(id) ON DELETE SET NULL,
-    FOREIGN KEY (created_by_user_id) REFERENCES users(id) ON DELETE CASCADE,
-    FOREIGN KEY (last_modified_by_user_id) REFERENCES users(id) ON DELETE SET NULL,
-    
-    -- Indexes
-    INDEX idx_transaction_uuid (transaction_uuid),
-    INDEX idx_transaction_type (transaction_type),
-    INDEX idx_transaction_status (transaction_status),
-    INDEX idx_property_id (property_id),
-    INDEX idx_buyer_user (buyer_user_id),
-    INDEX idx_seller_user (seller_user_id),
-    INDEX idx_broker_id (broker_id),
-    INDEX idx_closing_date (closing_date)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- =============================================
--- NOW CREATE BROKER_REVIEWS TABLE
--- =============================================
-
--- Broker reviews and ratings table
-CREATE TABLE IF NOT EXISTS broker_reviews (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    
-    -- Relationship mapping
-    broker_id INT NOT NULL,
-    client_id INT NOT NULL,
-    property_id INT NULL, -- Optional link to specific property
-    transaction_id INT NULL, -- Link to specific transaction
-    
-    -- Rating components (1-5 scale)
-    overall_rating INT NOT NULL CHECK (overall_rating BETWEEN 1 AND 5),
-    communication_rating INT CHECK (communication_rating BETWEEN 1 AND 5),
-    professionalism_rating INT CHECK (professionalism_rating BETWEEN 1 AND 5),
-    knowledge_rating INT CHECK (knowledge_rating BETWEEN 1 AND 5),
-    
-    -- Multilingual review content
-    title_amharic VARCHAR(255),
-    title_english VARCHAR(255),
-    comment_amharic TEXT,
-    comment_english TEXT,
-    
-    -- Transaction context
-    transaction_type ENUM('sale', 'rental') NOT NULL,
-    transaction_date DATE,
-    transaction_amount DECIMAL(15,2),
-    
-    -- Review moderation status
-    is_approved BOOLEAN DEFAULT FALSE,
-    is_verified BOOLEAN DEFAULT FALSE, -- Verified actual client
-    
-    -- Timestamps
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    
-    -- Foreign keys and indexes
-    FOREIGN KEY (broker_id) REFERENCES users(id) ON DELETE CASCADE,
-    FOREIGN KEY (client_id) REFERENCES users(id) ON DELETE CASCADE,
-    FOREIGN KEY (property_id) REFERENCES properties(id) ON DELETE SET NULL,
-    FOREIGN KEY (transaction_id) REFERENCES transactions(id) ON DELETE SET NULL,
-    INDEX idx_broker_rating (broker_id, overall_rating),
     INDEX idx_created_at (created_at),
-    INDEX idx_is_approved (is_approved)
+    INDEX idx_lat_lng (latitude, longitude)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- =============================================
--- CONTINUE WITH OTHER PROPERTY-RELATED TABLES
--- =============================================
 
 -- Property images table
 CREATE TABLE IF NOT EXISTS property_images (
@@ -622,6 +507,129 @@ CREATE TABLE IF NOT EXISTS property_viewing_attendees (
     INDEX idx_viewing_id (viewing_id),
     INDEX idx_user_id (user_id),
     INDEX idx_attendee_status (attendee_status)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- =============================================
+-- TRANSACTION SERVICE TABLES
+-- =============================================
+
+-- Main transactions table
+CREATE TABLE IF NOT EXISTS transactions (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    transaction_uuid VARCHAR(36) NOT NULL UNIQUE,
+    
+    -- Transaction identification
+    transaction_type ENUM('sale', 'rental', 'lease') NOT NULL,
+    transaction_status ENUM('draft', 'offer_pending', 'offer_accepted', 'offer_rejected', 
+                           'under_contract', 'pending_approval', 'approved', 'closed', 
+                           'cancelled', 'expired') DEFAULT 'draft',
+    
+    -- Property information
+    property_id INT NOT NULL,
+    
+    -- Parties involved
+    buyer_user_id INT, -- For sales/rentals
+    seller_user_id INT NOT NULL, -- Property owner
+    broker_id INT, -- Assigned broker
+    
+    -- Financial details
+    offer_price DECIMAL(15,2),
+    final_price DECIMAL(15,2),
+    deposit_amount DECIMAL(15,2),
+    commission_amount DECIMAL(15,2),
+    commission_rate DECIMAL(5,2),
+    tax_amount DECIMAL(15,2),
+    fees_amount DECIMAL(15,2),
+    currency VARCHAR(3) DEFAULT 'ETB',
+    
+    -- Dates
+    offer_date DATE,
+    acceptance_date DATE,
+    closing_date DATE,
+    occupancy_date DATE,
+    lease_start_date DATE,
+    lease_end_date DATE,
+    
+    -- Terms and conditions
+    terms JSON,
+    special_conditions TEXT,
+    
+    -- Audit trail
+    created_by_user_id INT NOT NULL,
+    last_modified_by_user_id INT NULL,
+    
+    -- Timestamps
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    deleted_at TIMESTAMP NULL,
+    status_changed_at TIMESTAMP NULL,
+    
+    -- Foreign keys
+    FOREIGN KEY (property_id) REFERENCES properties(id) ON DELETE CASCADE,
+    FOREIGN KEY (buyer_user_id) REFERENCES users(id) ON DELETE SET NULL,
+    FOREIGN KEY (seller_user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (broker_id) REFERENCES users(id) ON DELETE SET NULL,
+    FOREIGN KEY (created_by_user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (last_modified_by_user_id) REFERENCES users(id) ON DELETE SET NULL,
+    
+    -- Indexes
+    INDEX idx_transaction_uuid (transaction_uuid),
+    INDEX idx_transaction_type (transaction_type),
+    INDEX idx_transaction_status (transaction_status),
+    INDEX idx_property_id (property_id),
+    INDEX idx_buyer_user (buyer_user_id),
+    INDEX idx_seller_user (seller_user_id),
+    INDEX idx_broker_id (broker_id),
+    INDEX idx_closing_date (closing_date)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- =============================================
+-- BROKER_REVIEWS TABLE
+-- =============================================
+
+-- Broker reviews and ratings table
+CREATE TABLE IF NOT EXISTS broker_reviews (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    
+    -- Relationship mapping
+    broker_id INT NOT NULL,
+    client_id INT NOT NULL,
+    property_id INT NULL, -- Optional link to specific property
+    transaction_id INT NULL, -- Link to specific transaction
+    
+    -- Rating components (1-5 scale)
+    overall_rating INT NOT NULL CHECK (overall_rating BETWEEN 1 AND 5),
+    communication_rating INT CHECK (communication_rating BETWEEN 1 AND 5),
+    professionalism_rating INT CHECK (professionalism_rating BETWEEN 1 AND 5),
+    knowledge_rating INT CHECK (knowledge_rating BETWEEN 1 AND 5),
+    
+    -- Multilingual review content
+    title_amharic VARCHAR(255),
+    title_english VARCHAR(255),
+    comment_amharic TEXT,
+    comment_english TEXT,
+    
+    -- Transaction context
+    transaction_type ENUM('sale', 'rental') NOT NULL,
+    transaction_date DATE,
+    transaction_amount DECIMAL(15,2),
+    
+    -- Review moderation status
+    is_approved BOOLEAN DEFAULT FALSE,
+    is_verified BOOLEAN DEFAULT FALSE, -- Verified actual client
+    
+    -- Timestamps
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    
+    -- Foreign keys and indexes
+    FOREIGN KEY (broker_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (client_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (property_id) REFERENCES properties(id) ON DELETE SET NULL,
+    FOREIGN KEY (transaction_id) REFERENCES transactions(id) ON DELETE SET NULL,
+    INDEX idx_broker_rating (broker_id, overall_rating),
+    INDEX idx_created_at (created_at),
+    INDEX idx_is_approved (is_approved)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- =============================================
@@ -1804,62 +1812,3 @@ CREATE TABLE IF NOT EXISTS todo_templates (
     INDEX idx_category_department (category, department),
     INDEX idx_recurrence (recurrence_pattern)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- =============================================
--- INITIAL DATA POPULATION
--- =============================================
-
--- Insert essential system configurations
-INSERT IGNORE INTO system_configurations (config_key, config_value, data_type, description, category) VALUES
--- Communication settings
-('chat.free_message_limit', '10', 'number', 'Number of free messages for non-premium users', 'communication'),
-('chat.premium_features', '["unlimited_messages", "group_chats", "file_sharing"]', 'array', 'Features available to premium users', 'communication'),
-
--- Support service level agreements
-('support.sla_first_response', '1440', 'number', 'SLA for first response in minutes', 'support'),
-('support.sla_resolution', '10080', 'number', 'SLA for ticket resolution in minutes', 'support'),
-
--- User management settings
-('user.verification_required', 'true', 'boolean', 'Whether email verification is required', 'user'),
-
--- System operation settings
-('system.maintenance_mode', 'false', 'boolean', 'System maintenance mode', 'system'),
-
--- Property settings
-('property.default_commission_rate', '2.5', 'number', 'Default broker commission rate (%)', 'property'),
-('property.listing_expiry_days', '90', 'number', 'Days before property listing expires', 'property'),
-
--- Transaction settings
-('transaction.default_deposit_percentage', '10', 'number', 'Default deposit percentage for offers', 'transaction');
-
--- Insert privilege templates for role-based access control
-INSERT IGNORE INTO privilege_templates (template_name, role_type, tier, privileges, monthly_price, description) VALUES
--- Premium internal broker template
-('internal_broker_premium', 'broker', 'premium', 
- '{"properties": {"manage": ["create", "read", "update", "delete", "bulk_upload", "list_directly", "feature"], "limits": {"max_listings": 1000, "max_images": 50, "max_featured": 20}}, "communication": {"chat": ["unlimited_messages", "initiate_chats", "group_chats"], "limits": {"max_active_chats": 100}}, "analytics": ["advanced_reports", "market_trends"], "transactions": ["create_offers", "manage_contracts", "view_financials"], "payments": ["receive_commissions", "view_payment_history"]}', 
- 299.00, 
- 'Premium internal broker with full feature access'),
-
--- Standard external broker template
-('external_broker_standard', 'broker', 'standard', 
- '{"properties": {"manage": ["create", "read", "update", "delete", "list_directly"], "limits": {"max_listings": 100, "max_images": 20, "max_featured": 5}}, "communication": {"chat": ["unlimited_messages", "initiate_chats"], "limits": {"max_active_chats": 50}}, "analytics": ["basic_reports"], "transactions": ["create_offers", "manage_contracts"], "payments": ["receive_commissions"]}', 
- 99.00, 
- 'Standard external broker with basic features'),
-
--- Basic support agent template
-('support_agent_basic', 'support', 'basic', 
- '{"support": ["view_assigned_tickets", "respond", "resolve"], "knowledge_base": ["create", "suggest_updates"], "communication": ["view_assigned_chats", "respond_chats"], "users": ["view_basic_info", "reset_passwords"], "properties": ["view_listings", "flag_content"]}', 
- 0.00, 
- 'Basic support agent privileges'),
-
--- Premium seller/landlord template
-('seller_premium', 'client', 'premium', 
- '{"properties": {"manage": ["create", "read", "update", "delete", "feature"], "limits": {"max_listings": 50, "max_images": 30, "max_featured": 5}}, "communication": {"chat": ["unlimited_messages"], "limits": {"max_active_chats": 20}}, "analytics": ["view_performance"], "transactions": ["view_offers", "accept_offers", "manage_contracts"], "payments": ["receive_payments", "view_invoices"]}', 
- 49.00, 
- 'Premium seller/landlord with enhanced features'),
-
--- Basic buyer/renter template
-('buyer_basic', 'client', 'basic', 
- '{"properties": {"search": ["advanced_search", "save_searches"], "limits": {"saved_properties": 100, "saved_searches": 10}}, "communication": {"chat": ["limited_messages"], "limits": {"max_active_chats": 5}}, "transactions": ["create_offers", "view_status"]}', 
- 0.00, 
- 'Basic buyer/renter privileges');

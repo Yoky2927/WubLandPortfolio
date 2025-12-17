@@ -1,0 +1,1241 @@
+{
+  "timestamp": "2025-12-16T18:25:29.747Z",
+  "services": {
+    "property": "http://localhost:5002",
+    "analytics": "http://localhost:5004"
+  },
+  "database": {
+    "propertiesCount": 1,
+    "usersCount": 5,
+    "brokersCount": 5,
+    "hasAuthToken": false
+  },
+  "summary": {
+    "total": 29,
+    "passed": 26,
+    "failed": 3,
+    "successRate": "89.66%"
+  },
+  "failedEndpoints": [
+    {
+      "name": "Analytics Service Root",
+      "url": "http://localhost:5004/",
+      "expectedStatus": 200,
+      "actualStatus": 404
+    },
+    {
+      "name": "Get property analytics",
+      "url": "http://localhost:5004/api/analytics/properties",
+      "expectedStatus": 200,
+      "actualStatus": 404
+    },
+    {
+      "name": "Get user analytics",
+      "url": "http://localhost:5004/api/analytics/users",
+      "expectedStatus": 200,
+      "actualStatus": 404
+    }
+  ],
+  "results": [
+    {
+      "name": "Property Service Health",
+      "method": "GET",
+      "url": "http://localhost:5002/health",
+      "expectedStatus": 200,
+      "actualStatus": 200,
+      "success": true,
+      "responseTime": 64,
+      "data": {
+        "status": "healthy",
+        "service": "property-service",
+        "timestamp": "2025-12-16T18:25:28.582Z"
+      }
+    },
+    {
+      "name": "Property Service Root",
+      "method": "GET",
+      "url": "http://localhost:5002/",
+      "expectedStatus": 200,
+      "actualStatus": 200,
+      "success": true,
+      "responseTime": 6,
+      "data": {
+        "service": "property-service",
+        "version": "1.0.0",
+        "status": "running",
+        "timestamp": "2025-12-16T18:25:28.613Z",
+        "endpoints": [
+          "/health",
+          "/api/properties",
+          "/api/properties/:id",
+          "/api/properties/search",
+          "/api/properties/featured",
+          "/api/properties/premium",
+          "/api/properties/recent"
+        ]
+      }
+    },
+    {
+      "name": "Analytics Service Health",
+      "method": "GET",
+      "url": "http://localhost:5004/health",
+      "expectedStatus": 200,
+      "actualStatus": 200,
+      "success": true,
+      "responseTime": 6,
+      "data": {
+        "status": "ok",
+        "service": "analysis-service",
+        "uptime": 7015.1575379,
+        "timestamp": "2025-12-16T18:25:28.621Z",
+        "connections": 0
+      }
+    },
+    {
+      "name": "Analytics Service Root",
+      "method": "GET",
+      "url": "http://localhost:5004/",
+      "expectedStatus": 200,
+      "actualStatus": 404,
+      "success": false,
+      "responseTime": 4,
+      "data": {
+        "error": "Route not found"
+      }
+    },
+    {
+      "name": "Get all properties",
+      "method": "GET",
+      "url": "http://localhost:5002/api/properties",
+      "expectedStatus": 200,
+      "actualStatus": 200,
+      "success": true,
+      "responseTime": 20,
+      "data": {
+        "success": true,
+        "message": "Properties retrieved successfully",
+        "timestamp": "2025-12-16T18:25:28.653Z",
+        "data": {
+          "properties": [
+            {
+              "id": 1,
+              "property_uuid": "fdaff6ef-a032-45f2-b5e6-0b04b2fd9b9d",
+              "title": "Luxury Villa in Bole",
+              "description": "A magnificent luxury villa in Addis Ababa",
+              "property_type": "villa",
+              "property_status": "active",
+              "address": "Summit St. George, Bole, Addis Ababa",
+              "city": "Addis Ababa",
+              "state": "Addis Ababa",
+              "country": "Ethiopia",
+              "zip_code": "1000",
+              "neighborhood": "Bole",
+              "latitude": "9.03200000",
+              "longitude": "38.74680000",
+              "google_place_id": null,
+              "region": null,
+              "beds": 5,
+              "baths": 6,
+              "sqft": "5500.00",
+              "lot_size": null,
+              "year_built": null,
+              "garage_spaces": 0,
+              "parking_spaces": 0,
+              "price": "26000000.00",
+              "currency": "ETB",
+              "price_per_sqft": null,
+              "is_negotiable": 1,
+              "deposit_amount": null,
+              "monthly_rent": null,
+              "listing_type": "sale",
+              "mls_number": null,
+              "mls_source": null,
+              "listing_date": null,
+              "expiration_date": null,
+              "owner_user_id": 5,
+              "created_by_user_id": 5,
+              "assigned_broker_id": 3,
+              "is_exclusive": 0,
+              "features": "[]",
+              "amenities": "[]",
+              "property_tags": "[]",
+              "views_count": 0,
+              "saves_count": 0,
+              "inquiries_count": 0,
+              "is_featured": 0,
+              "is_premium": 0,
+              "average_rating": "0.00",
+              "total_reviews": 0,
+              "tax_amount": null,
+              "hoa_fees": null,
+              "insurance_amount": null,
+              "est_payment": null,
+              "price_history": "[]",
+              "status_history": "[]",
+              "created_at": "2025-12-16T18:19:52.000Z",
+              "updated_at": "2025-12-16T18:19:52.000Z",
+              "deleted_at": null,
+              "published_at": "2025-12-16T18:19:52.000Z",
+              "last_modified_by_user_id": null,
+              "owner_username": "test_seller",
+              "owner_email": "seller@wubland.com",
+              "broker_username": "beza_hilemariam"
+            }
+          ],
+          "pagination": {
+            "page": 1,
+            "limit": 20,
+            "total": 1,
+            "pages": 1
+          }
+        }
+      }
+    },
+    {
+      "name": "Get properties with pagination",
+      "method": "GET",
+      "url": "http://localhost:5002/api/properties?page=1&limit=5",
+      "expectedStatus": 200,
+      "actualStatus": 200,
+      "success": true,
+      "responseTime": 7,
+      "data": {
+        "success": true,
+        "message": "Properties retrieved successfully",
+        "timestamp": "2025-12-16T18:25:28.671Z",
+        "data": {
+          "properties": [
+            {
+              "id": 1,
+              "property_uuid": "fdaff6ef-a032-45f2-b5e6-0b04b2fd9b9d",
+              "title": "Luxury Villa in Bole",
+              "description": "A magnificent luxury villa in Addis Ababa",
+              "property_type": "villa",
+              "property_status": "active",
+              "address": "Summit St. George, Bole, Addis Ababa",
+              "city": "Addis Ababa",
+              "state": "Addis Ababa",
+              "country": "Ethiopia",
+              "zip_code": "1000",
+              "neighborhood": "Bole",
+              "latitude": "9.03200000",
+              "longitude": "38.74680000",
+              "google_place_id": null,
+              "region": null,
+              "beds": 5,
+              "baths": 6,
+              "sqft": "5500.00",
+              "lot_size": null,
+              "year_built": null,
+              "garage_spaces": 0,
+              "parking_spaces": 0,
+              "price": "26000000.00",
+              "currency": "ETB",
+              "price_per_sqft": null,
+              "is_negotiable": 1,
+              "deposit_amount": null,
+              "monthly_rent": null,
+              "listing_type": "sale",
+              "mls_number": null,
+              "mls_source": null,
+              "listing_date": null,
+              "expiration_date": null,
+              "owner_user_id": 5,
+              "created_by_user_id": 5,
+              "assigned_broker_id": 3,
+              "is_exclusive": 0,
+              "features": "[]",
+              "amenities": "[]",
+              "property_tags": "[]",
+              "views_count": 0,
+              "saves_count": 0,
+              "inquiries_count": 0,
+              "is_featured": 0,
+              "is_premium": 0,
+              "average_rating": "0.00",
+              "total_reviews": 0,
+              "tax_amount": null,
+              "hoa_fees": null,
+              "insurance_amount": null,
+              "est_payment": null,
+              "price_history": "[]",
+              "status_history": "[]",
+              "created_at": "2025-12-16T18:19:52.000Z",
+              "updated_at": "2025-12-16T18:19:52.000Z",
+              "deleted_at": null,
+              "published_at": "2025-12-16T18:19:52.000Z",
+              "last_modified_by_user_id": null,
+              "owner_username": "test_seller",
+              "owner_email": "seller@wubland.com",
+              "broker_username": "beza_hilemariam"
+            }
+          ],
+          "pagination": {
+            "page": 1,
+            "limit": 5,
+            "total": 1,
+            "pages": 1
+          }
+        }
+      }
+    },
+    {
+      "name": "Public properties Filter by city",
+      "method": "GET",
+      "url": "http://localhost:5002/api/properties?city=Addis%20Ababa",
+      "expectedStatus": 200,
+      "actualStatus": 200,
+      "success": true,
+      "responseTime": 19,
+      "data": {
+        "success": true,
+        "message": "Properties retrieved successfully",
+        "timestamp": "2025-12-16T18:25:28.700Z",
+        "data": {
+          "properties": [
+            {
+              "id": 1,
+              "property_uuid": "fdaff6ef-a032-45f2-b5e6-0b04b2fd9b9d",
+              "title": "Luxury Villa in Bole",
+              "description": "A magnificent luxury villa in Addis Ababa",
+              "property_type": "villa",
+              "property_status": "active",
+              "address": "Summit St. George, Bole, Addis Ababa",
+              "city": "Addis Ababa",
+              "state": "Addis Ababa",
+              "country": "Ethiopia",
+              "zip_code": "1000",
+              "neighborhood": "Bole",
+              "latitude": "9.03200000",
+              "longitude": "38.74680000",
+              "google_place_id": null,
+              "region": null,
+              "beds": 5,
+              "baths": 6,
+              "sqft": "5500.00",
+              "lot_size": null,
+              "year_built": null,
+              "garage_spaces": 0,
+              "parking_spaces": 0,
+              "price": "26000000.00",
+              "currency": "ETB",
+              "price_per_sqft": null,
+              "is_negotiable": 1,
+              "deposit_amount": null,
+              "monthly_rent": null,
+              "listing_type": "sale",
+              "mls_number": null,
+              "mls_source": null,
+              "listing_date": null,
+              "expiration_date": null,
+              "owner_user_id": 5,
+              "created_by_user_id": 5,
+              "assigned_broker_id": 3,
+              "is_exclusive": 0,
+              "features": "[]",
+              "amenities": "[]",
+              "property_tags": "[]",
+              "views_count": 0,
+              "saves_count": 0,
+              "inquiries_count": 0,
+              "is_featured": 0,
+              "is_premium": 0,
+              "average_rating": "0.00",
+              "total_reviews": 0,
+              "tax_amount": null,
+              "hoa_fees": null,
+              "insurance_amount": null,
+              "est_payment": null,
+              "price_history": "[]",
+              "status_history": "[]",
+              "created_at": "2025-12-16T18:19:52.000Z",
+              "updated_at": "2025-12-16T18:19:52.000Z",
+              "deleted_at": null,
+              "published_at": "2025-12-16T18:19:52.000Z",
+              "last_modified_by_user_id": null,
+              "owner_username": "test_seller",
+              "owner_email": "seller@wubland.com",
+              "broker_username": "beza_hilemariam"
+            }
+          ],
+          "pagination": {
+            "page": 1,
+            "limit": 20,
+            "total": 1,
+            "pages": 1
+          }
+        }
+      }
+    },
+    {
+      "name": "Public properties Filter by property type",
+      "method": "GET",
+      "url": "http://localhost:5002/api/properties?property_type=house",
+      "expectedStatus": 200,
+      "actualStatus": 200,
+      "success": true,
+      "responseTime": 10,
+      "data": {
+        "success": true,
+        "message": "Properties retrieved successfully",
+        "timestamp": "2025-12-16T18:25:28.717Z",
+        "data": {
+          "properties": [],
+          "pagination": {
+            "page": 1,
+            "limit": 20,
+            "total": 0,
+            "pages": 0
+          }
+        }
+      }
+    },
+    {
+      "name": "Public properties Filter for sale",
+      "method": "GET",
+      "url": "http://localhost:5002/api/properties?listing_type=sale",
+      "expectedStatus": 200,
+      "actualStatus": 200,
+      "success": true,
+      "responseTime": 9,
+      "data": {
+        "success": true,
+        "message": "Properties retrieved successfully",
+        "timestamp": "2025-12-16T18:25:28.727Z",
+        "data": {
+          "properties": [
+            {
+              "id": 1,
+              "property_uuid": "fdaff6ef-a032-45f2-b5e6-0b04b2fd9b9d",
+              "title": "Luxury Villa in Bole",
+              "description": "A magnificent luxury villa in Addis Ababa",
+              "property_type": "villa",
+              "property_status": "active",
+              "address": "Summit St. George, Bole, Addis Ababa",
+              "city": "Addis Ababa",
+              "state": "Addis Ababa",
+              "country": "Ethiopia",
+              "zip_code": "1000",
+              "neighborhood": "Bole",
+              "latitude": "9.03200000",
+              "longitude": "38.74680000",
+              "google_place_id": null,
+              "region": null,
+              "beds": 5,
+              "baths": 6,
+              "sqft": "5500.00",
+              "lot_size": null,
+              "year_built": null,
+              "garage_spaces": 0,
+              "parking_spaces": 0,
+              "price": "26000000.00",
+              "currency": "ETB",
+              "price_per_sqft": null,
+              "is_negotiable": 1,
+              "deposit_amount": null,
+              "monthly_rent": null,
+              "listing_type": "sale",
+              "mls_number": null,
+              "mls_source": null,
+              "listing_date": null,
+              "expiration_date": null,
+              "owner_user_id": 5,
+              "created_by_user_id": 5,
+              "assigned_broker_id": 3,
+              "is_exclusive": 0,
+              "features": "[]",
+              "amenities": "[]",
+              "property_tags": "[]",
+              "views_count": 0,
+              "saves_count": 0,
+              "inquiries_count": 0,
+              "is_featured": 0,
+              "is_premium": 0,
+              "average_rating": "0.00",
+              "total_reviews": 0,
+              "tax_amount": null,
+              "hoa_fees": null,
+              "insurance_amount": null,
+              "est_payment": null,
+              "price_history": "[]",
+              "status_history": "[]",
+              "created_at": "2025-12-16T18:19:52.000Z",
+              "updated_at": "2025-12-16T18:19:52.000Z",
+              "deleted_at": null,
+              "published_at": "2025-12-16T18:19:52.000Z",
+              "last_modified_by_user_id": null,
+              "owner_username": "test_seller",
+              "owner_email": "seller@wubland.com",
+              "broker_username": "beza_hilemariam"
+            }
+          ],
+          "pagination": {
+            "page": 1,
+            "limit": 20,
+            "total": 1,
+            "pages": 1
+          }
+        }
+      }
+    },
+    {
+      "name": "Public properties Filter for rent",
+      "method": "GET",
+      "url": "http://localhost:5002/api/properties?listing_type=rent",
+      "expectedStatus": 200,
+      "actualStatus": 200,
+      "success": true,
+      "responseTime": 7,
+      "data": {
+        "success": true,
+        "message": "Properties retrieved successfully",
+        "timestamp": "2025-12-16T18:25:28.744Z",
+        "data": {
+          "properties": [],
+          "pagination": {
+            "page": 1,
+            "limit": 20,
+            "total": 0,
+            "pages": 0
+          }
+        }
+      }
+    },
+    {
+      "name": "Public properties Filter by price range",
+      "method": "GET",
+      "url": "http://localhost:5002/api/properties?min_price=1000000&max_price=5000000",
+      "expectedStatus": 200,
+      "actualStatus": 200,
+      "success": true,
+      "responseTime": 8,
+      "data": {
+        "success": true,
+        "message": "Properties retrieved successfully",
+        "timestamp": "2025-12-16T18:25:28.757Z",
+        "data": {
+          "properties": [],
+          "pagination": {
+            "page": 1,
+            "limit": 20,
+            "total": 0,
+            "pages": 0
+          }
+        }
+      }
+    },
+    {
+      "name": "Public properties Filter by beds",
+      "method": "GET",
+      "url": "http://localhost:5002/api/properties?beds=2",
+      "expectedStatus": 200,
+      "actualStatus": 200,
+      "success": true,
+      "responseTime": 11,
+      "data": {
+        "success": true,
+        "message": "Properties retrieved successfully",
+        "timestamp": "2025-12-16T18:25:28.770Z",
+        "data": {
+          "properties": [
+            {
+              "id": 1,
+              "property_uuid": "fdaff6ef-a032-45f2-b5e6-0b04b2fd9b9d",
+              "title": "Luxury Villa in Bole",
+              "description": "A magnificent luxury villa in Addis Ababa",
+              "property_type": "villa",
+              "property_status": "active",
+              "address": "Summit St. George, Bole, Addis Ababa",
+              "city": "Addis Ababa",
+              "state": "Addis Ababa",
+              "country": "Ethiopia",
+              "zip_code": "1000",
+              "neighborhood": "Bole",
+              "latitude": "9.03200000",
+              "longitude": "38.74680000",
+              "google_place_id": null,
+              "region": null,
+              "beds": 5,
+              "baths": 6,
+              "sqft": "5500.00",
+              "lot_size": null,
+              "year_built": null,
+              "garage_spaces": 0,
+              "parking_spaces": 0,
+              "price": "26000000.00",
+              "currency": "ETB",
+              "price_per_sqft": null,
+              "is_negotiable": 1,
+              "deposit_amount": null,
+              "monthly_rent": null,
+              "listing_type": "sale",
+              "mls_number": null,
+              "mls_source": null,
+              "listing_date": null,
+              "expiration_date": null,
+              "owner_user_id": 5,
+              "created_by_user_id": 5,
+              "assigned_broker_id": 3,
+              "is_exclusive": 0,
+              "features": "[]",
+              "amenities": "[]",
+              "property_tags": "[]",
+              "views_count": 0,
+              "saves_count": 0,
+              "inquiries_count": 0,
+              "is_featured": 0,
+              "is_premium": 0,
+              "average_rating": "0.00",
+              "total_reviews": 0,
+              "tax_amount": null,
+              "hoa_fees": null,
+              "insurance_amount": null,
+              "est_payment": null,
+              "price_history": "[]",
+              "status_history": "[]",
+              "created_at": "2025-12-16T18:19:52.000Z",
+              "updated_at": "2025-12-16T18:19:52.000Z",
+              "deleted_at": null,
+              "published_at": "2025-12-16T18:19:52.000Z",
+              "last_modified_by_user_id": null,
+              "owner_username": "test_seller",
+              "owner_email": "seller@wubland.com",
+              "broker_username": "beza_hilemariam"
+            }
+          ],
+          "pagination": {
+            "page": 1,
+            "limit": 20,
+            "total": 1,
+            "pages": 1
+          }
+        }
+      }
+    },
+    {
+      "name": "Public properties Filter by active status",
+      "method": "GET",
+      "url": "http://localhost:5002/api/properties?property_status=active",
+      "expectedStatus": 200,
+      "actualStatus": 200,
+      "success": true,
+      "responseTime": 8,
+      "data": {
+        "success": true,
+        "message": "Properties retrieved successfully",
+        "timestamp": "2025-12-16T18:25:28.791Z",
+        "data": {
+          "properties": [
+            {
+              "id": 1,
+              "property_uuid": "fdaff6ef-a032-45f2-b5e6-0b04b2fd9b9d",
+              "title": "Luxury Villa in Bole",
+              "description": "A magnificent luxury villa in Addis Ababa",
+              "property_type": "villa",
+              "property_status": "active",
+              "address": "Summit St. George, Bole, Addis Ababa",
+              "city": "Addis Ababa",
+              "state": "Addis Ababa",
+              "country": "Ethiopia",
+              "zip_code": "1000",
+              "neighborhood": "Bole",
+              "latitude": "9.03200000",
+              "longitude": "38.74680000",
+              "google_place_id": null,
+              "region": null,
+              "beds": 5,
+              "baths": 6,
+              "sqft": "5500.00",
+              "lot_size": null,
+              "year_built": null,
+              "garage_spaces": 0,
+              "parking_spaces": 0,
+              "price": "26000000.00",
+              "currency": "ETB",
+              "price_per_sqft": null,
+              "is_negotiable": 1,
+              "deposit_amount": null,
+              "monthly_rent": null,
+              "listing_type": "sale",
+              "mls_number": null,
+              "mls_source": null,
+              "listing_date": null,
+              "expiration_date": null,
+              "owner_user_id": 5,
+              "created_by_user_id": 5,
+              "assigned_broker_id": 3,
+              "is_exclusive": 0,
+              "features": "[]",
+              "amenities": "[]",
+              "property_tags": "[]",
+              "views_count": 0,
+              "saves_count": 0,
+              "inquiries_count": 0,
+              "is_featured": 0,
+              "is_premium": 0,
+              "average_rating": "0.00",
+              "total_reviews": 0,
+              "tax_amount": null,
+              "hoa_fees": null,
+              "insurance_amount": null,
+              "est_payment": null,
+              "price_history": "[]",
+              "status_history": "[]",
+              "created_at": "2025-12-16T18:19:52.000Z",
+              "updated_at": "2025-12-16T18:19:52.000Z",
+              "deleted_at": null,
+              "published_at": "2025-12-16T18:19:52.000Z",
+              "last_modified_by_user_id": null,
+              "owner_username": "test_seller",
+              "owner_email": "seller@wubland.com",
+              "broker_username": "beza_hilemariam"
+            }
+          ],
+          "pagination": {
+            "page": 1,
+            "limit": 20,
+            "total": 1,
+            "pages": 1
+          }
+        }
+      }
+    },
+    {
+      "name": "Get active property details",
+      "method": "GET",
+      "url": "http://localhost:5002/api/properties/1",
+      "expectedStatus": 200,
+      "actualStatus": 200,
+      "success": true,
+      "responseTime": 9,
+      "data": {
+        "success": true,
+        "message": "Property retrieved successfully",
+        "timestamp": "2025-12-16T18:25:28.812Z",
+        "data": {
+          "id": 1,
+          "property_uuid": "fdaff6ef-a032-45f2-b5e6-0b04b2fd9b9d",
+          "title": "Luxury Villa in Bole",
+          "description": "A magnificent luxury villa in Addis Ababa",
+          "property_type": "villa",
+          "property_status": "active",
+          "address": "Summit St. George, Bole, Addis Ababa",
+          "city": "Addis Ababa",
+          "state": "Addis Ababa",
+          "country": "Ethiopia",
+          "zip_code": "1000",
+          "neighborhood": "Bole",
+          "latitude": "9.03200000",
+          "longitude": "38.74680000",
+          "google_place_id": null,
+          "region": null,
+          "beds": 5,
+          "baths": 6,
+          "sqft": "5500.00",
+          "lot_size": null,
+          "year_built": null,
+          "garage_spaces": 0,
+          "parking_spaces": 0,
+          "price": "26000000.00",
+          "currency": "ETB",
+          "price_per_sqft": null,
+          "is_negotiable": 1,
+          "deposit_amount": null,
+          "monthly_rent": null,
+          "listing_type": "sale",
+          "mls_number": null,
+          "mls_source": null,
+          "listing_date": null,
+          "expiration_date": null,
+          "owner_user_id": 5,
+          "created_by_user_id": 5,
+          "assigned_broker_id": 3,
+          "is_exclusive": 0,
+          "features": "[]",
+          "amenities": "[]",
+          "property_tags": "[]",
+          "views_count": 0,
+          "saves_count": 0,
+          "inquiries_count": 0,
+          "is_featured": 0,
+          "is_premium": 0,
+          "average_rating": "0.00",
+          "total_reviews": 0,
+          "tax_amount": null,
+          "hoa_fees": null,
+          "insurance_amount": null,
+          "est_payment": null,
+          "price_history": "[]",
+          "status_history": "[]",
+          "created_at": "2025-12-16T18:19:52.000Z",
+          "updated_at": "2025-12-16T18:19:52.000Z",
+          "deleted_at": null,
+          "published_at": "2025-12-16T18:19:52.000Z",
+          "last_modified_by_user_id": null,
+          "owner_username": "test_seller",
+          "owner_email": "seller@wubland.com",
+          "owner_phone": "+251955667788",
+          "broker_username": "beza_hilemariam",
+          "broker_email": "beza@wubland.com"
+        }
+      }
+    },
+    {
+      "name": "Get featured properties",
+      "method": "GET",
+      "url": "http://localhost:5002/api/properties/featured?limit=3",
+      "expectedStatus": 200,
+      "actualStatus": 200,
+      "success": true,
+      "responseTime": 10,
+      "data": {
+        "success": true,
+        "message": "Featured properties retrieved successfully",
+        "timestamp": "2025-12-16T18:25:28.830Z",
+        "data": []
+      }
+    },
+    {
+      "name": "Get recent properties",
+      "method": "GET",
+      "url": "http://localhost:5002/api/properties/recent?limit=5",
+      "expectedStatus": 200,
+      "actualStatus": 200,
+      "success": true,
+      "responseTime": 19,
+      "data": {
+        "success": true,
+        "message": "Recent properties retrieved successfully",
+        "timestamp": "2025-12-16T18:25:28.851Z",
+        "data": [
+          {
+            "id": 1,
+            "property_uuid": "fdaff6ef-a032-45f2-b5e6-0b04b2fd9b9d",
+            "title": "Luxury Villa in Bole",
+            "description": "A magnificent luxury villa in Addis Ababa",
+            "property_type": "villa",
+            "property_status": "active",
+            "address": "Summit St. George, Bole, Addis Ababa",
+            "city": "Addis Ababa",
+            "state": "Addis Ababa",
+            "country": "Ethiopia",
+            "zip_code": "1000",
+            "neighborhood": "Bole",
+            "latitude": "9.03200000",
+            "longitude": "38.74680000",
+            "google_place_id": null,
+            "region": null,
+            "beds": 5,
+            "baths": 6,
+            "sqft": "5500.00",
+            "lot_size": null,
+            "year_built": null,
+            "garage_spaces": 0,
+            "parking_spaces": 0,
+            "price": "26000000.00",
+            "currency": "ETB",
+            "price_per_sqft": null,
+            "is_negotiable": 1,
+            "deposit_amount": null,
+            "monthly_rent": null,
+            "listing_type": "sale",
+            "mls_number": null,
+            "mls_source": null,
+            "listing_date": null,
+            "expiration_date": null,
+            "owner_user_id": 5,
+            "created_by_user_id": 5,
+            "assigned_broker_id": 3,
+            "is_exclusive": 0,
+            "features": "[]",
+            "amenities": "[]",
+            "property_tags": "[]",
+            "views_count": 0,
+            "saves_count": 0,
+            "inquiries_count": 0,
+            "is_featured": 0,
+            "is_premium": 0,
+            "average_rating": "0.00",
+            "total_reviews": 0,
+            "tax_amount": null,
+            "hoa_fees": null,
+            "insurance_amount": null,
+            "est_payment": null,
+            "price_history": "[]",
+            "status_history": "[]",
+            "created_at": "2025-12-16T18:19:52.000Z",
+            "updated_at": "2025-12-16T18:19:52.000Z",
+            "deleted_at": null,
+            "published_at": "2025-12-16T18:19:52.000Z",
+            "last_modified_by_user_id": null,
+            "owner_username": "test_seller",
+            "broker_username": "beza_hilemariam"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Get premium properties",
+      "method": "GET",
+      "url": "http://localhost:5002/api/properties/premium?limit=3",
+      "expectedStatus": 200,
+      "actualStatus": 200,
+      "success": true,
+      "responseTime": 8,
+      "data": {
+        "success": true,
+        "message": "Premium properties retrieved successfully",
+        "timestamp": "2025-12-16T18:25:28.867Z",
+        "data": []
+      }
+    },
+    {
+      "name": "Search properties",
+      "method": "GET",
+      "url": "http://localhost:5002/api/properties/search?q=villa",
+      "expectedStatus": 200,
+      "actualStatus": 200,
+      "success": true,
+      "responseTime": 6,
+      "data": {
+        "success": true,
+        "message": "Search results retrieved successfully",
+        "timestamp": "2025-12-16T18:25:28.875Z",
+        "data": {
+          "properties": [
+            {
+              "id": 1,
+              "property_uuid": "fdaff6ef-a032-45f2-b5e6-0b04b2fd9b9d",
+              "title": "Luxury Villa in Bole",
+              "description": "A magnificent luxury villa in Addis Ababa",
+              "property_type": "villa",
+              "property_status": "active",
+              "address": "Summit St. George, Bole, Addis Ababa",
+              "city": "Addis Ababa",
+              "state": "Addis Ababa",
+              "country": "Ethiopia",
+              "zip_code": "1000",
+              "neighborhood": "Bole",
+              "latitude": "9.03200000",
+              "longitude": "38.74680000",
+              "google_place_id": null,
+              "region": null,
+              "beds": 5,
+              "baths": 6,
+              "sqft": "5500.00",
+              "lot_size": null,
+              "year_built": null,
+              "garage_spaces": 0,
+              "parking_spaces": 0,
+              "price": "26000000.00",
+              "currency": "ETB",
+              "price_per_sqft": null,
+              "is_negotiable": 1,
+              "deposit_amount": null,
+              "monthly_rent": null,
+              "listing_type": "sale",
+              "mls_number": null,
+              "mls_source": null,
+              "listing_date": null,
+              "expiration_date": null,
+              "owner_user_id": 5,
+              "created_by_user_id": 5,
+              "assigned_broker_id": 3,
+              "is_exclusive": 0,
+              "features": "[]",
+              "amenities": "[]",
+              "property_tags": "[]",
+              "views_count": 0,
+              "saves_count": 0,
+              "inquiries_count": 0,
+              "is_featured": 0,
+              "is_premium": 0,
+              "average_rating": "0.00",
+              "total_reviews": 0,
+              "tax_amount": null,
+              "hoa_fees": null,
+              "insurance_amount": null,
+              "est_payment": null,
+              "price_history": "[]",
+              "status_history": "[]",
+              "created_at": "2025-12-16T18:19:52.000Z",
+              "updated_at": "2025-12-16T18:19:52.000Z",
+              "deleted_at": null,
+              "published_at": "2025-12-16T18:19:52.000Z",
+              "last_modified_by_user_id": null,
+              "owner_username": "test_seller",
+              "broker_username": "beza_hilemariam"
+            }
+          ],
+          "pagination": {
+            "page": 1,
+            "limit": 20,
+            "total": 1,
+            "pages": 1
+          }
+        }
+      }
+    },
+    {
+      "name": "Get dashboard analytics",
+      "method": "GET",
+      "url": "http://localhost:5004/api/analytics/dashboard",
+      "expectedStatus": 200,
+      "actualStatus": 200,
+      "success": true,
+      "responseTime": 464,
+      "data": {
+        "success": true,
+        "data": {
+          "overview": {
+            "totalProperties": 1,
+            "activeProperties": 1,
+            "totalUsers": 10,
+            "activeUsers": 10,
+            "totalRevenue": 0,
+            "pendingApprovals": 0
+          },
+          "propertyBreakdown": {
+            "byType": {
+              "villa": 1
+            },
+            "byStatus": {
+              "active": 1
+            },
+            "byCity": {
+              "Addis Ababa": 1
+            }
+          },
+          "userBreakdown": {
+            "byRole": {
+              "support_agent": 1,
+              "seller": 1,
+              "admin": 2,
+              "support_lead": 1,
+              "support_admin": 1,
+              "external_broker": 1,
+              "super_admin": 2,
+              "internal_broker": 1
+            },
+            "byStatus": {
+              "active": 10
+            }
+          },
+          "recentActivities": [
+            {
+              "id": 1,
+              "title": "Luxury Villa in Bole",
+              "status": "active",
+              "city": "Addis Ababa",
+              "price": "26000000.00",
+              "created_at": "2025-12-16T18:19:52.000Z"
+            }
+          ],
+          "generatedAt": "2025-12-16T18:25:29.365Z"
+        }
+      }
+    },
+    {
+      "name": "Get broker analytics for ID 10",
+      "method": "GET",
+      "url": "http://localhost:5004/api/analytics/broker/10",
+      "expectedStatus": 200,
+      "actualStatus": 200,
+      "success": true,
+      "responseTime": 245,
+      "data": {
+        "success": true,
+        "data": {
+          "brokerId": 10,
+          "totalListings": 0,
+          "pendingReviews": 0,
+          "approvedListings": 0,
+          "rejectedListings": 0,
+          "totalTransactions": 0,
+          "completedTransactions": 0,
+          "pendingTransactions": 0,
+          "totalRevenue": 0,
+          "responseRate": 85,
+          "avgResponseTime": "2h",
+          "activeClients": 0,
+          "propertyStats": {
+            "approved": 0,
+            "pending": 0,
+            "rejected": 0,
+            "draft": 0
+          },
+          "transactionStats": {
+            "total": 0,
+            "completed": 0,
+            "pending": 0,
+            "avgCommission": 0
+          },
+          "clientStats": {
+            "totalClients": 0,
+            "activeClients": 0,
+            "newClients": 3,
+            "retentionRate": 87
+          },
+          "performance": {
+            "responseRate": 85,
+            "approvalRate": 0,
+            "clientSatisfaction": 90,
+            "avgCommissionRate": 2.5
+          },
+          "revenueTrend": {
+            "labels": [
+              "Jan",
+              "Feb",
+              "Mar",
+              "Apr",
+              "May",
+              "Jun"
+            ],
+            "data": [
+              45000,
+              52000,
+              48000,
+              55000,
+              60000,
+              70000
+            ]
+          },
+          "recentActivities": [],
+          "timeframe": "monthly",
+          "generatedAt": "2025-12-16T18:25:29.633Z",
+          "brokerInfo": {
+            "name": "Admin User",
+            "email": "admin@wubland.com",
+            "role": "super_admin"
+          }
+        }
+      }
+    },
+    {
+      "name": "Get broker stats for ID 10",
+      "method": "GET",
+      "url": "http://localhost:5004/api/analytics/broker/statistics/10",
+      "expectedStatus": 200,
+      "actualStatus": 200,
+      "success": true,
+      "responseTime": 14,
+      "data": {
+        "success": true,
+        "data": {
+          "brokerId": 10,
+          "totalListings": 0,
+          "pendingReviews": 0,
+          "totalRevenue": 0,
+          "totalTransactions": 0,
+          "activeClients": 0,
+          "timestamp": "2025-12-16T18:25:29.661Z"
+        }
+      }
+    },
+    {
+      "name": "Get broker clients for ID 10",
+      "method": "GET",
+      "url": "http://localhost:5004/api/analytics/broker/clients/10",
+      "expectedStatus": 200,
+      "actualStatus": 200,
+      "success": true,
+      "responseTime": 23,
+      "data": {
+        "success": true,
+        "data": []
+      }
+    },
+    {
+      "name": "Get property analytics",
+      "method": "GET",
+      "url": "http://localhost:5004/api/analytics/properties",
+      "expectedStatus": 200,
+      "actualStatus": 404,
+      "success": false,
+      "responseTime": 3,
+      "data": {
+        "error": "Route not found"
+      }
+    },
+    {
+      "name": "Get user analytics",
+      "method": "GET",
+      "url": "http://localhost:5004/api/analytics/users",
+      "expectedStatus": 200,
+      "actualStatus": 404,
+      "success": false,
+      "responseTime": 4,
+      "data": {
+        "error": "Route not found"
+      }
+    },
+    {
+      "name": "Non-existent endpoint",
+      "method": "GET",
+      "url": "http://localhost:5002/api/nonexistent",
+      "expectedStatus": 404,
+      "actualStatus": 404,
+      "success": true,
+      "responseTime": 3,
+      "data": {
+        "success": false,
+        "message": "Route not found",
+        "path": "/api/nonexistent"
+      }
+    },
+    {
+      "name": "Invalid property ID",
+      "method": "GET",
+      "url": "http://localhost:5002/api/properties/999999",
+      "expectedStatus": 404,
+      "actualStatus": 404,
+      "success": true,
+      "responseTime": 7,
+      "data": {
+        "success": false,
+        "message": "Property not found",
+        "timestamp": "2025-12-16T18:25:29.711Z"
+      }
+    },
+    {
+      "name": "Invalid ID format",
+      "method": "GET",
+      "url": "http://localhost:5002/api/properties/abc",
+      "expectedStatus": 400,
+      "actualStatus": 400,
+      "success": true,
+      "responseTime": 3,
+      "data": {
+        "success": false,
+        "message": "Invalid property ID",
+        "timestamp": "2025-12-16T18:25:29.719Z"
+      }
+    },
+    {
+      "name": "Broker listings without auth",
+      "method": "GET",
+      "url": "http://localhost:5002/api/properties/broker/listings",
+      "expectedStatus": 401,
+      "actualStatus": 401,
+      "success": true,
+      "responseTime": 3,
+      "data": {
+        "success": false,
+        "message": "Authentication required"
+      }
+    },
+    {
+      "name": "Property action without auth",
+      "method": "POST",
+      "url": "http://localhost:5002/api/properties/1/action",
+      "expectedStatus": 401,
+      "actualStatus": 401,
+      "success": true,
+      "responseTime": 10,
+      "data": {
+        "success": false,
+        "message": "Authentication required"
+      }
+    }
+  ]
+}

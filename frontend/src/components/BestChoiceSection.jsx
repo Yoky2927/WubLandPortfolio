@@ -1,28 +1,107 @@
 import { useState, useEffect, useRef } from "react";
-import { Ruler } from "lucide-react";
+import { Ruler, Star } from "lucide-react";
 import PropertyDetailsPopup from "./PropertyDetailsPopup";
-import { sampleProperties } from "../data/sampleProperties";
+import { httpClient } from "../services/http.service";
+import { API_CONFIG } from "../config/api.config";
 
-const BestChoiceSection = ({ theme }) => {
+const BestChoiceSection = ({ theme, brokers = [] }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [selectedProperty, setSelectedProperty] = useState(null);
   const [isPopupOpen, setIsPopupOpen] = useState(false);
   const [visibleCards, setVisibleCards] = useState(3);
+  const [premiumProperties, setPremiumProperties] = useState([]);
+  const [loading, setLoading] = useState(true);
   const autoSlideInterval = 5000;
   const slideRef = useRef(null);
+  const containerRef = useRef(null);
 
-  // Filter premium properties for the Best Choice section
-  const premiumProperties = sampleProperties.filter(property => property.premium);
+  // Fetch premium properties from API
+  useEffect(() => {
+    const fetchPremiumProperties = async () => {
+      setLoading(true);
+      try {
+        const url = API_CONFIG.getUrl('PREMIUM_PROPERTIES');
+        const response = await httpClient.get(url, { params: { limit: 6 } });
+        
+        if (response.data?.success) {
+          let propertiesData = [];
+          
+          // Handle different response structures
+          if (response.data.data?.properties && Array.isArray(response.data.data.properties)) {
+            propertiesData = response.data.data.properties;
+          } else if (Array.isArray(response.data.data)) {
+            propertiesData = response.data.data;
+          } else if (response.data.properties && Array.isArray(response.data.properties)) {
+            propertiesData = response.data.properties;
+          } else if (Array.isArray(response.data)) {
+            propertiesData = response.data;
+          }
+          
+          // Transform API data
+          const transformedProperties = propertiesData.map(property => ({
+            id: property.id,
+            title: property.title,
+            description: property.description,
+            propertyType: property.property_type || property.propertyType,
+            propertyStatus: property.listing_type === 'rent' ? 'for rent' : 'for sale',
+            price: parseFloat(property.price) || 0,
+            address: property.address,
+            city: property.city,
+            state: property.state,
+            region: property.region || property.neighborhood || '',
+            beds: property.beds || 0,
+            baths: property.baths || 0,
+            sqft: parseFloat(property.sqft) || 0,
+            lotSize: property.lot_size ? parseFloat(property.lot_size) : 0,
+            yearBuilt: property.year_built,
+            garage: property.garage_spaces || property.parking_spaces || 0,
+            images: ['/images/default-property.jpg'],
+            broker: property.assigned_broker_id ? {
+              id: property.assigned_broker_id,
+              name: property.broker_username || 'Broker',
+              email: property.broker_email || '',
+              phone: '',
+              profilePicture: ''
+            } : null,
+            latitude: parseFloat(property.latitude) || 9.1450,
+            longitude: parseFloat(property.longitude) || 40.4897,
+            is_featured: property.is_featured || false,
+            is_premium: property.is_premium || false,
+            premium: property.is_premium || false, // For filtering
+            mlsNumber: property.mls_number || 'N/A',
+            source: property.mls_source || 'WubLand',
+            listedDate: property.created_at ? Math.floor((Date.now() - new Date(property.created_at).getTime()) / (1000 * 60 * 60 * 24)) : 0,
+            views: property.views_count || 0,
+            saves: property.saves_count || 0,
+            estPayment: property.est_payment || null
+          }));
+          
+          setPremiumProperties(transformedProperties);
+        } else {
+          setPremiumProperties([]);
+        }
+      } catch (error) {
+        console.error('Error fetching premium properties:', error);
+        setPremiumProperties([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchPremiumProperties();
+  }, []);
+
   const totalCards = premiumProperties.length;
 
   // Format currency for display
   const formatCurrency = (amount) => {
+    if (!amount) return "ETB 0";
     if (amount >= 1000000) {
       return `ETB ${(amount / 1000000).toFixed(1)}M`;
     } else if (amount >= 1000) {
       return `ETB ${(amount / 1000).toFixed(0)}K`;
     }
-    return `ETB ${amount}`;
+    return `ETB ${amount.toLocaleString()}`;
   };
 
   // Get property type display text and color
@@ -51,27 +130,30 @@ const BestChoiceSection = ({ theme }) => {
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
-  // Auto-slide effect with looping
+  // Auto-slide effect with looping - FIXED
   useEffect(() => {
-    if (totalCards === 0) return;
+    if (totalCards === 0 || loading || totalCards <= visibleCards) return;
 
     const interval = setInterval(() => {
       setCurrentIndex((prevIndex) => {
         const maxIndex = Math.max(0, totalCards - visibleCards);
+        if (maxIndex === 0) return 0;
         return (prevIndex + 1) % (maxIndex + 1);
       });
     }, autoSlideInterval);
     
     return () => clearInterval(interval);
-  }, [totalCards, visibleCards]);
+  }, [totalCards, visibleCards, loading]);
 
   const handlePrev = () => {
     const maxIndex = Math.max(0, totalCards - visibleCards);
+    if (maxIndex === 0) return;
     setCurrentIndex((prev) => (prev - 1 + (maxIndex + 1)) % (maxIndex + 1));
   };
 
   const handleNext = () => {
     const maxIndex = Math.max(0, totalCards - visibleCards);
+    if (maxIndex === 0) return;
     setCurrentIndex((prev) => (prev + 1) % (maxIndex + 1));
   };
 
@@ -86,6 +168,15 @@ const BestChoiceSection = ({ theme }) => {
   };
 
   const translateX = `-${currentIndex * (100 / visibleCards)}%`;
+
+  if (loading) {
+    return (
+      <div className="w-full max-w-[1035px] py-8 mx-auto px-4 sm:px-6 md:px-8 text-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-amber-600 mx-auto"></div>
+        <p className="text-gray-500 mt-4">Loading premium properties...</p>
+      </div>
+    );
+  }
 
   if (premiumProperties.length === 0) {
     return (
@@ -110,7 +201,8 @@ const BestChoiceSection = ({ theme }) => {
             Top Ranking Residences
           </h1>
           
-          <div className="relative group">
+          {/* Main container with group class - FIXED */}
+          <div className="relative" ref={containerRef}>
             <div className="overflow-hidden">
               <div
                 ref={slideRef}
@@ -150,7 +242,7 @@ const BestChoiceSection = ({ theme }) => {
                         {/* Image */}
                         <div className="w-full h-48 overflow-hidden">
                           <img
-                            src={property.image}
+                            src={property.images[0] || '/images/default-property.jpg'}
                             alt={property.title}
                             className="w-full h-full object-cover transition-transform duration-500"
                           />
@@ -275,10 +367,10 @@ const BestChoiceSection = ({ theme }) => {
                           </div>
 
                           {/* CTA Button */}
-                          <div className="mt-auto">
+                          <div className="mt-auto flex justify-center">
                             <button
                               onClick={() => handleMoreDetails(property)}
-                              className={`Button2 ml-20 px-4 py-2 text-sm hover:scale-105 transition-all duration-300 rounded ${
+                              className={`Button2 px-4 py-2 text-sm hover:scale-105 transition-all duration-300 rounded ${
                                 theme === "dark" 
                                   ? "border-amber-400 text-white hover:bg-amber-500 hover:text-gray-900" 
                                   : "border-amber-500 text-gray-900 hover:bg-amber-500 hover:text-white"
@@ -295,12 +387,23 @@ const BestChoiceSection = ({ theme }) => {
               </div>
             </div>
 
-            {/* Navigation Buttons - Hidden on mobile */}
+            {/* Navigation Buttons - Fixed hover effect */}
             {totalCards > visibleCards && (
               <>
+                {/* Prev button - Always visible on hover */}
                 <button
                   onClick={handlePrev}
-                  className="hidden sm:flex absolute left-0 top-1/2 transform -translate-y-1/2 w-10 h-10 bg-amber-400 rounded-full shadow-2xl border border-amber-500 items-center justify-center transition-all duration-500 opacity-0 group-hover:opacity-100 hover:scale-110"
+                  className="absolute left-0 top-1/2 transform -translate-y-1/2 w-10 h-10 bg-amber-400 rounded-full shadow-2xl border border-amber-500 items-center justify-center transition-all duration-300 opacity-0 hover:opacity-100 hover:scale-110 hidden sm:flex"
+                  onMouseEnter={() => {
+                    if (containerRef.current) {
+                      containerRef.current.classList.add('hovering');
+                    }
+                  }}
+                  onMouseLeave={() => {
+                    if (containerRef.current) {
+                      containerRef.current.classList.remove('hovering');
+                    }
+                  }}
                 >
                   <svg
                     className="w-5 h-5"
@@ -317,9 +420,20 @@ const BestChoiceSection = ({ theme }) => {
                   </svg>
                 </button>
 
+                {/* Next button - Always visible on hover */}
                 <button
                   onClick={handleNext}
-                  className="hidden sm:flex absolute right-0 top-1/2 transform -translate-y-1/2 w-10 h-10 bg-amber-400 rounded-full shadow-2xl border border-amber-500 items-center justify-center transition-all duration-500 opacity-0 group-hover:opacity-100 hover:scale-110"
+                  className="absolute right-0 top-1/2 transform -translate-y-1/2 w-10 h-10 bg-amber-400 rounded-full shadow-2xl border border-amber-500 items-center justify-center transition-all duration-300 opacity-0 hover:opacity-100 hover:scale-110 hidden sm:flex"
+                  onMouseEnter={() => {
+                    if (containerRef.current) {
+                      containerRef.current.classList.add('hovering');
+                    }
+                  }}
+                  onMouseLeave={() => {
+                    if (containerRef.current) {
+                      containerRef.current.classList.remove('hovering');
+                    }
+                  }}
                 >
                   <svg
                     className="w-5 h-5"
@@ -335,6 +449,16 @@ const BestChoiceSection = ({ theme }) => {
                     />
                   </svg>
                 </button>
+
+                {/* Alternative: Show buttons when container is hovered (CSS solution) */}
+                <style jsx>{`
+                  .relative:hover button {
+                    opacity: 1 !important;
+                  }
+                  .relative button {
+                    transition: opacity 0.3s ease, transform 0.3s ease;
+                  }
+                `}</style>
               </>
             )}
 
@@ -388,6 +512,7 @@ const BestChoiceSection = ({ theme }) => {
         isOpen={isPopupOpen}
         onClose={() => setIsPopupOpen(false)}
         onNavigateToProperties={handleNavigateToProperties}
+        brokers={brokers}
       />
     </>
   );

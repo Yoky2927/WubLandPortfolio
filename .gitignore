@@ -1,0 +1,4 @@
+# dnode_modules/
+.env
+ngrok.exe
+package-lock.json

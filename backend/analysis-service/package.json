@@ -1,0 +1,26 @@
+{
+  "name": "analysis-service",
+  "version": "1.0.0",
+  "main": "server.js",
+  "type": "module",
+  "directories": {
+    "test": "test"
+  },
+  "scripts": {
+    "dev": "nodemon server.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "dependencies": {
+    "axios": "^1.12.2",
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.1",
+    "express": "^5.1.0",
+    "mysql2": "^3.15.1",
+    "nodemon": "^3.1.10",
+    "pdfkit": "^0.17.1",
+    "socket.io": "^4.8.1"
+  }
+}

@@ -12,29 +12,65 @@ import axios from "axios"; // Added for inter-service communication
 // Email Service interface - will call Communication-Service API instead of direct import
 class EmailServiceClient {
   constructor() {
-    this.baseURL = process.env.COMMUNICATION_SERVICE_URL || "http://localhost:5003";
+    // FIX: Change from 5003 to 5001 (your communication-service port)
+    this.baseURL = process.env.COMMUNICATION_SERVICE_URL || "http://localhost:5001";
+    console.log(`📧 EmailServiceClient configured with baseURL: ${this.baseURL}`);
   }
 
   async sendVerificationEmail(emailData, token) {
     try {
-      const response = await axios.post(`${this.baseURL}/api/email/send-verification`, {
-        email: emailData.email,
-        fullName: emailData.fullName,
-        token: token
-      });
+      console.log(`📧 Attempting to send verification email to: ${emailData.email}`);
+      console.log(`📧 Calling: ${this.baseURL}/api/email/send-verification`);
+      
+      const response = await axios.post(
+        `${this.baseURL}/api/email/send-verification`,
+        {
+          email: emailData.email,
+          fullName: emailData.fullName,
+          token: token
+        },
+        {
+          timeout: 10000, // 10 second timeout
+          headers: {
+            'Content-Type': 'application/json',
+            'Internal-Service-Token': process.env.INTERNAL_SERVICE_TOKEN || 'communication-service-secret-12345'
+          }
+        }
+      );
+      
+      console.log(`✅ Email API response:`, response.data);
       return response.data;
     } catch (error) {
-      console.warn("Failed to send verification email via API:", error.message);
+      console.error("❌ Failed to send verification email via API:", error.message);
+      if (error.response) {
+        console.error("❌ Response status:", error.response.status);
+        console.error("❌ Response data:", error.response.data);
+      }
+      console.error("❌ URL attempted:", `${this.baseURL}/api/email/send-verification`);
       return null;
     }
   }
 
   async sendPasswordChangeRequired(emailData) {
     try {
-      const response = await axios.post(`${this.baseURL}/api/email/send-password-change`, {
-        email: emailData.email,
-        fullName: emailData.fullName
-      });
+      console.log(`📧 Attempting to send password change email to: ${emailData.email}`);
+      
+      const response = await axios.post(
+        `${this.baseURL}/api/email/send-password-change`,
+        {
+          email: emailData.email,
+          fullName: emailData.fullName
+        },
+        {
+          timeout: 10000,
+          headers: {
+            'Content-Type': 'application/json',
+            'Internal-Service-Token': process.env.INTERNAL_SERVICE_TOKEN || 'communication-service-secret-12345'
+          }
+        }
+      );
+      
+      console.log(`✅ Password change email sent:`, response.data);
       return response.data;
     } catch (error) {
       console.warn("Failed to send password change email via API:", error.message);
@@ -44,7 +80,21 @@ class EmailServiceClient {
 
   async sendSecurityAlert(alertData) {
     try {
-      const response = await axios.post(`${this.baseURL}/api/email/send-security-alert`, alertData);
+      console.log(`📧 Attempting to send security alert to: ${alertData.email}`);
+      
+      const response = await axios.post(
+        `${this.baseURL}/api/email/send-security-alert`,
+        alertData,
+        {
+          timeout: 10000,
+          headers: {
+            'Content-Type': 'application/json',
+            'Internal-Service-Token': process.env.INTERNAL_SERVICE_TOKEN || 'communication-service-secret-12345'
+          }
+        }
+      );
+      
+      console.log(`✅ Security alert sent:`, response.data);
       return response.data;
     } catch (error) {
       console.warn("Failed to send security alert via API:", error.message);

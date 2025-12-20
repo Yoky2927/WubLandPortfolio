@@ -1812,3 +1812,9 @@ CREATE TABLE IF NOT EXISTS todo_templates (
     INDEX idx_category_department (category, department),
     INDEX idx_recurrence (recurrence_pattern)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+
+-- Add default privilege_tier values for existing users
+UPDATE users SET privilege_tier = 'premium' WHERE role IN ('internal_broker', 'admin', 'super_admin');
+UPDATE users SET privilege_tier = 'standard' WHERE role = 'external_broker';
+UPDATE users SET privilege_tier = 'basic' WHERE privilege_tier IS NULL;

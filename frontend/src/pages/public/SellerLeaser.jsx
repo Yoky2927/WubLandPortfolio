@@ -280,7 +280,9 @@ const SellerLeaser = () => {
     setIsLoading(true);
     try {
       const token = localStorage.getItem("token");
-      const response = await fetch(
+
+      // 1. Submit property request to property-service
+      const propertyResponse = await fetch(
         "http://localhost:5000/api/property/request-listing",
         {
           method: "POST",
@@ -296,9 +298,52 @@ const SellerLeaser = () => {
         }
       );
 
-      if (response.ok) {
-        setActiveStep(2);
-        toast.success("Property details submitted successfully!");
+      if (propertyResponse.ok) {
+        const propertyData = await propertyResponse.json();
+
+        // 2. Send notification to brokers via communication-service
+        const notificationResponse = await fetch(
+          "http://localhost:5005/api/internal/notifications/send-to-brokers",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "X-Internal-Token":
+                process.env.INTERNAL_API_KEY || "your-internal-secret-key",
+            },
+            body: JSON.stringify({
+              brokerType: "internal", // or both "internal" and "external"
+              notificationData: {
+                title: "New Property Request",
+                message: `New ${
+                  userType === "seller" ? "selling" : "rental"
+                } request submitted for ${formData.location}`,
+                type: "property",
+                priority: "medium",
+                action_url: `/broker/property-requests/${propertyData.id}`,
+                related_entity_type: "property",
+                related_entity_id: propertyData.id,
+                metadata: {
+                  propertyType: formData.propertyType,
+                  location: formData.location,
+                  price: formData.price,
+                  userType: userType,
+                  userId: user?.id,
+                  userName: `${user?.first_name} ${user?.last_name}`,
+                },
+              },
+            }),
+          }
+        );
+
+        if (notificationResponse.ok) {
+          setActiveStep(2);
+          toast.success(
+            "Property request submitted! Brokers have been notified."
+          );
+        } else {
+          throw new Error("Failed to send notifications");
+        }
       } else {
         throw new Error("Failed to submit property request");
       }
@@ -308,7 +353,7 @@ const SellerLeaser = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [isLoggedIn, formData, userType]);
+  }, [isLoggedIn, formData, userType, user]);
 
   const handleProfilePictureUpload = async (file) => {
     try {

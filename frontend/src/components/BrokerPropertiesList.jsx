@@ -1,5 +1,5 @@
-// components/BrokerPropertiesList.jsx - COMPLETE FIXED VERSION
-import React, { useState, useRef } from "react";
+// components/BrokerPropertiesList.jsx - FIXED WITH REAL BACKEND DATA
+import React, { useState, useRef, useEffect } from "react";
 import {
   Eye,
   FileEdit,
@@ -47,13 +47,15 @@ import {
   Globe,
   Crown,
   Bed,
-  Lock, // Added for rented icon
-  Users, // For beds/baths icons
-  Key // Added for completeness
+  Lock,
+  Users,
+  Key
 } from "lucide-react";
 import PropertyDetailsModal from "./PropertyDetailsModal";
 import CreatePropertyForm from "./CreatePropertyForm";
 import EditPropertyForm from "./EditPropertyForm";
+import { apiCall } from "../utils/api.endpoints";
+import { apiClient } from "../utils/api.client";
 
 const BrokerPropertiesList = ({
   theme,
@@ -80,13 +82,46 @@ const BrokerPropertiesList = ({
   const [uploadProgress, setUploadProgress] = useState(0);
   const [isUploading, setIsUploading] = useState(false);
   const [selectedFiles, setSelectedFiles] = useState([]);
-  const fileInputRef = useRef(null);
   const [showEditForm, setShowEditForm] = useState(false);
   const [selectedPropertyForEdit, setSelectedPropertyForEdit] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const fileInputRef = useRef(null);
 
   // Ensure brokerProperties is always an array
   const safeBrokerProperties = Array.isArray(brokerProperties) ? brokerProperties : [];
   
+  // Fetch broker properties on mount
+  useEffect(() => {
+    if (!user?.id) return;
+    
+    const fetchBrokerProperties = async () => {
+      try {
+        setLoading(true);
+        const response = await apiCall('GET_BROKER_LISTINGS', {}, {});
+        
+        if (response.success) {
+          const properties = response.data?.properties || response.data || [];
+          if (Array.isArray(properties)) {
+            // Update parent component if needed
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching broker properties:', error);
+        if (setToast) {
+          setToast({
+            show: true,
+            message: "Failed to load properties",
+            type: "error",
+          });
+        }
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    fetchBrokerProperties();
+  }, [user?.id]);
+
   // Helper to get status from backend property_status field
   const getPropertyStatus = (property) => {
     return property.property_status || property.status || 'unknown';
@@ -102,22 +137,35 @@ const BrokerPropertiesList = ({
       'inactive': 'Inactive',
       'sold': 'Sold',
       'rented': 'Rented',
-      'approved': 'Approved'
+      'approved': 'Approved',
+      'pending_review': 'Pending Review'
     };
     return statusMap[status] || status.replace('_', ' ');
   };
 
   // Get property image - handles various image formats
   const getPropertyImage = (property) => {
+    // Check property_images array
+    if (property.property_images && Array.isArray(property.property_images) && property.property_images.length > 0) {
+      const primaryImage = property.property_images.find(img => img.is_primary) || property.property_images[0];
+      return primaryImage.image_url || primaryImage.url || '';
+    }
+    
+    // Check images array
     if (property.images && Array.isArray(property.images) && property.images.length > 0) {
       return property.images[0];
     }
+    
+    // Check single image fields
     if (property.image_url) {
       return property.image_url;
     }
+    
     if (property.featured_image) {
       return property.featured_image;
     }
+    
+    // Fallback image based on property type
     return `https://images.unsplash.com/photo-${property.property_type === 'apartment' ? '1560448204-e02f11c3d0e2' : 
       property.property_type === 'house' ? '1518780664697-55e3ad937233' :
       property.property_type === 'villa' ? '1613490493576-7fde63acd4e1' :
@@ -141,27 +189,101 @@ const BrokerPropertiesList = ({
   // Format date
   const formatDate = (dateString) => {
     if (!dateString) return "N/A";
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric'
-    });
+    try {
+      const date = new Date(dateString);
+      return date.toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric'
+      });
+    } catch (error) {
+      return "Invalid date";
+    }
   };
 
-  // Function to handle property actions
+  // Function to handle property actions using real API
   const handlePropertyAction = async (propertyId, action) => {
+    if (!propertyId) {
+      console.error('No property ID provided');
+      return;
+    }
+    
     setActionLoading(prev => ({ ...prev, [propertyId]: true }));
+    
     try {
-      if (onPropertyAction) {
-        await onPropertyAction(propertyId, action);
+      // Use the PROPERTY_ACTION endpoint
+      const response = await apiCall('PROPERTY_ACTION', { id: propertyId }, {
+        data: { action }
+      });
+      
+      if (response.success) {
+        if (onPropertyAction) {
+          onPropertyAction(propertyId, action);
+        }
+        
+        if (setToast) {
+          setToast({
+            show: true,
+            message: `Property ${action}d successfully`,
+            type: "success",
+          });
+        }
+        
+        // Refresh properties list
+        if (onRefresh) {
+          onRefresh();
+        }
       }
     } catch (error) {
       console.error("Action failed:", error);
       if (setToast) {
         setToast({
           show: true,
-          message: `Failed to ${action} property`,
+          message: `Failed to ${action} property: ${error.message}`,
+          type: "error",
+        });
+      }
+    } finally {
+      setActionLoading(prev => ({ ...prev, [propertyId]: false }));
+    }
+  };
+
+  // Function to handle property deletion
+  const handleDeleteProperty = async (propertyId) => {
+    if (!propertyId) {
+      console.error('No property ID provided');
+      return;
+    }
+    
+    if (!window.confirm('Are you sure you want to delete this property? This action cannot be undone.')) {
+      return;
+    }
+    
+    setActionLoading(prev => ({ ...prev, [propertyId]: true }));
+    
+    try {
+      const response = await apiCall('DELETE_PROPERTY', { id: propertyId }, {});
+      
+      if (response.success) {
+        if (setToast) {
+          setToast({
+            show: true,
+            message: "Property deleted successfully",
+            type: "success",
+          });
+        }
+        
+        // Refresh properties list
+        if (onRefresh) {
+          onRefresh();
+        }
+      }
+    } catch (error) {
+      console.error("Delete failed:", error);
+      if (setToast) {
+        setToast({
+          show: true,
+          message: `Failed to delete property: ${error.message}`,
           type: "error",
         });
       }
@@ -188,6 +310,103 @@ const BrokerPropertiesList = ({
     } else {
       setShowCreateForm(true);
     }
+  };
+
+  // Handle image upload using real API
+  const handleImageUpload = async () => {
+    if (!selectedFiles.length || !selectedPropertyForImages?.id) {
+      if (setToast) {
+        setToast({
+          show: true,
+          message: "Please select files to upload",
+          type: "warning",
+        });
+      }
+      return;
+    }
+
+    setIsUploading(true);
+    setUploadProgress(0);
+
+    try {
+      const formData = new FormData();
+      selectedFiles.forEach((file, index) => {
+        formData.append('images', file);
+        // Optional: Add metadata for each image
+        formData.append(`image_${index}_caption`, file.name);
+      });
+
+      // Use the UPLOAD_PROPERTY_IMAGES endpoint
+      const response = await apiCall('UPLOAD_PROPERTY_IMAGES', 
+        { propertyId: selectedPropertyForImages.id }, 
+        {
+          method: 'POST',
+          body: formData
+        }
+      );
+
+      setUploadProgress(100);
+      
+      setTimeout(() => {
+        setShowImageUpload(false);
+        setSelectedFiles([]);
+        setUploadProgress(0);
+        setIsUploading(false);
+        
+        if (response.success) {
+          if (setToast) {
+            setToast({
+              show: true,
+              message: "Images uploaded successfully!",
+              type: "success",
+            });
+          }
+          
+          // Refresh properties list
+          if (onRefresh) {
+            onRefresh();
+          }
+        } else {
+          throw new Error(response.message || 'Upload failed');
+        }
+      }, 500);
+
+    } catch (error) {
+      console.error("Upload failed:", error);
+      if (setToast) {
+        setToast({
+          show: true,
+          message: `Upload failed: ${error.message}`,
+          type: "error",
+        });
+      }
+      setIsUploading(false);
+      setUploadProgress(0);
+    }
+  };
+
+  // Handle file selection for upload
+  const handleFileSelect = (e) => {
+    const files = Array.from(e.target.files);
+    const imageFiles = files.filter(file => file.type.startsWith('image/'));
+    
+    if (imageFiles.length === 0) {
+      if (setToast) {
+        setToast({
+          show: true,
+          message: "Please select image files only",
+          type: "warning",
+        });
+      }
+      return;
+    }
+    
+    setSelectedFiles(imageFiles);
+  };
+
+  // Remove selected file
+  const removeFile = (index) => {
+    setSelectedFiles(prev => prev.filter((_, i) => i !== index));
   };
 
   // Apply filters
@@ -232,9 +451,9 @@ const BrokerPropertiesList = ({
     
     switch (sortBy) {
       case "newest":
-        return new Date(b.created_at || b.updated_at) - new Date(a.created_at || a.updated_at);
+        return new Date(b.created_at || b.updated_at || 0) - new Date(a.created_at || a.updated_at || 0);
       case "oldest":
-        return new Date(a.created_at || a.updated_at) - new Date(b.created_at || b.updated_at);
+        return new Date(a.created_at || a.updated_at || 0) - new Date(b.created_at || b.updated_at || 0);
       case "price_high":
         return (b.price || 0) - (a.price || 0);
       case "price_low":
@@ -246,7 +465,7 @@ const BrokerPropertiesList = ({
     }
   });
 
-  // Status color mapping with improved colors
+  // Status color mapping
   const getStatusColor = (status) => {
     const actualStatus = status.toLowerCase();
     switch (actualStatus) {
@@ -322,92 +541,52 @@ const BrokerPropertiesList = ({
     }
   };
 
-  // Handle file selection for upload
-  const handleFileSelect = (e) => {
-    const files = Array.from(e.target.files);
-    const imageFiles = files.filter(file => file.type.startsWith('image/'));
+  // Calculate stats from properties
+  const calculatePropertyStats = () => {
+    const stats = {
+      total: safeBrokerProperties.length,
+      active: safeBrokerProperties.filter(p => getPropertyStatus(p) === 'active').length,
+      pending: safeBrokerProperties.filter(p => ['pending', 'draft'].includes(getPropertyStatus(p))).length,
+      withoutImages: safeBrokerProperties.filter(p => 
+        !p.images && 
+        !p.image_url && 
+        !p.featured_image && 
+        (!p.property_images || p.property_images.length === 0)
+      ).length,
+      totalValue: safeBrokerProperties.reduce((sum, p) => sum + (parseFloat(p.price) || 0), 0),
+      sold: safeBrokerProperties.filter(p => getPropertyStatus(p) === 'sold').length,
+      rented: safeBrokerProperties.filter(p => getPropertyStatus(p) === 'rented').length
+    };
     
-    if (imageFiles.length === 0) {
-      if (setToast) {
-        setToast({
-          show: true,
-          message: "Please select image files only",
-          type: "warning",
-        });
-      }
-      return;
-    }
-    
-    setSelectedFiles(imageFiles);
+    return stats;
   };
 
-  // Handle image upload
-  const handleImageUpload = async () => {
-    if (!selectedFiles.length || !selectedPropertyForImages) {
-      if (setToast) {
-        setToast({
-          show: true,
-          message: "Please select files to upload",
-          type: "warning",
-        });
-      }
-      return;
-    }
+  const propertyStats = calculatePropertyStats();
 
-    setIsUploading(true);
-    setUploadProgress(0);
-
-    try {
-      // Simulate upload progress
-      const progressInterval = setInterval(() => {
-        setUploadProgress(prev => {
-          if (prev >= 90) {
-            clearInterval(progressInterval);
-            return 90;
-          }
-          return prev + 10;
-        });
-      }, 200);
-
-      // Call actual upload function if provided
-      if (onUploadImages) {
-        await onUploadImages(selectedPropertyForImages.id, selectedFiles);
-      }
-      
-      setUploadProgress(100);
-      
-      setTimeout(() => {
-        setShowImageUpload(false);
-        setSelectedFiles([]);
-        setUploadProgress(0);
-        setIsUploading(false);
-        
-        if (setToast) {
-          setToast({
-            show: true,
-            message: "Images uploaded successfully!",
-            type: "success",
-          });
-        }
-      }, 500);
-
-    } catch (error) {
-      if (setToast) {
-        setToast({
-          show: true,
-          message: "Upload failed. Please try again.",
-          type: "error",
-        });
-      }
-      setIsUploading(false);
-      setUploadProgress(0);
+  // Handle refresh if not provided
+  const handleRefresh = () => {
+    if (onRefresh) {
+      onRefresh();
+    } else {
+      // Default refresh behavior
+      window.location.reload();
     }
   };
 
-  // Remove selected file
-  const removeFile = (index) => {
-    setSelectedFiles(prev => prev.filter((_, i) => i !== index));
-  };
+  if (loading) {
+    return (
+      <div className={`p-4 lg:p-6 rounded-2xl ${theme === "dark" ? "bg-gray-900/50" : "bg-white"} border ${theme === "dark" ? "border-gray-800" : "border-gray-200"} shadow-lg`}>
+        <div className="flex items-center justify-center h-64">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-amber-500 mx-auto mb-4"></div>
+            <p className={`text-sm ${theme === "dark" ? "text-gray-400" : "text-gray-600"}`}>
+              Loading properties...
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className={`p-4 lg:p-6 rounded-2xl ${theme === "dark" ? "bg-gray-900/50" : "bg-white"} border ${theme === "dark" ? "border-gray-800" : "border-gray-200"} shadow-lg`}>
@@ -415,7 +594,6 @@ const BrokerPropertiesList = ({
       <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-8 gap-6">
         <div className="flex-1">
           <div className="flex items-center gap-3 mb-3">
-            
             <div>
               <h2 className="text-2xl lg:text-3xl font-bold bg-gradient-to-r from-amber-600 to-orange-600 bg-clip-text text-transparent">
                 Property Listings
@@ -428,20 +606,20 @@ const BrokerPropertiesList = ({
           
           <div className="flex flex-wrap items-center gap-4 mt-4">
             <div className={`px-3 py-1.5 rounded-full ${theme === "dark" ? "bg-gray-800" : "bg-gray-100"} border ${theme === "dark" ? "border-gray-700" : "border-gray-200"}`}>
-              <span className={` font-semibold ${theme === "dark" ? "text-amber-400" : "text-amber-600"}`}>{safeBrokerProperties.length}</span>
+              <span className={`font-semibold ${theme === "dark" ? "text-amber-400" : "text-amber-600"}`}>{propertyStats.total}</span>
               <span className={`ml-1 ${theme === "dark" ? "text-gray-400" : "text-gray-600"}`}>Total</span>
             </div>
             <div className="flex items-center gap-2 text-sm">
               <div className="flex items-center gap-1">
                 <div className="w-2 h-2 rounded-full bg-emerald-500"></div>
                 <span className={theme === "dark" ? "text-gray-400" : "text-gray-600"}>
-                  Active: <span className={` font-semibold ${theme === "dark" ? "text-gray-400" : "text-gray-600"}`}>{safeBrokerProperties.filter(p => getPropertyStatus(p) === 'active').length}</span>
+                  Active: <span className={`font-semibold ${theme === "dark" ? "text-gray-400" : "text-gray-600"}`}>{propertyStats.active}</span>
                 </span>
               </div>
               <div className="flex items-center gap-1">
                 <div className="w-2 h-2 rounded-full bg-amber-500"></div>
                 <span className={theme === "dark" ? "text-gray-400" : "text-gray-600"}>
-                  Pending: <span className={` font-semibold ${theme === "dark" ? "text-gray-400" : "text-gray-600"}`}>{safeBrokerProperties.filter(p => ['pending', 'draft'].includes(getPropertyStatus(p))).length}</span>
+                  Pending: <span className={`font-semibold ${theme === "dark" ? "text-gray-400" : "text-gray-600"}`}>{propertyStats.pending}</span>
                 </span>
               </div>
             </div>
@@ -450,7 +628,7 @@ const BrokerPropertiesList = ({
         
         <div className="flex flex-wrap gap-3">
           <button
-            onClick={onRefresh}
+            onClick={handleRefresh}
             className={`px-4 py-2.5 rounded-xl flex items-center gap-2 transition-all duration-300 ${theme === "dark" ? "bg-gray-800 hover:bg-gray-700 text-gray-300 border border-gray-700" : "bg-gray-100 hover:bg-gray-200 text-gray-700 border border-gray-200"} hover:scale-105`}
           >
             <RefreshCw className="w-4 h-4" />
@@ -462,17 +640,17 @@ const BrokerPropertiesList = ({
             className="px-5 py-2.5 bg-gradient-to-r from-amber-500 to-orange-500 text-white rounded-xl hover:from-amber-600 hover:to-orange-600 flex items-center gap-2 transition-all duration-300 hover:scale-105 shadow-lg hover:shadow-xl"
           >
             <Plus className="w-5 h-5" />
-            <span className={`  ${theme === "dark" ? "text-white" : "text-white"}`}>Create Listing</span>
+            <span className={` ${theme === "dark" ? "text-white" : "text-white"}`}>Create Listing</span>
           </button>
         </div>
       </div>
 
-      {/* Stats Cards - Enhanced with fixed light mode */}
+      {/* Stats Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
         {[
           { 
             label: "Active Listings", 
-            value: safeBrokerProperties.filter(p => getPropertyStatus(p) === 'active').length,
+            value: propertyStats.active,
             icon: Home,
             color: "from-emerald-500 to-teal-500",
             bgColor: theme === "dark" ? "bg-emerald-900/20" : "bg-emerald-50",
@@ -481,7 +659,7 @@ const BrokerPropertiesList = ({
           },
           { 
             label: "Pending Review", 
-            value: safeBrokerProperties.filter(p => ['pending', 'draft'].includes(getPropertyStatus(p))).length,
+            value: propertyStats.pending,
             icon: Clock,
             color: "from-amber-500 to-orange-500",
             bgColor: theme === "dark" ? "bg-amber-900/20" : "bg-amber-50",
@@ -490,7 +668,7 @@ const BrokerPropertiesList = ({
           },
           { 
             label: "Without Images", 
-            value: safeBrokerProperties.filter(p => !p.images && !p.image_url).length,
+            value: propertyStats.withoutImages,
             icon: Camera,
             color: "from-blue-500 to-indigo-500",
             bgColor: theme === "dark" ? "bg-blue-900/20" : "bg-blue-50",
@@ -499,7 +677,7 @@ const BrokerPropertiesList = ({
           },
           { 
             label: "Total Value", 
-            value: formatCurrency(safeBrokerProperties.reduce((sum, p) => sum + (p.price || 0), 0)),
+            value: formatCurrency(propertyStats.totalValue),
             icon: TrendingUp,
             color: "from-purple-500 to-pink-500",
             bgColor: theme === "dark" ? "bg-purple-900/20" : "bg-purple-50",
@@ -528,7 +706,7 @@ const BrokerPropertiesList = ({
         ))}
       </div>
 
-      {/* Search and Filter Bar - Enhanced */}
+      {/* Search and Filter Bar */}
       <div className={`p-4 rounded-xl mb-8 ${theme === "dark" ? "bg-gray-900/30 border border-gray-800" : "bg-gray-50 border border-gray-200"}`}>
         <div className="flex flex-col lg:flex-row gap-4">
           {/* Search */}
@@ -625,11 +803,12 @@ const BrokerPropertiesList = ({
             const statusDisplay = formatStatusDisplay(status);
             const statusColors = getStatusColor(status);
             const propertyImage = getPropertyImage(property);
-            const hasImages = property.images || property.image_url || property.featured_image;
+            const hasImages = property.images || property.image_url || property.featured_image || (property.property_images && property.property_images.length > 0);
+            const propertyId = property.id || property.property_id;
             
             return (
               <div
-                key={property.id}
+                key={propertyId}
                 className={`rounded-2xl border overflow-hidden transition-all duration-300 hover:shadow-xl ${theme === "dark" ? "bg-gray-900/50 border-gray-800 hover:border-gray-700" : "bg-white border-gray-200 hover:border-gray-300"}`}
               >
                 {/* Property Card Header with Image */}
@@ -718,7 +897,7 @@ const BrokerPropertiesList = ({
                   </div>
                 </div>
 
-                {/* Property Details - FIXED LIGHT MODE TEXT COLORS */}
+                {/* Property Details */}
                 <div className="p-5">
                   {/* Property Features */}
                   <div className="grid grid-cols-2 gap-4 mb-5">
@@ -737,7 +916,7 @@ const BrokerPropertiesList = ({
                       </div>
                       <div>
                         <div className={`text-sm ${theme === "dark" ? "text-gray-400" : "text-gray-600"}`}>Area</div>
-                        <div className={`font-medium ${theme === "dark" ? "text-gray-200" : "text-gray-900"}`}>{property.sqft || 'N/A'} sqft</div>
+                        <div className={`font-medium ${theme === "dark" ? "text-gray-200" : "text-gray-900"}`}>{property.sqft || property.square_feet || property.area || 'N/A'} sqft</div>
                       </div>
                     </div>
                     <div className="flex items-center gap-3">
@@ -746,7 +925,7 @@ const BrokerPropertiesList = ({
                       </div>
                       <div>
                         <div className={`text-sm ${theme === "dark" ? "text-gray-400" : "text-gray-600"}`}>Beds</div>
-                        <div className={`font-medium ${theme === "dark" ? "text-gray-200" : "text-gray-900"}`}>{property.beds || 0}</div>
+                        <div className={`font-medium ${theme === "dark" ? "text-gray-200" : "text-gray-900"}`}>{property.beds || property.bedrooms || 0}</div>
                       </div>
                     </div>
                     <div className="flex items-center gap-3">
@@ -755,7 +934,7 @@ const BrokerPropertiesList = ({
                       </div>
                       <div>
                         <div className={`text-sm ${theme === "dark" ? "text-gray-400" : "text-gray-600"}`}>Baths</div>
-                        <div className={`font-medium ${theme === "dark" ? "text-gray-200" : "text-gray-900"}`}>{property.baths || 0}</div>
+                        <div className={`font-medium ${theme === "dark" ? "text-gray-200" : "text-gray-900"}`}>{property.baths || property.bathrooms || 0}</div>
                       </div>
                     </div>
                   </div>
@@ -763,15 +942,15 @@ const BrokerPropertiesList = ({
                   {/* Stats */}
                   <div className="grid grid-cols-3 gap-3 mb-5">
                     <div className="text-center">
-                      <div className={`text-lg font-bold ${theme === "dark" ? "text-white" : "text-gray-900"}`}>{property.views_count || 0}</div>
+                      <div className={`text-lg font-bold ${theme === "dark" ? "text-white" : "text-gray-900"}`}>{property.views_count || property.views || 0}</div>
                       <div className={`text-xs ${theme === "dark" ? "text-gray-400" : "text-gray-600"}`}>Views</div>
                     </div>
                     <div className="text-center">
-                      <div className={`text-lg font-bold ${theme === "dark" ? "text-white" : "text-gray-900"}`}>{property.saves_count || 0}</div>
+                      <div className={`text-lg font-bold ${theme === "dark" ? "text-white" : "text-gray-900"}`}>{property.saves_count || property.favorites || 0}</div>
                       <div className={`text-xs ${theme === "dark" ? "text-gray-400" : "text-gray-600"}`}>Saves</div>
                     </div>
                     <div className="text-center">
-                      <div className={`text-lg font-bold ${theme === "dark" ? "text-white" : "text-gray-900"}`}>{property.inquiries_count || 0}</div>
+                      <div className={`text-lg font-bold ${theme === "dark" ? "text-white" : "text-gray-900"}`}>{property.inquiries_count || property.inquiries || 0}</div>
                       <div className={`text-xs ${theme === "dark" ? "text-gray-400" : "text-gray-600"}`}>Inquiries</div>
                     </div>
                   </div>
@@ -787,10 +966,10 @@ const BrokerPropertiesList = ({
                     </button>
                     
                     <button
-                      onClick={() => togglePropertyExpansion(property.id)}
+                      onClick={() => togglePropertyExpansion(propertyId)}
                       className={`px-4 py-2.5 border rounded-xl hover:bg-gray-50 dark:hover:bg-gray-800 flex items-center justify-center transition-all duration-300 hover:scale-105 ${theme === "dark" ? "border-gray-700 text-gray-400" : "border-gray-300 text-gray-600"}`}
                     >
-                      {expandedProperty === property.id ? (
+                      {expandedProperty === propertyId ? (
                         <ChevronUp className="w-4 h-4" />
                       ) : (
                         <ChevronDown className="w-4 h-4" />
@@ -799,26 +978,30 @@ const BrokerPropertiesList = ({
                   </div>
 
                   {/* Expanded Actions */}
-                  {expandedProperty === property.id && (
+                  {expandedProperty === propertyId && (
                     <div className="mt-5 pt-5 border-t border-gray-200 dark:border-gray-800 space-y-4">
                       <div className="grid grid-cols-2 gap-3">
-                        <button
-                          onClick={() => handlePropertyAction(property.id, 'approve')}
-                          disabled={actionLoading[property.id]}
-                          className="px-4 py-2.5 bg-gradient-to-r from-emerald-500 to-teal-500 text-white rounded-xl hover:from-emerald-600 hover:to-teal-600 disabled:opacity-50 text-sm flex items-center justify-center gap-2 transition-all duration-300"
-                        >
-                          <CheckCircle className="w-4 h-4" />
-                          Approve
-                        </button>
-                        
-                        <button
-                          onClick={() => handlePropertyAction(property.id, 'reject')}
-                          disabled={actionLoading[property.id]}
-                          className="px-4 py-2.5 bg-gradient-to-r from-rose-500 to-pink-500 text-white rounded-xl hover:from-rose-600 hover:to-pink-600 disabled:opacity-50 text-sm flex items-center justify-center gap-2 transition-all duration-300"
-                        >
-                          <XCircle className="w-4 h-4" />
-                          Reject
-                        </button>
+                        {status === 'pending' && (
+                          <>
+                            <button
+                              onClick={() => handlePropertyAction(propertyId, 'approve')}
+                              disabled={actionLoading[propertyId]}
+                              className="px-4 py-2.5 bg-gradient-to-r from-emerald-500 to-teal-500 text-white rounded-xl hover:from-emerald-600 hover:to-teal-600 disabled:opacity-50 text-sm flex items-center justify-center gap-2 transition-all duration-300"
+                            >
+                              <CheckCircle className="w-4 h-4" />
+                              Approve
+                            </button>
+                            
+                            <button
+                              onClick={() => handlePropertyAction(propertyId, 'reject')}
+                              disabled={actionLoading[propertyId]}
+                              className="px-4 py-2.5 bg-gradient-to-r from-rose-500 to-pink-500 text-white rounded-xl hover:from-rose-600 hover:to-pink-600 disabled:opacity-50 text-sm flex items-center justify-center gap-2 transition-all duration-300"
+                            >
+                              <XCircle className="w-4 h-4" />
+                              Reject
+                            </button>
+                          </>
+                        )}
                         
                         <button
                           onClick={() => {
@@ -837,6 +1020,25 @@ const BrokerPropertiesList = ({
                         >
                           <Edit className="w-4 h-4" />
                           Edit
+                        </button>
+                      </div>
+                      
+                      <div className="grid grid-cols-2 gap-3">
+                        <button
+                          onClick={() => window.open(`/property/${propertyId}`, '_blank')}
+                          className="px-4 py-2.5 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-xl hover:from-purple-600 hover:to-pink-600 text-sm flex items-center justify-center gap-2 transition-all duration-300"
+                        >
+                          <Eye className="w-4 h-4" />
+                          View Public
+                        </button>
+                        
+                        <button
+                          onClick={() => handleDeleteProperty(propertyId)}
+                          disabled={actionLoading[propertyId]}
+                          className="px-4 py-2.5 bg-gradient-to-r from-red-500 to-rose-500 text-white rounded-xl hover:from-red-600 hover:to-rose-600 disabled:opacity-50 text-sm flex items-center justify-center gap-2 transition-all duration-300"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                          Delete
                         </button>
                       </div>
                       
@@ -870,7 +1072,7 @@ const BrokerPropertiesList = ({
           
           <div className="flex gap-3">
             <button
-              onClick={onRefresh}
+              onClick={handleRefresh}
               className={`px-4 py-2.5 border rounded-xl hover:bg-gray-50 dark:hover:bg-gray-800 flex items-center gap-2 transition-all duration-300 hover:scale-105 ${theme === "dark" ? "border-gray-700 text-gray-400" : "border-gray-300 text-gray-600"}`}
             >
               <RefreshCw className="w-4 h-4" />
@@ -888,14 +1090,14 @@ const BrokerPropertiesList = ({
         </div>
       )}
 
-      {/* Enhanced Image Upload Modal - FIXED LIGHT MODE */}
+      {/* Enhanced Image Upload Modal */}
       {showImageUpload && selectedPropertyForImages && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className={`relative rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-hidden ${theme === "dark" ? "bg-gray-900" : "bg-white"} shadow-2xl`}>
             {/* Header */}
             <div className={`p-6 border-b ${theme === "dark" ? "border-gray-800" : "border-gray-200"} flex justify-between items-center`}>
               <div>
-                <h3 className={`text-xl font-bold ${theme === "dark" ? "text-gray-400" : "text-dark-600"}`}>Upload Images</h3>
+                <h3 className={`text-xl font-bold ${theme === "dark" ? "text-white" : "text-gray-900"}`}>Upload Images</h3>
                 <p className={`text-sm mt-1 ${theme === "dark" ? "text-gray-400" : "text-gray-600"}`}>
                   Add images to "{selectedPropertyForImages.title}"
                 </p>
@@ -941,6 +1143,7 @@ const BrokerPropertiesList = ({
                 <button
                   className={`px-6 py-2.5 rounded-xl font-medium transition-all duration-300 ${isUploading ? 'bg-gray-300 dark:bg-gray-700 cursor-not-allowed' : 'bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white hover:shadow-lg'}`}
                   disabled={isUploading}
+                  onClick={() => !isUploading && fileInputRef.current?.click()}
                 >
                   Browse Files
                 </button>
@@ -1058,8 +1261,7 @@ const BrokerPropertiesList = ({
             console.log("Property updated:", updatedProperty);
             setShowEditForm(false);
             setSelectedPropertyForEdit(null);
-            // Refresh the properties list
-            if (onRefresh) onRefresh();
+            handleRefresh();
           }}
           theme={theme}
         />
@@ -1073,7 +1275,7 @@ const BrokerPropertiesList = ({
           onSubmit={(newProperty) => {
             console.log("Property created:", newProperty);
             setShowCreateForm(false);
-            if (onRefresh) onRefresh();
+            handleRefresh();
           }}
           theme={theme}
         />

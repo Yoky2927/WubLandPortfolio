@@ -2,7 +2,6 @@ import React, { useState, useEffect, Suspense, lazy } from "react";
 import {
   Users,
   Home,
-  Search,
   MessageSquare,
   CreditCard,
   CheckCircle,
@@ -23,7 +22,6 @@ import {
   Calendar,
   Shield,
   Upload,
-  TrendingUp,
   Phone,
   Mail,
   RefreshCw,
@@ -31,7 +29,6 @@ import {
   AlertTriangle,
   Clock,
   Target,
-  TrendingDown,
   Percent,
   Activity,
   Package,
@@ -72,103 +69,12 @@ const Toast = lazy(() => import("../../components/Toast"));
 const NotificationsPanel = lazy(() =>
   import("../../components/NotificationsPanel")
 );
-// Add this to your lazy imports section (around line 40-50)
 const EditPropertyForm = lazy(() => import("../../components/EditPropertyForm"));
+
 // Import services
 import { httpClient } from "../../services/http.service";
 import socketService from "../../services/socket.service";
 import { API_CONFIG } from "../../config/api.config";
-
-// Create a simple broker analytics hook inline since we don't have the file
-const useBrokerAnalytics = (brokerId) => {
-  const [brokerAnalytics, setBrokerAnalytics] = useState(null);
-  const [transactions, setTransactions] = useState([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [timeframe, setTimeframe] = useState("monthly");
-
-  const fetchBrokerData = async () => {
-    if (!brokerId) return null;
-
-    setIsLoading(true);
-    try {
-      // Try to fetch real data first
-      const response = await httpClient.get(
-        API_CONFIG.getUrl("BROKER_ANALYTICS", { brokerId }) +
-          "?timeframe=monthly"
-      );
-
-      if (response.data.success) {
-        console.log("✅ Real broker analytics received:", response.data.data);
-        setBrokerAnalytics(response.data.data);
-        return {
-          analytics: response.data.data,
-          transactions: [],
-          commissions: [],
-        };
-      } else {
-        throw new Error("No real data available");
-      }
-    } catch (error) {
-      console.warn("⚠️ Using mock broker analytics data:", error.message);
-      // Mock data as fallback
-      const mockAnalytics = {
-        brokerId: brokerId,
-        totalListings: 12,
-        pendingReviews: 3,
-        approvedListings: 8,
-        rejectedListings: 1,
-        activeClients: 5,
-        totalRevenue: 245000,
-        responseRate: 85,
-        avgResponseTime: "2h",
-        totalTransactions: 15,
-        completedTransactions: 12,
-        pendingTransactions: 3,
-        propertyStats: {
-          approved: 8,
-          pending: 3,
-          rejected: 1,
-          draft: 0,
-        },
-        performance: {
-          responseRate: 85,
-          approvalRate: 67,
-          clientSatisfaction: 90,
-          avgCommissionRate: 2.5,
-        },
-        revenueTrend: {
-          labels: ["Jan", "Feb", "Mar", "Apr", "May", "Jun"],
-          data: [45000, 52000, 48000, 55000, 60000, 70000],
-        },
-        clientStats: {
-          totalClients: 15,
-          activeClients: 5,
-          newClients: 3,
-          retentionRate: 87,
-        },
-        transactionStats: {
-          total: 15,
-          completed: 12,
-          pending: 3,
-          avgCommission: 16333,
-        },
-      };
-
-      setBrokerAnalytics(mockAnalytics);
-      return { analytics: mockAnalytics, transactions: [], commissions: [] };
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  return {
-    brokerAnalytics,
-    transactions,
-    isLoading,
-    fetchBrokerData,
-    updateTimeframe: () => {},
-  };
-};
 
 const BrokerDashboard = ({ isInternal = true }) => {
   const { theme, toggleTheme } = useTheme();
@@ -181,6 +87,11 @@ const BrokerDashboard = ({ isInternal = true }) => {
   const [selectedProperty, setSelectedProperty] = useState(null);
   const [showPropertyDetails, setShowPropertyDetails] = useState(false);
   const [showCreatePropertyForm, setShowCreatePropertyForm] = useState(false);
+  const [brokerProperties, setBrokerProperties] = useState([]);
+  const [requests, setRequests] = useState([]);
+  const [requestCount, setRequestCount] = useState(0);
+  const [showEditPropertyForm, setShowEditPropertyForm] = useState(false);
+  const [propertyToEdit, setPropertyToEdit] = useState(null);
   const [brokerStats, setBrokerStats] = useState({
     totalListings: 0,
     pendingReviews: 0,
@@ -194,29 +105,6 @@ const BrokerDashboard = ({ isInternal = true }) => {
     completedTransactions: 0,
     pendingTransactions: 0,
   });
-  const [brokerProperties, setBrokerProperties] = useState([]);
-  const [clients, setClients] = useState([]);
-  const [requests, setRequests] = useState([]);
-  const [requestCount, setRequestCount] = useState(0);
-  const [showEditPropertyForm, setShowEditPropertyForm] = useState(false);
-  const [propertyToEdit, setPropertyToEdit] = useState(null);
-
-  // Fetch requests
-  const fetchRequests = async () => {
-    try {
-      const response = await httpClient.get(
-        "http://localhost:5000/api/property-requests/broker"
-      );
-      if (response.data.success) {
-        setRequests(response.data.data);
-        setRequestCount(
-          response.data.data.filter((r) => r.status === "pending").length
-        );
-      }
-    } catch (error) {
-      console.error("Error fetching requests:", error);
-    }
-  };
 
   const [toast, setToast] = useState({
     show: false,
@@ -226,14 +114,6 @@ const BrokerDashboard = ({ isInternal = true }) => {
   const [refreshing, setRefreshing] = useState(false);
   const navigate = useNavigate();
 
-  // Use the inline broker analytics hook
-  const {
-    brokerAnalytics,
-    transactions,
-    fetchBrokerData,
-    isLoading: analyticsLoading,
-  } = useBrokerAnalytics(user?.id);
-
   // Format profile picture URL
   const formatProfilePictureUrl = (url) => {
     if (!url) return null;
@@ -242,7 +122,7 @@ const BrokerDashboard = ({ isInternal = true }) => {
     return `${API_CONFIG.BASE_URL}/${url}`;
   };
 
-  // Add handlers
+  // Handlers
   const handleViewDetails = (property) => {
     setSelectedProperty(property);
     setShowPropertyDetails(true);
@@ -253,8 +133,6 @@ const BrokerDashboard = ({ isInternal = true }) => {
   };
 
   const handleEditProperty = (property) => {
-    console.log("📝 Edit Property clicked:", property);
-
     if (!property?.id) {
       setToast({
         show: true,
@@ -264,34 +142,26 @@ const BrokerDashboard = ({ isInternal = true }) => {
       return;
     }
 
-    // Close property details modal
     setShowPropertyDetails(false);
-
-    // Set property to edit and open edit form
     setPropertyToEdit(property);
     setShowEditPropertyForm(true);
-
-    console.log(`Opening edit form for property ID: ${property.id}`);
   };
 
-  // Add this function to handle property updates:
   const handleUpdateProperty = async (updatedProperty) => {
-    console.log("🔄 Updating property:", updatedProperty);
-
     try {
-      // Close edit form
-      setShowEditPropertyForm(false);
+      const response = await httpClient.put(
+        API_CONFIG.getUrl("UPDATE_PROPERTY", { id: updatedProperty.id }),
+        updatedProperty
+      );
 
-      // Show success message
-      setToast({
-        show: true,
-        message: "Property updated successfully!",
-        type: "success",
-      });
-
-      // Refresh data
-      if (user?.id) {
-        await fetchBrokerDashboardData(user.id);
+      if (response.data.success) {
+        setShowEditPropertyForm(false);
+        setToast({
+          show: true,
+          message: "Property updated successfully!",
+          type: "success",
+        });
+        fetchBrokerDashboardData(user.id);
       }
     } catch (error) {
       console.error("Error updating property:", error);
@@ -311,13 +181,11 @@ const BrokerDashboard = ({ isInternal = true }) => {
       });
 
       const response = await httpClient.post(
-        `http://localhost:5002/api/properties/images/property/${propertyId}/upload`,
+        API_CONFIG.getUrl("UPLOAD_PROPERTY_IMAGES", { propertyId }),
         formData,
         {
           headers: {
             "Content-Type": "multipart/form-data",
-            // Add authorization if needed
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
           },
         }
       );
@@ -329,16 +197,12 @@ const BrokerDashboard = ({ isInternal = true }) => {
           type: "success",
         });
         fetchBrokerDashboardData(user.id);
-      } else {
-        throw new Error(response.data.message || "Upload failed");
       }
     } catch (error) {
       console.error("Upload error:", error);
       setToast({
         show: true,
-        message: `Failed to upload images: ${
-          error.response?.data?.error || error.message
-        }`,
+        message: `Failed to upload images: ${error.response?.data?.error || error.message}`,
         type: "error",
       });
     }
@@ -347,7 +211,7 @@ const BrokerDashboard = ({ isInternal = true }) => {
   const handleCreateNewProperty = async (propertyData) => {
     try {
       const response = await httpClient.post(
-        "http://localhost:5002/api/properties",
+        API_CONFIG.getUrl("CREATE_PROPERTY"),
         propertyData
       );
 
@@ -374,128 +238,72 @@ const BrokerDashboard = ({ isInternal = true }) => {
     try {
       setRefreshing(true);
 
-      console.log(`🔄 Fetching broker data for ID: ${brokerId}`);
-
-      // 1. Fetch broker properties from PROPERTY-SERVICE (port 5002)
-      const propertiesUrl =
-        "http://localhost:5002/api/properties/broker/listings";
-      console.log(`🏠 Fetching broker properties from: ${propertiesUrl}`);
-
+      // Fetch broker properties
       try {
-        const propertiesResponse = await httpClient.get(propertiesUrl);
+        const response = await httpClient.get(
+          API_CONFIG.getUrl("GET_BROKER_LISTINGS")
+        );
 
-        console.log("📥 Properties response:", propertiesResponse.data);
-
-        if (propertiesResponse.data?.success) {
+        if (response.data?.success) {
           let properties = [];
-          if (propertiesResponse.data.data?.properties) {
-            properties = propertiesResponse.data.data.properties;
-          } else if (Array.isArray(propertiesResponse.data.data)) {
-            properties = propertiesResponse.data.data;
-          } else if (Array.isArray(propertiesResponse.data)) {
-            properties = propertiesResponse.data;
+          if (response.data.data?.properties) {
+            properties = response.data.data.properties;
+          } else if (Array.isArray(response.data.data)) {
+            properties = response.data.data;
           }
 
-          console.log(`✅ ${properties.length} properties received`);
           setBrokerProperties(properties);
-
-          // Calculate broker stats from properties
           calculateBrokerStatsFromProperties(properties);
-        } else {
-          console.warn(
-            "⚠️ Properties response not successful:",
-            propertiesResponse.data
-          );
-          setBrokerProperties([]);
         }
-      } catch (propertiesError) {
-        console.error(
-          "❌ Error fetching from property-service:",
-          propertiesError
-        );
-        console.warn("⚠️ Setting empty properties array");
+      } catch (error) {
+        console.error("Error fetching properties:", error);
         setBrokerProperties([]);
       }
 
-      // 2. Fetch broker stats from ANALYSIS-SERVICE (analytics) - port 5004
-      const statsUrl = API_CONFIG.getUrl("BROKER_STATS", { brokerId });
-      console.log(
-        `📊 Fetching broker stats from analysis-service: ${statsUrl}`
-      );
-
+      // Fetch broker stats from analysis service
       try {
-        const statsResponse = await httpClient.get(statsUrl);
+        const statsResponse = await httpClient.get(
+          API_CONFIG.getUrl("BROKER_STATS", { brokerId })
+        );
 
         if (statsResponse.data?.success) {
-          console.log(
-            "✅ Broker stats received from analysis-service:",
-            statsResponse.data.data
-          );
-          // Merge with calculated stats from properties
           setBrokerStats((prev) => ({
             ...prev,
             ...statsResponse.data.data,
           }));
-        } else {
-          console.warn(
-            "⚠️ Analysis-service stats response not successful:",
-            statsResponse.data
-          );
         }
-      } catch (statsError) {
-        console.warn(
-          "⚠️ Could not fetch broker stats from analysis-service:",
-          statsError.response?.data?.message || statsError.message
-        );
+      } catch (error) {
+        console.warn("Could not fetch broker stats:", error.message);
       }
 
-      // 3. Fetch broker clients from ANALYSIS-SERVICE
-      if (isInternal) {
-        const clientsUrl = API_CONFIG.getUrl("BROKER_CLIENTS", { brokerId });
-        console.log(
-          `👥 Fetching broker clients from analysis-service: ${clientsUrl}`
-        );
-
-        try {
-          const clientsResponse = await httpClient.get(clientsUrl);
-
-          if (clientsResponse.data?.success) {
-            const clients = Array.isArray(clientsResponse.data.data)
-              ? clientsResponse.data.data
-              : [];
-            console.log(
-              `✅ ${clients.length} clients received from analysis-service`
-            );
-            setClients(clients);
-          } else {
-            console.warn(
-              "⚠️ Clients response not successful, setting empty array"
-            );
-            setClients([]);
-          }
-        } catch (clientsError) {
-          console.warn(
-            "⚠️ Could not fetch clients:",
-            clientsError.response?.data?.message || clientsError.message
-          );
-          setClients([]);
-        }
-      }
+      // Fetch requests
+      await fetchRequests();
     } catch (error) {
-      console.error("❌ Error in fetchBrokerDashboardData:", error);
-
-      // Set empty arrays on any error
-      setBrokerProperties([]);
-      setClients([]);
-
+      console.error("Error in fetchBrokerDashboardData:", error);
       setToast({
         show: true,
-        message:
-          "Some broker data failed to load. Please check your network connection.",
-        type: "warning",
+        message: "Failed to load broker data. Please try again.",
+        type: "error",
       });
     } finally {
       setRefreshing(false);
+    }
+  };
+
+  // Fetch requests
+  const fetchRequests = async () => {
+    try {
+      const response = await httpClient.get(
+        API_CONFIG.getUrl("GET_BROKER_REQUESTS")
+      );
+      if (response.data.success) {
+        setRequests(response.data.data);
+        setRequestCount(
+          response.data.data.filter((r) => r.status === "pending").length
+        );
+      }
+    } catch (error) {
+      console.error("Error fetching requests:", error);
     }
   };
 
@@ -530,156 +338,13 @@ const BrokerDashboard = ({ isInternal = true }) => {
     }));
   };
 
-  // Fetch user data
-  useEffect(() => {
-    const fetchUserData = async () => {
-      try {
-        const token = localStorage.getItem("token");
-        if (!token) {
-          navigate("/login-register");
-          return;
-        }
-
-        // FIX: Use getUrl instead of ENDPOINTS directly
-        const checkAuthUrl = API_CONFIG.getUrl("CHECK_AUTH");
-        console.log(`🔐 Checking auth at: ${checkAuthUrl}`);
-
-        const response = await httpClient.get(checkAuthUrl);
-
-        // Check if user is a broker
-        const userRole = response.data.role;
-        if (!userRole || !userRole.includes("broker")) {
-          console.warn(
-            `User role "${userRole}" is not a broker, redirecting...`
-          );
-          navigate("/unauthorized");
-          return;
-        }
-
-        console.log("✅ User authenticated:", response.data);
-        setUser(response.data);
-
-        // Fetch broker data
-        await fetchBrokerDashboardData(response.data.id);
-
-        // Set up WebSocket connection
-        try {
-          socketService.connect(response.data.id, {
-            timeout: 10000, // 10 second timeout
-            retry: true,
-            retryDelay: 3000, // 3 second retry delay
-          });
-          // Add connection status listener
-          socketService.addListener("connect_error", (error) => {
-            console.warn("Socket connection error:", error.message);
-            // You might want to show a toast notification here
-            setToast({
-              show: true,
-              message:
-                "Realtime connection lost. Some features may be limited.",
-              type: "warning",
-            });
-          });
-
-          socketService.addListener("connect", () => {
-            console.log("✅ Socket connected");
-            setToast({
-              show: true,
-              message: "Realtime connection established",
-              type: "success",
-            });
-          });
-
-          // Listen for new listings assigned to broker
-          socketService.addListener("new_listing_assigned", (data) => {
-            setToast({
-              show: true,
-              message: `New listing assigned: ${data.propertyTitle}`,
-              type: "info",
-            });
-            fetchBrokerDashboardData(response.data.id);
-            setNotificationCount((prev) => prev + 1);
-          });
-
-          // Listen for property status updates
-          socketService.addListener("property_status_changed", (data) => {
-            if (data.brokerId === response.data.id) {
-              setToast({
-                show: true,
-                message: `Property ${data.propertyTitle} status updated to ${data.newStatus}`,
-                type: "info",
-              });
-              fetchBrokerDashboardData(response.data.id);
-            }
-          });
-
-          // Listen for new messages
-          socketService.addListener("new_message", (data) => {
-            setNotificationCount((prev) => prev + 1);
-          });
-        } catch (socketError) {
-          console.warn("⚠️ WebSocket connection failed:", socketError.message);
-        }
-      } catch (error) {
-        console.error("❌ Error fetching user data:", error);
-        console.error("Error details:", {
-          message: error.message,
-          response: error.response?.data,
-          status: error.response?.status,
-          url: error.config?.url,
-        });
-
-        if (error.response?.status === 401) {
-          localStorage.removeItem("token");
-          navigate("/login-register");
-        } else {
-          setToast({
-            show: true,
-            message:
-              "Failed to load user data. Please try refreshing the page.",
-            type: "error",
-          });
-        }
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchUserData();
-
-    return () => {
-      try {
-        socketService.disconnect();
-      } catch (error) {
-        console.warn("Error disconnecting socket:", error.message);
-      }
-    };
-  }, [navigate, isInternal]);
-
+  // Handle property actions
   const handlePropertyAction = async (propertyId, action, notes = "") => {
     try {
-      const actionMap = {
-        approve: "active",
-        reject: "rejected",
-        request_changes: "pending",
-      };
-
-      const newStatus = actionMap[action];
-
-      if (!newStatus) {
-        throw new Error(`Invalid action: ${action}`);
-      }
-
-      // USE THE CORRECT ENDPOINT - /action not /status
-      const url = `http://localhost:5002/api/properties/${propertyId}/action`;
-      console.log(
-        `⚡ Performing ${action} (status: ${newStatus}) on property ${propertyId}`
+      const response = await httpClient.post(
+        API_CONFIG.getUrl("PROPERTY_ACTION", { id: propertyId }),
+        { action, notes }
       );
-
-      const response = await httpClient.post(url, {
-        action,
-        notes,
-      });
 
       if (response.data.success) {
         // Update local state
@@ -688,7 +353,7 @@ const BrokerDashboard = ({ isInternal = true }) => {
             property.id === propertyId
               ? {
                   ...property,
-                  property_status: newStatus,
+                  property_status: response.data.data.property_status,
                 }
               : property
           )
@@ -712,26 +377,22 @@ const BrokerDashboard = ({ isInternal = true }) => {
           message: `Property ${action}d successfully`,
           type: "success",
         });
-      } else {
-        throw new Error(response.data.message || "Action failed");
       }
     } catch (error) {
-      console.error("❌ Error performing property action:", error);
+      console.error("Error performing property action:", error);
       setToast({
         show: true,
-        message:
-          error.response?.data?.message ||
-          error.message ||
-          "Failed to perform action",
+        message: error.response?.data?.message || "Failed to perform action",
         type: "error",
       });
     }
   };
 
+  // Handle accept/reject requests
   const handleAcceptRequest = async (requestId) => {
     try {
       const response = await httpClient.put(
-        `http://localhost:5000/api/property-requests/${requestId}/accept`,
+        API_CONFIG.getUrl("ACCEPT_PROPERTY_REQUEST", { requestId }),
         { brokerId: user?.id }
       );
 
@@ -757,8 +418,7 @@ const BrokerDashboard = ({ isInternal = true }) => {
   const handleRejectRequest = async (requestId) => {
     try {
       const response = await httpClient.put(
-        `http://localhost:5000/api/property-requests/${requestId}/reject`,
-        { brokerId: user?.id }
+        API_CONFIG.getUrl("REJECT_PROPERTY_REQUEST", { requestId })
       );
 
       if (response.data.success) {
@@ -781,13 +441,12 @@ const BrokerDashboard = ({ isInternal = true }) => {
   };
 
   const handleMessageClient = (clientId) => {
-    // Navigate to chat
     navigate(`/chat/${clientId}`);
   };
+
   // Handle refresh
   const handleRefresh = () => {
     if (user?.id) {
-      console.log("🔄 Manual refresh triggered");
       fetchBrokerDashboardData(user.id);
     }
   };
@@ -795,9 +454,7 @@ const BrokerDashboard = ({ isInternal = true }) => {
   // Handle logout
   const handleLogout = async () => {
     try {
-      const logoutUrl = API_CONFIG.getUrl("LOGOUT");
-      console.log(`🚪 Logging out at: ${logoutUrl}`);
-      await httpClient.post(logoutUrl);
+      await httpClient.post(API_CONFIG.getUrl("LOGOUT"));
     } catch (error) {
       console.error("Logout error:", error);
     } finally {
@@ -806,6 +463,91 @@ const BrokerDashboard = ({ isInternal = true }) => {
       window.location.href = "/login-register";
     }
   };
+
+  // Fetch user data
+  useEffect(() => {
+    const fetchUserData = async () => {
+      try {
+        const token = localStorage.getItem("token");
+        if (!token) {
+          navigate("/login-register");
+          return;
+        }
+
+        const response = await apiCall('CHECK_AUTH');
+
+        // Check if user is a broker
+        const userRole = response.data.role;
+        if (!userRole || !userRole.includes("broker")) {
+          navigate("/unauthorized");
+          return;
+        }
+
+        setUser(response.data);
+        await fetchBrokerDashboardData(response.data.id);
+
+        // Set up WebSocket connection
+        try {
+          socketService.connect(response.data.id, {
+            timeout: 10000,
+            retry: true,
+            retryDelay: 3000,
+          });
+
+          socketService.addListener("new_listing_assigned", (data) => {
+            setToast({
+              show: true,
+              message: `New listing assigned: ${data.propertyTitle}`,
+              type: "info",
+            });
+            fetchBrokerDashboardData(response.data.id);
+            setNotificationCount((prev) => prev + 1);
+          });
+
+          socketService.addListener("property_status_changed", (data) => {
+            if (data.brokerId === response.data.id) {
+              setToast({
+                show: true,
+                message: `Property ${data.propertyTitle} status updated to ${data.newStatus}`,
+                type: "info",
+              });
+              fetchBrokerDashboardData(response.data.id);
+            }
+          });
+
+          socketService.addListener("new_message", () => {
+            setNotificationCount((prev) => prev + 1);
+          });
+        } catch (socketError) {
+          console.warn("WebSocket connection failed:", socketError.message);
+        }
+      } catch (error) {
+        console.error("Error fetching user data:", error);
+        if (error.response?.status === 401) {
+          localStorage.removeItem("token");
+          navigate("/login-register");
+        } else {
+          setToast({
+            show: true,
+            message: "Failed to load user data. Please try refreshing the page.",
+            type: "error",
+          });
+        }
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchUserData();
+
+    return () => {
+      try {
+        socketService.disconnect();
+      } catch (error) {
+        console.warn("Error disconnecting socket:", error.message);
+      }
+    };
+  }, [navigate, isInternal]);
 
   // Render content based on active tab
   const renderContent = () => {
@@ -822,13 +564,10 @@ const BrokerDashboard = ({ isInternal = true }) => {
       user,
       brokerStats,
       brokerProperties,
-      clients,
       isInternal,
       onPropertyAction: handlePropertyAction,
       onRefresh: handleRefresh,
       setToast,
-      brokerMetrics: brokerAnalytics,
-      analyticsLoading,
     };
 
     switch (activeTab) {
@@ -857,7 +596,6 @@ const BrokerDashboard = ({ isInternal = true }) => {
             onMessageClient={handleMessageClient}
           />
         );
-
       case "transactions":
         return (
           <Suspense
@@ -865,7 +603,10 @@ const BrokerDashboard = ({ isInternal = true }) => {
               <div className="h-96 bg-gray-200 dark:bg-gray-700 rounded-xl animate-pulse" />
             }
           >
-            <BrokerTransactions {...contentProps} />
+            <BrokerTransactions
+              {...contentProps}
+              brokerId={user?.id}
+            />
           </Suspense>
         );
       case "analytics":
@@ -875,75 +616,11 @@ const BrokerDashboard = ({ isInternal = true }) => {
               <div className="h-96 bg-gray-200 dark:bg-gray-700 rounded-xl animate-pulse" />
             }
           >
-            <BrokerAnalytics {...contentProps} />
+            <BrokerAnalytics
+              {...contentProps}
+              brokerId={user?.id}
+            />
           </Suspense>
-        );
-      case "clients":
-        return (
-          <div
-            className={`p-4 lg:p-6 rounded-xl ${
-              theme === "dark" ? "bg-gray-800" : "bg-white"
-            } border ${
-              theme === "dark" ? "border-gray-700" : "border-gray-200"
-            }`}
-          >
-            <h2 className="text-2xl font-bold mb-4">My Clients</h2>
-            {clients.length > 0 ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {clients.map((client) => (
-                  <div
-                    key={client.id}
-                    className={`p-6 rounded-xl border ${
-                      theme === "dark"
-                        ? "bg-gray-700 border-gray-600"
-                        : "bg-white border-gray-200"
-                    }`}
-                  >
-                    <div className="flex items-center space-x-4 mb-4">
-                      <div className="w-12 h-12 bg-amber-400 rounded-full flex items-center justify-center text-white font-bold">
-                        {client.name?.charAt(0) || "C"}
-                      </div>
-                      <div>
-                        <h3 className="font-bold text-lg">
-                          {client.name || "Unknown Client"}
-                        </h3>
-                        <p className="text-sm text-gray-500">
-                          {client.role || "Client"}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="space-y-2">
-                      <p className="text-sm flex items-center">
-                        <Mail className="w-4 h-4 mr-2" />
-                        {client.email || "No email"}
-                      </p>
-                      {client.phone && (
-                        <p className="text-sm flex items-center">
-                          <Phone className="w-4 h-4 mr-2" />
-                          {client.phone}
-                        </p>
-                      )}
-                      <div className="flex justify-between text-sm pt-2 border-t border-gray-200 dark:border-gray-600">
-                        <span>Properties: {client.total_properties || 0}</span>
-                        <span>Active: {client.active_transactions || 0}</span>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="text-center py-12">
-                <Users className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-                <p className="text-gray-500">No clients assigned yet</p>
-                <button
-                  onClick={handleRefresh}
-                  className="mt-4 px-4 py-2 bg-amber-500 text-white rounded-lg hover:bg-amber-600"
-                >
-                  Refresh
-                </button>
-              </div>
-            )}
-          </div>
         );
       default:
         return (
@@ -994,7 +671,7 @@ const BrokerDashboard = ({ isInternal = true }) => {
               : "bg-white border-r border-gray-200"
           } flex flex-col z-30`}
         >
-          {/* Logo - REMOVED the label */}
+          {/* Logo */}
           <div
             className={`flex items-center gap-4 px-8 py-3 border-b ${
               theme === "dark"
@@ -1010,7 +687,6 @@ const BrokerDashboard = ({ isInternal = true }) => {
             <span className="font-medium text-lg md:text-2xl text-amber-500">
               WubLand
             </span>
-            {/* REMOVED: The Internal/External label */}
           </div>
 
           {/* Static Profile */}
@@ -1082,12 +758,10 @@ const BrokerDashboard = ({ isInternal = true }) => {
                   badge: requestCount,
                 },
                 {
-                  id: "clients",
-                  label: "My Clients",
-                  icon: Users,
-                  badge: isInternal ? brokerStats.activeClients : 0,
+                  id: "transactions",
+                  label: "Transactions",
+                  icon: CreditCard,
                 },
-                { id: "transactions", label: "Transactions", icon: CreditCard },
                 { id: "analytics", label: "Analytics", icon: BarChart3 },
                 { id: "chat", label: "Messages", icon: MessageSquare },
                 { id: "documents", label: "Documents", icon: FileText },
@@ -1212,7 +886,7 @@ const BrokerDashboard = ({ isInternal = true }) => {
                     : activeTab.charAt(0).toUpperCase() + activeTab.slice(1)}
                 </h1>
 
-                {/* Quick Stats - UPDATED with transparent background */}
+                {/* Quick Stats */}
                 <div className="hidden md:flex items-center space-x-6">
                   <div className="text-center backdrop-blur-sm bg-white/10 dark:bg-gray-800/20 rounded-lg px-4 py-2">
                     <div className="font-bold text-lg text-white dark:text-gray-100">
@@ -1321,6 +995,7 @@ const BrokerDashboard = ({ isInternal = true }) => {
             onClick={() => setIsMobileMenuOpen(false)}
           />
         )}
+
         {/* Property Details Modal */}
         {showPropertyDetails && selectedProperty && (
           <PropertyDetailsModal
@@ -1332,6 +1007,7 @@ const BrokerDashboard = ({ isInternal = true }) => {
           />
         )}
 
+        {/* Edit Property Form Modal */}
         {showEditPropertyForm && propertyToEdit && (
           <EditPropertyForm
             property={propertyToEdit}
@@ -1355,6 +1031,7 @@ const BrokerDashboard = ({ isInternal = true }) => {
             brokerId={user?.id}
           />
         )}
+
         {/* Notifications Panel */}
         <Suspense fallback={null}>
           <NotificationsPanel

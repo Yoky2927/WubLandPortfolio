@@ -1,83 +1,98 @@
-// frontend/src/utils/api.endpoints.js
+// frontend/src/utils/api.endpoints.js - UPDATED & CLEANED
 
-// Base URLs for each service
-const SERVICE_BASE_URLS = {
-  user: 'http://localhost:5000',       // User service with brokers
-  property: 'http://localhost:5002',    // Property service
-  communication: 'http://localhost:5001', // Communication service
-  transaction: 'http://localhost:5006',  // Transaction service
-  support: 'http://localhost:5005',      // Support service
-  todo: 'http://localhost:5003',         // Todo service
-  analysis: 'http://localhost:5004',     // Analysis service
-  registry: 'http://localhost:5008'      // API Registry
+// Service URLs - single source of truth
+const SERVICE_URLS = {
+  USER: 'http://localhost:5000',
+  PROPERTY: 'http://localhost:5002',
+  COMMUNICATION: 'http://localhost:5001',
+  TRANSACTION: 'http://localhost:5006',
+  SUPPORT: 'http://localhost:5005',
+  TODO: 'http://localhost:5003',
+  ANALYSIS: 'http://localhost:5004',
+  REGISTRY: 'http://localhost:5008'
 };
 
+// All API endpoints
 export const API_ENDPOINTS = {
-  // Auth endpoints (User service - port 5000)
-  LOGIN: { service: 'user', path: '/api/auth/login', method: 'POST' },
-  REGISTER: { service: 'user', path: '/api/auth/register', method: 'POST' },
-  CHECK_AUTH: { service: 'user', path: '/api/auth/check', method: 'GET' },
-  LOGOUT: { service: 'user', path: '/api/auth/logout', method: 'POST' },
-  UPLOAD_PROFILE: { service: 'user', path: '/api/auth/upload-profile-picture', method: 'POST' },
+  // ========== AUTH ENDPOINTS ==========
+  LOGIN: { service: 'USER', path: '/api/auth/login', method: 'POST' },
+  REGISTER: { service: 'USER', path: '/api/auth/register', method: 'POST' },
+  CHECK_AUTH: { service: 'USER', path: '/api/auth/check', method: 'GET' },
+  LOGOUT: { service: 'USER', path: '/api/auth/logout', method: 'POST' },
+  UPLOAD_PROFILE: { service: 'USER', path: '/api/auth/upload-profile-picture', method: 'POST' },
   
-  // User management (User service - port 5000)
-  GET_BROKERS: { service: 'user', path: '/api/brokers', method: 'GET' },
-  GET_BROKERS_ALT: { service: 'user', path: '/api/users/brokers', method: 'GET' },
-  GET_USERS: { service: 'user', path: '/api/users', method: 'GET' },
-  GET_USER_BY_ID: { service: 'user', path: '/api/users/{id}', method: 'GET' },
+  // ========== USER MANAGEMENT ==========
+  GET_BROKERS: { service: 'USER', path: '/api/brokers', method: 'GET' },
+  GET_USERS: { service: 'USER', path: '/api/users', method: 'GET' },
+  GET_USER_BY_ID: { service: 'USER', path: '/api/users/{id}', method: 'GET' },
   
-  // Property endpoints (Property service - port 5002)
-  GET_PROPERTIES: { service: 'property', path: '/api/properties', method: 'GET' },
-  GET_PROPERTY_BY_ID: { service: 'property', path: '/api/properties/{id}', method: 'GET' },
-  SEARCH_PROPERTIES: { service: 'property', path: '/api/properties/search', method: 'GET' },
-  CREATE_PROPERTY_REQUEST: { service: 'property', path: '/api/properties/requests', method: 'POST' },
-  UPLOAD_PROPERTY_IMAGE: { service: 'property', path: '/api/properties/requests/{id}/upload-image', method: 'POST' },
-  ASSIGN_BROKER: { service: 'property', path: '/api/properties/requests/{id}/assign', method: 'POST' },
-  UPDATE_PROPERTY_REQUEST: { service: 'property', path: '/api/properties/requests/{id}', method: 'PUT' },
+  // ========== PROPERTY ENDPOINTS ==========
+  GET_PROPERTIES: { service: 'PROPERTY', path: '/api/properties', method: 'GET' },
+  GET_PROPERTY_BY_ID: { service: 'PROPERTY', path: '/api/properties/{id}', method: 'GET' },
+  GET_BROKER_LISTINGS: { service: 'PROPERTY', path: '/api/properties/broker/listings', method: 'GET' },
+  CREATE_PROPERTY: { service: 'PROPERTY', path: '/api/properties', method: 'POST' },
+  UPDATE_PROPERTY: { service: 'PROPERTY', path: '/api/properties/{id}', method: 'PUT' },
+  DELETE_PROPERTY: { service: 'PROPERTY', path: '/api/properties/{id}', method: 'DELETE' },
+  PROPERTY_ACTION: { service: 'PROPERTY', path: '/api/properties/{id}/action', method: 'POST' },
+  UPLOAD_PROPERTY_IMAGES: { service: 'PROPERTY', path: '/api/properties/images/property/{propertyId}/upload', method: 'POST' },
   
-  // Premium properties (Property service - port 5002)
-  GET_PREMIUM_PROPERTIES: { service: 'property', path: '/api/properties/premium', method: 'GET' },
+  // ========== PROPERTY REQUESTS ==========
+  GET_BROKER_REQUESTS: { service: 'PROPERTY', path: '/api/property-requests/broker', method: 'GET' },
+  ACCEPT_PROPERTY_REQUEST: { service: 'PROPERTY', path: '/api/property-requests/{requestId}/accept', method: 'PUT' },
+  REJECT_PROPERTY_REQUEST: { service: 'PROPERTY', path: '/api/property-requests/{requestId}/reject', method: 'PUT' },
   
-  // For backward compatibility
-  GET_BROKER_LIST: { service: 'user', path: '/api/users?role=broker', method: 'GET' },
-  GET_ALL_BROKERS: { service: 'user', path: '/api/brokers/all', method: 'GET' },
-  GET_AVAILABLE_BROKERS: { service: 'user', path: '/api/brokers/available', method: 'GET' },
+  // ========== BROKER ANALYTICS ==========
+  BROKER_ANALYTICS: { service: 'ANALYSIS', path: '/api/analytics/broker/{brokerId}', method: 'GET' },
+  BROKER_STATS: { service: 'ANALYSIS', path: '/api/analytics/broker/{brokerId}/stats', method: 'GET' },
+  BROKER_TRANSACTIONS: { service: 'ANALYSIS', path: '/api/analytics/broker/{brokerId}/transactions', method: 'GET' },
   
-  // Simple test endpoint
-  TEST_API: { service: 'user', path: '/api', method: 'GET' }
+  // ========== TRANSACTION ENDPOINTS ==========
+  GET_BROKER_TRANSACTIONS: { service: 'TRANSACTION', path: '/api/transactions/broker/{brokerId}', method: 'GET' },
+  CREATE_TRANSACTION: { service: 'TRANSACTION', path: '/api/transactions', method: 'POST' },
+  UPDATE_TRANSACTION: { service: 'TRANSACTION', path: '/api/transactions/{id}', method: 'PUT' },
+  
+  // ========== COMMUNICATION ENDPOINTS ==========
+  SEND_MESSAGE: { service: 'COMMUNICATION', path: '/api/messages/send', method: 'POST' },
+  GET_CONVERSATIONS: { service: 'COMMUNICATION', path: '/api/conversations/user/{userId}', method: 'GET' }
 };
 
 // Helper to replace path parameters
-function buildPath(template, params = {}) {
-  let path = template;
+function replacePathParams(path, params = {}) {
+  let result = path;
   Object.keys(params).forEach(key => {
-    path = path.replace(`{${key}}`, params[key]);
+    const placeholder = `{${key}}`;
+    if (result.includes(placeholder)) {
+      result = result.replace(placeholder, params[key]);
+    }
   });
-  return path;
+  return result;
 }
 
-// Unified API call using service-based URLs
+// Main API call function
 export async function apiCall(endpointKey, params = {}, options = {}) {
   const endpoint = API_ENDPOINTS[endpointKey];
+  
   if (!endpoint) {
+    console.error(`❌ Unknown endpoint: ${endpointKey}`);
     throw new Error(`Unknown endpoint: ${endpointKey}`);
   }
   
   const { service, path: pathTemplate, method: defaultMethod } = endpoint;
-  const baseUrl = SERVICE_BASE_URLS[service];
+  const baseUrl = SERVICE_URLS[service];
   
   if (!baseUrl) {
+    console.error(`❌ Unknown service: ${service}`);
     throw new Error(`Unknown service: ${service}`);
   }
   
-  const path = buildPath(pathTemplate, params);
+  // Replace path parameters
+  const path = replacePathParams(pathTemplate, params);
   const fullUrl = `${baseUrl}${path}`;
-  
-  console.log(`🔍 API Call [${service}]: ${defaultMethod} ${fullUrl}`, { params });
-  
   const method = options.method || defaultMethod;
   
-  // Get token from localStorage
+  console.log(`📡 API Call [${service}]: ${method} ${fullUrl}`, { params, options });
+  
+  // Get auth token
   const token = localStorage.getItem('token');
   
   // Prepare headers
@@ -86,178 +101,121 @@ export async function apiCall(endpointKey, params = {}, options = {}) {
     ...options.headers,
   };
   
-  // Only add Content-Type for non-FormData requests
+  // Set Content-Type for non-FormData requests
   if (!(options.body instanceof FormData) && !(options.data instanceof FormData)) {
     if (method !== 'GET') {
       headers['Content-Type'] = 'application/json';
     }
   }
   
-  // Add authorization if token exists
+  // Add authorization header
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
   }
   
-  // Prepare body
+  // Prepare request body
   let body;
   if (options.data) {
     if (options.data instanceof FormData) {
       body = options.data;
-      // Remove Content-Type header for FormData
-      delete headers['Content-Type'];
+      delete headers['Content-Type']; // Let browser set it
     } else {
       body = JSON.stringify(options.data);
     }
+  } else if (options.body) {
+    body = options.body;
   } else if (params && method !== 'GET') {
     body = JSON.stringify(params);
   }
   
   try {
-    // Remove credentials from options
-    const fetchOptions = { 
-      method, 
-      headers, 
-      body, 
-      mode: 'cors', 
-      ...options 
-    };
-    delete fetchOptions.credentials;
+    const response = await fetch(fullUrl, {
+      method,
+      headers,
+      body,
+      mode: 'cors',
+      credentials: 'omit',
+    });
     
-    const response = await fetch(fullUrl, fetchOptions);
-    
-    // Check if response is OK
+    // Handle response
     if (!response.ok) {
       let errorMessage = `HTTP ${response.status}`;
       
       try {
         const errorText = await response.text();
-        let errorData;
-        try {
-          errorData = JSON.parse(errorText);
-        } catch {
-          errorData = { message: errorText || `HTTP ${response.status}` };
+        if (errorText) {
+          try {
+            const errorData = JSON.parse(errorText);
+            errorMessage = errorData.message || errorData.error || errorMessage;
+          } catch {
+            errorMessage = errorText;
+          }
         }
-        errorMessage = errorData.message || errorMessage;
       } catch {
         // Ignore parsing errors
       }
       
-      // Handle auth errors
+      // Handle authentication errors
       if (response.status === 401 || response.status === 403) {
+        console.warn('🔐 Authentication error, clearing tokens');
         localStorage.removeItem('token');
         localStorage.removeItem('user');
-        window.dispatchEvent(new Event('storage'));
+        window.dispatchEvent(new Event('auth-changed'));
       }
       
       throw new Error(errorMessage);
     }
     
-    // Parse response
+    // Parse successful response
     const contentType = response.headers.get('content-type');
     let data;
     
     if (contentType && contentType.includes('application/json')) {
       data = await response.json();
     } else {
-      data = await response.text();
+      const text = await response.text();
       try {
-        data = JSON.parse(data);
+        data = JSON.parse(text);
       } catch {
-        // Keep as text if not JSON
+        data = { text };
       }
     }
     
-    console.log(`✅ API Success [${service}]: ${endpointKey}`, data);
+    console.log(`✅ API Success [${service}/${endpointKey}]:`, data);
     return data;
     
   } catch (error) {
     console.error(`❌ API Error [${service}/${endpointKey}]:`, error.message);
     
-    // Try alternative endpoints for brokers
-    if (endpointKey.includes('BROKER')) {
-      console.log('🔄 Trying alternative broker endpoints...');
-      // The fetchBrokers function will handle this
-    }
-    
-    throw error;
+    // Re-throw with more context
+    const apiError = new Error(`API call failed: ${endpointKey} - ${error.message}`);
+    apiError.originalError = error;
+    throw apiError;
   }
 }
 
-// Simple direct API call for testing
-export async function directApiCall(url, options = {}) {
-  console.log(`🔍 Direct API Call: ${options.method || 'GET'} ${url}`);
+// Convenience methods
+export const api = {
+  // GET request
+  get: (endpointKey, params = {}, options = {}) => 
+    apiCall(endpointKey, params, { ...options, method: 'GET' }),
   
-  try {
-    const response = await fetch(url, {
-      method: options.method || 'GET',
-      headers: {
-        'Accept': 'application/json',
-        'Authorization': `Bearer ${localStorage.getItem('token') || ''}`,
-        ...options.headers,
-      },
-      body: options.body,
-      mode: 'cors',
-    });
-    
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}`);
-    }
-    
-    const data = await response.json();
-    console.log(`✅ Direct API Success:`, data);
-    return data;
-    
-  } catch (error) {
-    console.error(`❌ Direct API Error:`, error.message);
-    throw error;
-  }
-}
+  // POST request
+  post: (endpointKey, data = {}, options = {}) => 
+    apiCall(endpointKey, {}, { ...options, method: 'POST', data }),
+  
+  // PUT request
+  put: (endpointKey, params = {}, data = {}, options = {}) => 
+    apiCall(endpointKey, params, { ...options, method: 'PUT', data }),
+  
+  // DELETE request
+  delete: (endpointKey, params = {}, options = {}) => 
+    apiCall(endpointKey, params, { ...options, method: 'DELETE' }),
+  
+  // PATCH request
+  patch: (endpointKey, params = {}, data = {}, options = {}) => 
+    apiCall(endpointKey, params, { ...options, method: 'PATCH', data }),
+};
 
-// Public API call (without auth headers)
-export async function publicApiCall(endpointKey, params = {}, options = {}) {
-  const endpoint = API_ENDPOINTS[endpointKey];
-  if (!endpoint) {
-    throw new Error(`Unknown endpoint: ${endpointKey}`);
-  }
-  
-  const { service, path: pathTemplate, method: defaultMethod } = endpoint;
-  const baseUrl = SERVICE_BASE_URLS[service];
-  
-  if (!baseUrl) {
-    throw new Error(`Unknown service: ${service}`);
-  }
-  
-  const path = buildPath(pathTemplate, params);
-  const fullUrl = `${baseUrl}${path}`;
-  
-  console.log(`🔍 Public API Call [${service}]: ${defaultMethod} ${fullUrl}`);
-  
-  const method = options.method || defaultMethod;
-  
-  try {
-    const response = await fetch(fullUrl, {
-      method,
-      headers: {
-        'Accept': 'application/json',
-        ...(method !== 'GET' && !(options.body instanceof FormData) ? { 'Content-Type': 'application/json' } : {}),
-        ...options.headers,
-      },
-      body: options.data ? (options.data instanceof FormData ? options.data : JSON.stringify(options.data)) : null,
-      mode: 'cors',
-    });
-    
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}`);
-    }
-    
-    const data = await response.json();
-    console.log(`✅ Public API Success [${service}]: ${endpointKey}`);
-    return data;
-    
-  } catch (error) {
-    console.error(`❌ Public API Error [${service}/${endpointKey}]:`, error.message);
-    throw error;
-  }
-}
-
-export default API_ENDPOINTS;
+// Export for convenience
+export default api;

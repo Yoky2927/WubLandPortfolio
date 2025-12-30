@@ -330,13 +330,13 @@ CREATE TABLE IF NOT EXISTS properties (
     
     -- Historical data
     price_history JSON DEFAULT '[]',
-tax_history JSON DEFAULT '[]',
-nearby_schools JSON DEFAULT '[]',
-floor_plans JSON DEFAULT '[]',
+ tax_history JSON DEFAULT '[]',
+ nearby_schools JSON DEFAULT '[]',
+ floor_plans JSON DEFAULT '[]',
 
--- Social metrics (for frontend compatibility)
-average_rating DECIMAL(3,2) DEFAULT 0.00,
-total_reviews INT DEFAULT 0,
+ -- Social metrics (for frontend compatibility)
+ average_rating DECIMAL(3,2) DEFAULT 0.00,
+ total_reviews INT DEFAULT 0,
     
     -- Timestamps with audit trail
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -435,6 +435,68 @@ CREATE TABLE IF NOT EXISTS property_documents (
     INDEX idx_property_id (property_id),
     INDEX idx_document_type (document_type)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS property_requests (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  user_id INT NOT NULL,
+  
+  -- User type and request type (from frontend)
+  user_type ENUM('seller', 'leaser') NOT NULL DEFAULT 'seller',
+  
+  -- Property details (from frontend form)
+  property_type ENUM('house', 'apartment', 'villa', 'condo', 'commercial', 'land', 'other') NOT NULL,
+  location VARCHAR(255) NOT NULL,
+  price DECIMAL(15,2),
+  price_currency VARCHAR(3) DEFAULT 'ETB',
+  verification_method ENUM('physical', 'video', 'documents', 'mixed') DEFAULT 'physical',
+  description TEXT,
+  
+  -- Property image storage (critical gap fix)
+  property_image_url VARCHAR(500),
+  property_images JSON DEFAULT '[]',
+  
+  -- Step tracking (from frontend's 6-step process)
+  current_step INT DEFAULT 1,
+  step_status JSON DEFAULT '[]', -- Track status of each step [1-6]
+  
+  -- Broker selection (missing relationship fix)
+  selected_broker_id INT NULL,
+  broker_selected_at TIMESTAMP NULL,
+  
+  -- Status tracking (enhanced from original)
+  status ENUM('draft', 'pending', 'assigned', 'in_progress', 'verification', 'listing', 'marketing', 'completed', 'rejected', 'cancelled') DEFAULT 'draft',
+  assigned_broker_id INT NULL,
+  assigned_at TIMESTAMP NULL,
+  
+  -- Original fields (kept for compatibility)
+  property_data JSON, -- Still kept but now for additional unstructured data
+  notes TEXT,
+  
+  -- Timestamps
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  completed_at TIMESTAMP NULL,
+  
+  -- Foreign keys
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+  FOREIGN KEY (assigned_broker_id) REFERENCES users(id) ON DELETE SET NULL,
+  FOREIGN KEY (selected_broker_id) REFERENCES users(id) ON DELETE SET NULL,
+  
+  -- Indexes for performance
+  INDEX idx_user_id (user_id),
+  INDEX idx_status (status),
+  INDEX idx_user_type (user_type),
+  INDEX idx_assigned_broker (assigned_broker_id),
+  INDEX idx_selected_broker (selected_broker_id),
+  INDEX idx_created_at (created_at),
+  INDEX idx_current_step (current_step)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+ALTER TABLE property_documents 
+ADD COLUMN verification_status ENUM('pending', 'approved', 'rejected') DEFAULT 'pending',
+ADD COLUMN verification_feedback TEXT,
+ADD COLUMN verified_by_user_id INT,
+ADD COLUMN verified_at TIMESTAMP NULL;
 
 -- Property viewing schedule
 CREATE TABLE IF NOT EXISTS property_viewings (
@@ -1675,6 +1737,7 @@ CREATE TABLE IF NOT EXISTS security_logs (
     INDEX idx_user_id (user_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+ ALTER TABLE security_logs ADD COLUMN type VARCHAR(50) AFTER id;
 -- System configurations table
 CREATE TABLE IF NOT EXISTS system_configurations (
     id INT AUTO_INCREMENT PRIMARY KEY,

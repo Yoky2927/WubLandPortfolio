@@ -1,3 +1,4 @@
+// backend/user-service/controllers/broker.controller.js
 import { Broker } from '../models/broker.model.js';
 
 export const getBrokers = async (req, res) => {
@@ -156,6 +157,17 @@ export const createBrokerProfile = async (req, res) => {
       });
     }
 
+    // Validate required fields for broker profile
+    const requiredFields = ['license_number', 'years_experience', 'specialization'];
+    const missingFields = requiredFields.filter(field => !brokerData[field]);
+
+    if (missingFields.length > 0) {
+      return res.status(400).json({
+        success: false,
+        message: `Missing required fields: ${missingFields.join(', ')}`
+      });
+    }
+
     const result = await Broker.upsertBrokerProfile(brokerData);
 
     res.json({
@@ -173,12 +185,89 @@ export const createBrokerProfile = async (req, res) => {
   }
 };
 
+export const updateBrokerProfile = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const updates = req.body;
+    const userId = req.user.id;
+
+    // Check permissions
+    if (parseInt(id) !== userId && req.user.role !== 'admin' && req.user.role !== 'super_admin') {
+      return res.status(403).json({
+        success: false,
+        message: 'Not authorized to update this profile'
+      });
+    }
+
+    // Prepare update data
+    const updateData = {
+      user_id: id,
+      ...updates
+    };
+
+    const result = await Broker.upsertBrokerProfile(updateData);
+
+    res.json({
+      success: true,
+      message: 'Broker profile updated successfully',
+      profile: result
+    });
+
+  } catch (error) {
+    console.error('Update broker profile error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to update broker profile'
+    });
+  }
+};
+
+export const getBrokerStatistics = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user.id;
+
+    // Check permissions
+    if (parseInt(id) !== userId && req.user.role !== 'admin' && req.user.role !== 'super_admin') {
+      return res.status(403).json({
+        success: false,
+        message: 'Not authorized to view these statistics'
+      });
+    }
+
+    const statistics = await Broker.getBrokerStatistics(id);
+
+    res.json({
+      success: true,
+      statistics
+    });
+
+  } catch (error) {
+    console.error('Get broker statistics error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch broker statistics'
+    });
+  }
+};
+
 export const addBrokerReview = async (req, res) => {
   try {
     const reviewData = {
       client_id: req.user.id,
       ...req.body
     };
+
+    // Validate required fields
+    const requiredFields = ['broker_id', 'overall_rating', 'transaction_type'];
+    const missingFields = requiredFields.filter(field => !reviewData[field]);
+
+    if (missingFields.length > 0) {
+      return res.status(400).json({
+        success: false,
+        message: `Missing required fields: ${missingFields.join(', ')}`
+      });
+    }
 
     const result = await Broker.addReview(reviewData);
 
@@ -193,6 +282,105 @@ export const addBrokerReview = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Failed to add review'
+    });
+  }
+};
+
+export const updateBrokerAvailability = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { is_available } = req.body;
+    const userId = req.user.id;
+
+    // Check permissions
+    if (parseInt(id) !== userId && req.user.role !== 'admin' && req.user.role !== 'super_admin') {
+      return res.status(403).json({
+        success: false,
+        message: 'Not authorized to update availability'
+      });
+    }
+
+    if (typeof is_available !== 'boolean') {
+      return res.status(400).json({
+        success: false,
+        message: 'is_available must be a boolean value'
+      });
+    }
+
+    const result = await Broker.updateAvailability(id, is_available);
+
+    res.json({
+      success: true,
+      message: `Broker availability ${is_available ? 'enabled' : 'disabled'} successfully`,
+      is_available
+    });
+
+  } catch (error) {
+    console.error('Update broker availability error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to update broker availability'
+    });
+  }
+};
+
+export const getBrokerDashboard = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user.id;
+
+    // Check permissions
+    if (parseInt(id) !== userId && req.user.role !== 'admin' && req.user.role !== 'super_admin') {
+      return res.status(403).json({
+        success: false,
+        message: 'Not authorized to view this dashboard'
+      });
+    }
+
+    // Get comprehensive dashboard data
+    const [
+      profile,
+      statistics,
+      recentReviews,
+      activeListings
+    ] = await Promise.all([
+      Broker.getBrokerById(id),
+      Broker.getBrokerStatistics(id),
+      Broker.getRecentReviews(id, 5),
+      Broker.getActiveListings(id)
+    ]);
+
+    const dashboard = {
+      profile: {
+        name: `${profile.first_name} ${profile.last_name}`,
+        email: profile.email,
+        phone_number: profile.phone_number,
+        broker_type: profile.broker_type,
+        is_available: profile.is_available,
+        license_number: profile.license_number
+      },
+      statistics,
+      recent_reviews: recentReviews,
+      active_listings: activeListings,
+      performance_metrics: {
+        response_rate: statistics.avg_response_time ? '95%' : 'N/A',
+        client_satisfaction: statistics.avg_rating ? `${(statistics.avg_rating * 20).toFixed(0)}%` : 'N/A',
+        deal_completion_rate: statistics.total_deals > 0 
+          ? `${((statistics.completed_deals / statistics.total_deals) * 100).toFixed(1)}%` 
+          : 'N/A'
+      }
+    };
+
+    res.json({
+      success: true,
+      dashboard
+    });
+
+  } catch (error) {
+    console.error('Get broker dashboard error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch broker dashboard'
     });
   }
 };

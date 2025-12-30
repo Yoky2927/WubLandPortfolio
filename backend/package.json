@@ -8,5 +8,11 @@
     "jsonwebtoken": "^9.0.2",
     "mysql2": "^3.15.0",
     "parser": "^0.1.4"
+  },
+   "scripts": {
+    "dev:registry": "node backend/api-registry-service/server.js",
+    "dev:all": "concurrently \"npm run dev --prefix backend/user-service\" \"npm run dev --prefix backend/property-service\" \"npm run dev --prefix backend/communication-service\" \"npm run dev --prefix backend/transaction-service\" \"npm run dev --prefix backend/support-service\" \"npm run dev --prefix backend/todo-service\" \"npm run dev --prefix backend/analysis-service\" \"node backend/api-registry-service/server.js\"",
+    "api:discover": "curl http://localhost:5008/api/registry",
+    "api:test": "curl http://localhost:5008/api/registry/test/all"
   }
 }

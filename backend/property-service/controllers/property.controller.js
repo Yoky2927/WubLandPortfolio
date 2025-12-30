@@ -66,272 +66,272 @@ class PropertyController {
   }
 
   async createProperty(req, res) {
-  try {
-    console.log("📁 DEBUG: Request received for createProperty");
-    console.log("📁 DEBUG: Request body keys:", Object.keys(req.body));
-    console.log("📁 DEBUG: Request files:", req.files);
-    console.log("📁 DEBUG: Request files structure:", JSON.stringify(req.files, null, 2));
+    try {
+      console.log("📁 DEBUG: Request received for createProperty");
+      console.log("📁 DEBUG: Request body keys:", Object.keys(req.body));
+      console.log("📁 DEBUG: Request files:", req.files);
+      console.log("📁 DEBUG: Request files structure:", JSON.stringify(req.files, null, 2));
 
-    const propertyData = req.body;
-    const files = req.files || {};
+      const propertyData = req.body;
+      const files = req.files || {};
 
-    // Debug: Check what's in files
-    if (files) {
-      console.log("📁 Files object keys:", Object.keys(files));
-      for (const key in files) {
-        console.log(`📁 File key '${key}':`, files[key]);
-        if (Array.isArray(files[key])) {
-          console.log(`📁 Found ${files[key].length} files in '${key}'`);
-          files[key].forEach((file, index) => {
-            console.log(`📁   File ${index}:`, {
-              fieldname: file.fieldname,
-              originalname: file.originalname,
-              filename: file.filename,
-              size: file.size,
-              mimetype: file.mimetype
+      // Debug: Check what's in files
+      if (files) {
+        console.log("📁 Files object keys:", Object.keys(files));
+        for (const key in files) {
+          console.log(`📁 File key '${key}':`, files[key]);
+          if (Array.isArray(files[key])) {
+            console.log(`📁 Found ${files[key].length} files in '${key}'`);
+            files[key].forEach((file, index) => {
+              console.log(`📁   File ${index}:`, {
+                fieldname: file.fieldname,
+                originalname: file.originalname,
+                filename: file.filename,
+                size: file.size,
+                mimetype: file.mimetype
+              });
             });
-          });
+          }
         }
       }
-    }
 
-    // Required fields validation
-    const requiredFields = [
-      "title",
-      "price",
-      "address",
-      "city",
-      "listing_type",
-    ];
-    const missingFields = requiredFields.filter(
-      (field) => !propertyData[field]
-    );
-
-    if (missingFields.length > 0) {
-      return errorResponse(
-        res,
-        400,
-        `Missing required fields: ${missingFields.join(", ")}`
+      // Required fields validation
+      const requiredFields = [
+        "title",
+        "price",
+        "address",
+        "city",
+        "listing_type",
+      ];
+      const missingFields = requiredFields.filter(
+        (field) => !propertyData[field]
       );
-    }
 
-    // Set defaults for required fields if not provided
-    const defaultData = {
-      property_status: "draft",
-      property_type: "house",
-      currency: "ETB",
-      country: "Ethiopia",
-      is_negotiable: true,
-      is_exclusive: false,
-      features: [],
-      amenities: [],
-      property_tags: [],
-    };
-
-    // Parse JSON fields if they're strings
-    if (typeof propertyData.features === "string") {
-      try {
-        propertyData.features = JSON.parse(propertyData.features);
-      } catch (e) {
-        console.warn("Failed to parse features:", e.message);
-        propertyData.features = [];
+      if (missingFields.length > 0) {
+        return errorResponse(
+          res,
+          400,
+          `Missing required fields: ${missingFields.join(", ")}`
+        );
       }
-    }
 
-    if (typeof propertyData.amenities === "string") {
-      try {
-        propertyData.amenities = JSON.parse(propertyData.amenities);
-      } catch (e) {
-        console.warn("Failed to parse amenities:", e.message);
-        propertyData.amenities = [];
-      }
-    }
+      // Set defaults for required fields if not provided
+      const defaultData = {
+        property_status: "draft",
+        property_type: "house",
+        currency: "ETB",
+        country: "Ethiopia",
+        is_negotiable: true,
+        is_exclusive: false,
+        features: [],
+        amenities: [],
+        property_tags: [],
+      };
 
-    // Handle property_tags properly
-    if (typeof propertyData.property_tags === "string") {
-      try {
-        // Check if it's already a JSON string
-        const parsed = JSON.parse(propertyData.property_tags);
-        propertyData.property_tags = Array.isArray(parsed) ? parsed : [parsed];
-      } catch (e) {
-        console.warn("Failed to parse property_tags:", e.message);
-        // If not JSON, try splitting by comma
-        propertyData.property_tags = propertyData.property_tags
-          .split(',')
-          .map(tag => tag.trim())
-          .filter(tag => tag.length > 0);
-      }
-    }
-
-    // Merge defaults with provided data
-    const mergedData = { ...defaultData, ...propertyData };
-
-    // Ensure owner and creator are set
-    if (!mergedData.owner_user_id) {
-      mergedData.owner_user_id = req.user?.id || 1;
-    }
-    if (!mergedData.created_by_user_id) {
-      mergedData.created_by_user_id = mergedData.owner_user_id;
-    }
-    if (!mergedData.assigned_broker_id && req.user?.id) {
-      mergedData.assigned_broker_id = req.user.id;
-    }
-
-    // Step 1: Create the property
-    const property = await PropertyModel.create(mergedData);
-    const propertyId = property.id;
-
-    console.log(`✅ Property created with ID: ${propertyId}`);
-
-    // Step 2: Handle image uploads if any - FIXED LOGIC
-    console.log("🖼️ Checking for images...");
-    
-    // Try different possible field names
-    let imagesArray = [];
-    
-    // Check for 'images' field (multer creates this as an array)
-    if (files.images && Array.isArray(files.images)) {
-      console.log(`📸 Found ${files.images.length} images in 'images' field`);
-      imagesArray = files.images;
-    } 
-    // Check if images are in the root of files object
-    else if (Array.isArray(files)) {
-      console.log(`📸 Found ${files.length} images in root files array`);
-      imagesArray = files.filter(file => file.fieldname === 'images');
-    }
-    // Check for any files that might be images
-    else {
-      for (const key in files) {
-        if (key.includes('image') || key.includes('img')) {
-          const fileArray = Array.isArray(files[key]) ? files[key] : [files[key]];
-          console.log(`📸 Found ${fileArray.length} images in '${key}' field`);
-          imagesArray = imagesArray.concat(fileArray);
-        }
-      }
-    }
-
-    if (imagesArray.length > 0) {
-      console.log(`🖼️ Total images to process: ${imagesArray.length}`);
-      
-      for (let i = 0; i < imagesArray.length; i++) {
-        const image = imagesArray[i];
-        console.log(`🖼️ Processing image ${i + 1}: ${image.originalname || image.filename}`);
-
-        const imageData = {
-          image_url: `/uploads/property-images/${image.filename}`,
-          thumbnail_url: `/uploads/property-images/thumbnails/${image.filename}`,
-          caption: req.body[`image_${i}_caption`] || req.body[`caption_${i}`] || "",
-          alt_text:
-            req.body[`image_${i}_alt_text`] ||
-            req.body[`alt_text_${i}`] ||
-            image.originalname ||
-            "Property image",
-          file_size: image.size || 0,
-          mime_type: image.mimetype || "image/jpeg",
-          width: 0,
-          height: 0,
-          is_primary: i === 0, // First image is primary
-          image_order: i,
-          uploaded_by_user_id: req.user?.id || mergedData.created_by_user_id,
-        };
-
-        console.log(`💾 Saving image ${i + 1} to DB for property ${propertyId}`);
+      // Parse JSON fields if they're strings
+      if (typeof propertyData.features === "string") {
         try {
-          await PropertyModel.addImage(propertyId, imageData);
-          console.log(`✅ Image ${i + 1} saved successfully`);
-        } catch (error) {
-          console.error(`❌ Failed to save image ${i + 1}:`, error.message);
+          propertyData.features = JSON.parse(propertyData.features);
+        } catch (e) {
+          console.warn("Failed to parse features:", e.message);
+          propertyData.features = [];
         }
       }
-    } else {
-      console.log("❌ No images found to process");
-    }
 
-    // Step 3: Handle floor plan uploads if any
-    let floorPlansArray = [];
-    
-    if (files.floor_plans && Array.isArray(files.floor_plans)) {
-      console.log(`📐 Found ${files.floor_plans.length} floor plans in 'floor_plans' field`);
-      floorPlansArray = files.floor_plans;
-    } else {
-      // Check for any files that might be floor plans
-      for (const key in files) {
-        if (key.includes('floor') || key.includes('plan')) {
-          const fileArray = Array.isArray(files[key]) ? files[key] : [files[key]];
-          console.log(`📐 Found ${fileArray.length} floor plans in '${key}' field`);
-          floorPlansArray = floorPlansArray.concat(fileArray);
-        }
-      }
-    }
-
-    if (floorPlansArray.length > 0) {
-      console.log(`📐 Total floor plans to process: ${floorPlansArray.length}`);
-      
-      for (let i = 0; i < floorPlansArray.length; i++) {
-        const floorPlan = floorPlansArray[i];
-        console.log(`📐 Processing floor plan ${i + 1}: ${floorPlan.originalname || floorPlan.filename}`);
-
-        const floorPlanData = {
-          image_url: `/uploads/property-images/${floorPlan.filename}`,
-          thumbnail_url: `/uploads/property-images/${floorPlan.filename}`,
-          caption: req.body[`floor_plan_${i}_caption`] || req.body[`caption_${i}`] || "Floor Plan",
-          alt_text:
-            req.body[`floor_plan_${i}_alt_text`] ||
-            req.body[`alt_text_${i}`] ||
-            floorPlan.originalname ||
-            "Property floor plan",
-          file_size: floorPlan.size || 0,
-          mime_type: floorPlan.mimetype || "image/jpeg",
-          width: 0,
-          height: 0,
-          is_primary: false, // Floor plans are never primary
-          image_order: 1000 + i, // High order to separate from regular images
-          uploaded_by_user_id: req.user?.id || mergedData.created_by_user_id,
-        };
-
-        console.log(`💾 Saving floor plan ${i + 1} to DB for property ${propertyId}`);
+      if (typeof propertyData.amenities === "string") {
         try {
-          await PropertyModel.addImage(propertyId, floorPlanData);
-          console.log(`✅ Floor plan ${i + 1} saved successfully`);
-        } catch (error) {
-          console.error(`❌ Failed to save floor plan ${i + 1}:`, error.message);
+          propertyData.amenities = JSON.parse(propertyData.amenities);
+        } catch (e) {
+          console.warn("Failed to parse amenities:", e.message);
+          propertyData.amenities = [];
         }
       }
-    } else {
-      console.log("❌ No floor plans found to process");
-    }
 
-    // Step 4: Get the complete property with images
-    console.log(`🔍 Fetching complete property ${propertyId} with images`);
-    const completeProperty = await PropertyModel.findById(propertyId);
+      // Handle property_tags properly
+      if (typeof propertyData.property_tags === "string") {
+        try {
+          // Check if it's already a JSON string
+          const parsed = JSON.parse(propertyData.property_tags);
+          propertyData.property_tags = Array.isArray(parsed) ? parsed : [parsed];
+        } catch (e) {
+          console.warn("Failed to parse property_tags:", e.message);
+          // If not JSON, try splitting by comma
+          propertyData.property_tags = propertyData.property_tags
+            .split(',')
+            .map(tag => tag.trim())
+            .filter(tag => tag.length > 0);
+        }
+      }
 
-    if (!completeProperty) {
-      console.error(`❌ Property ${propertyId} not found after creation`);
-      return errorResponse(res, 500, "Property not found after creation");
-    }
+      // Merge defaults with provided data
+      const mergedData = { ...defaultData, ...propertyData };
 
-    // Log what we found
-    console.log(`📊 Property ${propertyId} has ${completeProperty.images?.length || 0} images`);
-    console.log(`📊 Property ${propertyId} has ${completeProperty.floor_plans?.length || 0} floor plans`);
-    
-    if (completeProperty.images && completeProperty.images.length > 0) {
-      console.log(`📸 Image URLs:`, completeProperty.images.map(img => img.image_url));
-    }
-    if (completeProperty.floor_plans && completeProperty.floor_plans.length > 0) {
-      console.log(`📐 Floor Plan URLs:`, completeProperty.floor_plans.map(fp => fp.image_url));
-    }
+      // Ensure owner and creator are set
+      if (!mergedData.owner_user_id) {
+        mergedData.owner_user_id = req.user?.id || 1;
+      }
+      if (!mergedData.created_by_user_id) {
+        mergedData.created_by_user_id = mergedData.owner_user_id;
+      }
+      if (!mergedData.assigned_broker_id && req.user?.id) {
+        mergedData.assigned_broker_id = req.user.id;
+      }
 
-    successResponse(
-      res,
-      201,
-      "Property created successfully",
-      completeProperty
-    );
-  } catch (error) {
-    console.error("Create property error:", error);
-    errorResponse(res, 500, error.message);
+      // Step 1: Create the property
+      const property = await PropertyModel.create(mergedData);
+      const propertyId = property.id;
+
+      console.log(`✅ Property created with ID: ${propertyId}`);
+
+      // Step 2: Handle image uploads if any - FIXED LOGIC
+      console.log("🖼️ Checking for images...");
+
+      // Try different possible field names
+      let imagesArray = [];
+
+      // Check for 'images' field (multer creates this as an array)
+      if (files.images && Array.isArray(files.images)) {
+        console.log(`📸 Found ${files.images.length} images in 'images' field`);
+        imagesArray = files.images;
+      }
+      // Check if images are in the root of files object
+      else if (Array.isArray(files)) {
+        console.log(`📸 Found ${files.length} images in root files array`);
+        imagesArray = files.filter(file => file.fieldname === 'images');
+      }
+      // Check for any files that might be images
+      else {
+        for (const key in files) {
+          if (key.includes('image') || key.includes('img')) {
+            const fileArray = Array.isArray(files[key]) ? files[key] : [files[key]];
+            console.log(`📸 Found ${fileArray.length} images in '${key}' field`);
+            imagesArray = imagesArray.concat(fileArray);
+          }
+        }
+      }
+
+      if (imagesArray.length > 0) {
+        console.log(`🖼️ Total images to process: ${imagesArray.length}`);
+
+        for (let i = 0; i < imagesArray.length; i++) {
+          const image = imagesArray[i];
+          console.log(`🖼️ Processing image ${i + 1}: ${image.originalname || image.filename}`);
+
+          const imageData = {
+            image_url: `/uploads/property-images/${image.filename}`,
+            thumbnail_url: `/uploads/property-images/thumbnails/${image.filename}`,
+            caption: req.body[`image_${i}_caption`] || req.body[`caption_${i}`] || "",
+            alt_text:
+              req.body[`image_${i}_alt_text`] ||
+              req.body[`alt_text_${i}`] ||
+              image.originalname ||
+              "Property image",
+            file_size: image.size || 0,
+            mime_type: image.mimetype || "image/jpeg",
+            width: 0,
+            height: 0,
+            is_primary: i === 0, // First image is primary
+            image_order: i,
+            uploaded_by_user_id: req.user?.id || mergedData.created_by_user_id,
+          };
+
+          console.log(`💾 Saving image ${i + 1} to DB for property ${propertyId}`);
+          try {
+            await PropertyModel.addImage(propertyId, imageData);
+            console.log(`✅ Image ${i + 1} saved successfully`);
+          } catch (error) {
+            console.error(`❌ Failed to save image ${i + 1}:`, error.message);
+          }
+        }
+      } else {
+        console.log("❌ No images found to process");
+      }
+
+      // Step 3: Handle floor plan uploads if any
+      let floorPlansArray = [];
+
+      if (files.floor_plans && Array.isArray(files.floor_plans)) {
+        console.log(`📐 Found ${files.floor_plans.length} floor plans in 'floor_plans' field`);
+        floorPlansArray = files.floor_plans;
+      } else {
+        // Check for any files that might be floor plans
+        for (const key in files) {
+          if (key.includes('floor') || key.includes('plan')) {
+            const fileArray = Array.isArray(files[key]) ? files[key] : [files[key]];
+            console.log(`📐 Found ${fileArray.length} floor plans in '${key}' field`);
+            floorPlansArray = floorPlansArray.concat(fileArray);
+          }
+        }
+      }
+
+      if (floorPlansArray.length > 0) {
+        console.log(`📐 Total floor plans to process: ${floorPlansArray.length}`);
+
+        for (let i = 0; i < floorPlansArray.length; i++) {
+          const floorPlan = floorPlansArray[i];
+          console.log(`📐 Processing floor plan ${i + 1}: ${floorPlan.originalname || floorPlan.filename}`);
+
+          const floorPlanData = {
+            image_url: `/uploads/property-images/${floorPlan.filename}`,
+            thumbnail_url: `/uploads/property-images/${floorPlan.filename}`,
+            caption: req.body[`floor_plan_${i}_caption`] || req.body[`caption_${i}`] || "Floor Plan",
+            alt_text:
+              req.body[`floor_plan_${i}_alt_text`] ||
+              req.body[`alt_text_${i}`] ||
+              floorPlan.originalname ||
+              "Property floor plan",
+            file_size: floorPlan.size || 0,
+            mime_type: floorPlan.mimetype || "image/jpeg",
+            width: 0,
+            height: 0,
+            is_primary: false, // Floor plans are never primary
+            image_order: 1000 + i, // High order to separate from regular images
+            uploaded_by_user_id: req.user?.id || mergedData.created_by_user_id,
+          };
+
+          console.log(`💾 Saving floor plan ${i + 1} to DB for property ${propertyId}`);
+          try {
+            await PropertyModel.addImage(propertyId, floorPlanData);
+            console.log(`✅ Floor plan ${i + 1} saved successfully`);
+          } catch (error) {
+            console.error(`❌ Failed to save floor plan ${i + 1}:`, error.message);
+          }
+        }
+      } else {
+        console.log("❌ No floor plans found to process");
+      }
+
+      // Step 4: Get the complete property with images
+      console.log(`🔍 Fetching complete property ${propertyId} with images`);
+      const completeProperty = await PropertyModel.findById(propertyId);
+
+      if (!completeProperty) {
+        console.error(`❌ Property ${propertyId} not found after creation`);
+        return errorResponse(res, 500, "Property not found after creation");
+      }
+
+      // Log what we found
+      console.log(`📊 Property ${propertyId} has ${completeProperty.images?.length || 0} images`);
+      console.log(`📊 Property ${propertyId} has ${completeProperty.floor_plans?.length || 0} floor plans`);
+
+      if (completeProperty.images && completeProperty.images.length > 0) {
+        console.log(`📸 Image URLs:`, completeProperty.images.map(img => img.image_url));
+      }
+      if (completeProperty.floor_plans && completeProperty.floor_plans.length > 0) {
+        console.log(`📐 Floor Plan URLs:`, completeProperty.floor_plans.map(fp => fp.image_url));
+      }
+
+      successResponse(
+        res,
+        201,
+        "Property created successfully",
+        completeProperty
+      );
+    } catch (error) {
+      console.error("Create property error:", error);
+      errorResponse(res, 500, error.message);
+    }
   }
-}
 
   async updateProperty(req, res) {
     try {
@@ -563,24 +563,38 @@ class PropertyController {
         return errorResponse(res, 404, "Property not found");
       }
 
-      // Add status to history
-      const statusHistory = property.status_history
-        ? JSON.parse(property.status_history)
-        : [];
+      // FIX: Ensure status_history is an array
+      let statusHistory = [];
+      if (property.status_history) {
+        if (typeof property.status_history === 'string') {
+          try {
+            statusHistory = JSON.parse(property.status_history);
+          } catch {
+            statusHistory = [];
+          }
+        } else if (Array.isArray(property.status_history)) {
+          statusHistory = property.status_history;
+        }
+      }
+
+      // Add new status entry
       statusHistory.push({
         from: property.property_status,
         to: status,
         changed_at: new Date().toISOString(),
+        changed_by: req.user?.id || property.created_by_user_id,
       });
 
-      const updatedProperty = await PropertyModel.update(id, {
+      // FIX: Make sure to stringify before saving
+      const updates = {
         property_status: status,
-        status_history: statusHistory,
-        published_at:
-          status === "active" && !property.published_at
-            ? new Date()
-            : property.published_at,
-      });
+        status_history: JSON.stringify(statusHistory), // Stringify here
+        published_at: status === "active" && !property.published_at
+          ? new Date()
+          : property.published_at,
+      };
+
+      const updatedProperty = await PropertyModel.update(id, updates);
 
       successResponse(
         res,
@@ -589,7 +603,104 @@ class PropertyController {
         updatedProperty
       );
     } catch (error) {
+      console.error("Update status error:", error);
       errorResponse(res, 500, error.message);
+    }
+  }
+
+  // ADD THIS METHOD - For business workflow actions
+  async propertyAction(req, res) {
+    try {
+      console.log('=== DEBUG propertyAction ===');
+      console.log('Params:', req.params);
+      console.log('Body:', req.body);
+      console.log('User:', req.user);
+
+      const { id } = req.params;
+      const { action, notes } = req.body;
+
+      if (isNaN(id)) {
+        return errorResponse(res, 400, "Invalid property ID");
+      }
+
+      if (!action) {
+        return errorResponse(res, 400, "Action is required");
+      }
+
+      const validActions = ["approve", "reject", "publish", "unpublish"];
+      if (!validActions.includes(action)) {
+        return errorResponse(
+          res,
+          400,
+          `Invalid action. Must be one of: ${validActions.join(", ")}`
+        );
+      }
+
+      const property = await PropertyModel.findById(id);
+      if (!property) {
+        return errorResponse(res, 404, "Property not found");
+      }
+
+      // Determine new status based on action
+      const statusMap = {
+        approve: "active",
+        reject: "rejected",
+        publish: "active",
+        unpublish: "inactive"
+      };
+
+      const newStatus = statusMap[action];
+
+      // Get or initialize status history
+      let statusHistory = [];
+      if (property.status_history) {
+        if (typeof property.status_history === "string") {
+          try {
+            statusHistory = JSON.parse(property.status_history);
+          } catch {
+            statusHistory = [];
+          }
+        } else if (Array.isArray(property.status_history)) {
+          statusHistory = property.status_history;
+        }
+      }
+
+      // Add new status entry
+      statusHistory.push({
+        from: property.property_status,
+        to: newStatus,
+        action: action,
+        changed_at: new Date().toISOString(),
+        changed_by: req.user?.id || "system",
+        notes: notes || "",
+      });
+
+      // Update the property
+      const updates = {
+        property_status: newStatus,
+        status_history: JSON.stringify(statusHistory),
+        last_modified_by_user_id: req.user?.id,
+        updated_at: new Date(),
+      };
+
+      // Check if we should set published_at
+      if (action === "approve" || action === "publish") {
+        if (!property.published_at) {
+          updates.published_at = new Date();
+        }
+      }
+
+      const updatedProperty = await PropertyModel.update(id, updates);
+
+      successResponse(
+        res,
+        200,
+        `Property ${action}d successfully`,
+        updatedProperty
+      );
+    } catch (error) {
+      console.error("Property action error:", error);
+      errorResponse(res, 500, `Server error: ${error.message}`);
     }
   }
 
@@ -611,20 +722,36 @@ class PropertyController {
         return errorResponse(res, 404, "Property not found");
       }
 
-      // Add price to history
-      const priceHistory = property.price_history
-        ? JSON.parse(property.price_history)
-        : [];
+      // Handle price history - it might be an array or JSON string
+      let priceHistory = [];
+      if (property.price_history) {
+        if (typeof property.price_history === 'string') {
+          try {
+            priceHistory = JSON.parse(property.price_history);
+          } catch {
+            priceHistory = [];
+          }
+        } else if (Array.isArray(property.price_history)) {
+          priceHistory = property.price_history;
+        }
+      }
+
+      // Add new price entry to history
       priceHistory.push({
-        from: property.price,
-        to: price,
+        price: parseFloat(price),
+        currency: property.currency || "ETB",
         changed_at: new Date().toISOString(),
+        changed_by: req.user?.id || property.created_by_user_id,
       });
 
-      const updatedProperty = await PropertyModel.update(id, {
-        price: parseFloat(price),
-        price_history: priceHistory,
-      });
+      // Use PropertyModel.updatePrice method
+      const updatedProperty = await PropertyModel.updatePrice(
+        id,
+        parseFloat(price),
+        property.currency || "ETB",
+        req.user?.id || property.created_by_user_id,
+        priceHistory
+      );
 
       successResponse(
         res,
@@ -633,130 +760,7 @@ class PropertyController {
         updatedProperty
       );
     } catch (error) {
-      errorResponse(res, 500, error.message);
-    }
-  }
-  // Add this method to your PropertyController class
-  async updatePropertyStatusAction(req, res) {
-    try {
-      const { id } = req.params;
-      const { action, notes, status } = req.body;
-
-      if (isNaN(id)) {
-        return errorResponse(res, 400, "Invalid property ID");
-      }
-
-      // Determine new status based on action
-      const actionMap = {
-        approve: "active",
-        reject: "rejected",
-        request_changes: "pending",
-      };
-
-      const newStatus = status || actionMap[action];
-
-      if (!newStatus) {
-        return errorResponse(res, 400, "Invalid action or status");
-      }
-
-      const property = await PropertyModel.findById(id);
-      if (!property) {
-        return errorResponse(res, 404, "Property not found");
-      }
-
-      // Add status to history
-      const statusHistory = property.status_history
-        ? JSON.parse(property.status_history)
-        : [];
-      statusHistory.push({
-        from: property.property_status,
-        to: newStatus,
-        changed_at: new Date().toISOString(),
-        notes: notes || "",
-        changed_by: req.user?.id || "system",
-      });
-
-      const updatedProperty = await PropertyModel.update(id, {
-        property_status: newStatus,
-        status_history: JSON.stringify(statusHistory),
-      });
-
-      successResponse(
-        res,
-        200,
-        `Property ${action || "status"} updated successfully`,
-        updatedProperty
-      );
-    } catch (error) {
-      errorResponse(res, 500, error.message);
-    }
-  }
-
-  // Add this method for broker-specific actions
-  async brokerUpdatePropertyStatus(req, res) {
-    try {
-      const { id } = req.params;
-      const { action, notes } = req.body;
-      const brokerId = req.user?.id;
-
-      if (isNaN(id)) {
-        return errorResponse(res, 400, "Invalid property ID");
-      }
-
-      if (!brokerId) {
-        return errorResponse(res, 401, "Unauthorized: No broker ID found");
-      }
-
-      const actionMap = {
-        approve: "active",
-        reject: "rejected",
-        request_changes: "pending",
-      };
-
-      const newStatus = actionMap[action];
-
-      if (!newStatus) {
-        return errorResponse(res, 400, "Invalid action");
-      }
-
-      const property = await PropertyModel.findById(id);
-      if (!property) {
-        return errorResponse(res, 404, "Property not found");
-      }
-
-      // Verify broker is assigned to this property
-      if (property.assigned_broker_id !== parseInt(brokerId)) {
-        return errorResponse(
-          res,
-          403,
-          "Not authorized to manage this property"
-        );
-      }
-
-      // Add status to history
-      const statusHistory = property.status_history
-        ? JSON.parse(property.status_history)
-        : [];
-      statusHistory.push({
-        from: property.property_status,
-        to: newStatus,
-        changed_at: new Date().toISOString(),
-        notes: notes || "",
-        changed_by: brokerId,
-      });
-
-      const updatedProperty = await PropertyModel.update(id, {
-        property_status: newStatus,
-        status_history: JSON.stringify(statusHistory),
-      });
-
-      successResponse(
-        res,
-        200,
-        `Property ${action} successfully`,
-        updatedProperty
-      );
-    } catch (error) {
+      console.error("Update price error:", error);
       errorResponse(res, 500, error.message);
     }
   }

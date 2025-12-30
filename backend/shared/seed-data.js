@@ -2,7 +2,7 @@
 
 // Helper function to generate UUIDs
 const generateUUID = () => {
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
     const r = Math.random() * 16 | 0;
     const v = c === 'x' ? r : (r & 0x3 | 0x8);
     return v.toString(16);
@@ -16,7 +16,7 @@ const generatePriceHistory = (price, isForRent = false) => {
   threeMonthsAgo.setMonth(now.getMonth() - 3);
   const oneMonthAgo = new Date(now);
   oneMonthAgo.setMonth(now.getMonth() - 1);
-  
+
   if (isForRent) {
     return JSON.stringify([
       {
@@ -150,7 +150,7 @@ const generateNearbySchools = (city) => {
       }
     ]
   };
-  
+
   return JSON.stringify(schools[city] || [
     {
       name: 'Local Community School',
@@ -241,7 +241,10 @@ export const properties = [
     est_payment: 2600000,
     latitude: 9.0320,
     longitude: 38.7468,
-    google_place_id: null
+    google_place_id: null,
+    created_at: new Date().toISOString().slice(0, 19).replace('T', ' '),
+    updated_at: new Date().toISOString().slice(0, 19).replace('T', ' '),
+    deleted_at: null,
   },
   {
     title: "Modern Apartment in Cazanchise",
@@ -400,18 +403,19 @@ export const properties = [
     google_place_id: null
   }
 ].map((property, index) => {
-  // Add generated fields
   return {
     property_uuid: generateUUID(),
     ...property,
     // Generate dynamic fields
     price_history: generatePriceHistory(property.price, property.listing_type === "rent"),
-    status_history: generateStatusHistory(property.owner_user_id),
     tax_history: generateTaxHistory(property.price),
     nearby_schools: generateNearbySchools(property.city),
     floor_plans: generateFloorPlans(property.sqft, property.beds, property.baths),
     published_at: new Date().toISOString().slice(0, 19).replace('T', ' '),
     last_modified_by_user_id: property.owner_user_id,
+    created_at: property.created_at || new Date().toISOString().slice(0, 19).replace('T', ' '),
+    updated_at: property.updated_at || new Date().toISOString().slice(0, 19).replace('T', ' '),
+    deleted_at: null,
     // Image URLs for property_images table
     images: [
       "https://images.unsplash.com/photo-1613490493576-7fde63acd811",
@@ -726,7 +730,7 @@ export const brokerAvailability = [
   { broker_id: 3, day_of_week: "friday", start_time: "08:00", end_time: "17:00", is_available: 1 },
   { broker_id: 3, day_of_week: "saturday", start_time: "10:00", end_time: "14:00", is_available: 1 },
   { broker_id: 3, day_of_week: "sunday", start_time: "00:00", end_time: "00:00", is_available: 0 },
-  
+
   { broker_id: 9, day_of_week: "monday", start_time: "09:00", end_time: "18:00", is_available: 1 },
   { broker_id: 9, day_of_week: "tuesday", start_time: "09:00", end_time: "18:00", is_available: 1 },
   { broker_id: 9, day_of_week: "wednesday", start_time: "09:00", end_time: "18:00", is_available: 1 },
@@ -743,7 +747,7 @@ export const brokerAvailability = [
 export const propertyImages = properties.flatMap((property, index) => {
   const propertyId = index + 1;
   const images = property.images || [];
-  
+
   return images.map((imageUrl, imgIndex) => ({
     property_id: propertyId,
     image_url: imageUrl,

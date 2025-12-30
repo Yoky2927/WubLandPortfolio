@@ -24,7 +24,7 @@ function safeJsonStringify(data) {
 }
 
 class PropertyModel {
-  // CREATE PROPERTY
+  // CREATE PROPERTY - FIXED VERSION
   async create(propertyData) {
     const connection = await pool.getConnection();
 
@@ -142,30 +142,47 @@ class PropertyModel {
               1,
           },
         ]),
-        created_at: new Date(),
-        updated_at: new Date(),
-        published_at:
-          propertyData.property_status === "active" ? new Date() : null,
       };
 
-      // Build the SQL query
-      const columns = Object.keys(propertyFields).join(", ");
-      const placeholders = Object.keys(propertyFields)
-        .map(() => "?")
-        .join(", ");
-      const values = Object.values(propertyFields);
+      // FIXED: Build the SQL query
+      const columns = [];
+      const placeholders = [];
+      const values = [];
 
-      const query = `INSERT INTO properties (${columns}) VALUES (${placeholders})`;
+      // Manually build to ensure perfect match
+      for (const [key, value] of Object.entries(propertyFields)) {
+        columns.push(key);
+
+        if (value === null) {
+          placeholders.push("NULL");
+        } else {
+          placeholders.push("?");
+          values.push(value);
+        }
+      }
+
+      const columnsStr = columns.join(", ");
+      const placeholdersStr = placeholders.join(", ");
+      const query = `INSERT INTO properties (${columnsStr}) VALUES (${placeholdersStr})`;
 
       console.log("Creating property with data:", {
-        ...propertyFields,
-        features: features,
-        amenities: amenities,
-        property_tags: propertyTags,
+        columnsCount: columns.length,
+        valuesCount: values.length,
+        placeholdersCount: placeholders.length,
+        hasStatusHistory: columns.includes('status_history'),
+        queryPreview: query.substring(0, 150) + '...'
       });
 
       const [result] = await connection.execute(query, values);
       const propertyId = result.insertId;
+
+      // Handle published_at separately if status is active
+      if (propertyData.property_status === "active") {
+        await connection.execute(
+          `UPDATE properties SET published_at = ? WHERE id = ?`,
+          [new Date(), propertyId]
+        );
+      }
 
       await connection.commit();
 
@@ -174,6 +191,13 @@ class PropertyModel {
     } catch (error) {
       await connection.rollback();
       console.error("Error creating property:", error);
+
+      // Enhanced error logging
+      if (error.sqlMessage) {
+        console.error("SQL Error:", error.sqlMessage);
+        console.error("Error code:", error.code);
+      }
+
       throw error;
     } finally {
       connection.release();
@@ -442,9 +466,6 @@ class PropertyModel {
 
   // ADD PROPERTY IMAGE
   async addImage(propertyId, imageData) {
-    console.log(`💾 DEBUG: addImage called for property ${propertyId}`);
-    console.log(`💾 DEBUG: imageData:`, imageData);
-
     const connection = await pool.getConnection();
 
     try {
@@ -472,12 +493,8 @@ class PropertyModel {
         imageData.uploaded_by_user_id,
       ];
 
-      console.log(`💾 DEBUG: Executing query with values:`, values);
-
       const [result] = await connection.execute(query, values);
       const imageId = result.insertId;
-
-      console.log(`✅ DEBUG: Image inserted with ID: ${imageId}`);
 
       await connection.commit();
 
@@ -487,7 +504,7 @@ class PropertyModel {
       };
     } catch (error) {
       await connection.rollback();
-      console.error("❌ Error adding property image:", error);
+      console.error("Error adding property image:", error);
       throw error;
     } finally {
       connection.release();
@@ -496,14 +513,23 @@ class PropertyModel {
 
   // GET PROPERTY IMAGES
   async getImages(propertyId) {
-    const query = `
-      SELECT * FROM property_images 
-      WHERE property_id = ? AND deleted_at IS NULL
-      ORDER BY is_primary DESC, image_order ASC
-    `;
+    const connection = await pool.getConnection();
 
-    const [images] = await pool.execute(query, [propertyId]);
-    return images;
+    try {
+      const query = `
+        SELECT * FROM property_images 
+        WHERE property_id = ? AND deleted_at IS NULL
+        ORDER BY is_primary DESC, image_order ASC
+      `;
+
+      const [images] = await connection.execute(query, [propertyId]);
+      return images;
+    } catch (error) {
+      console.error("Error getting property images:", error);
+      throw error;
+    } finally {
+      connection.release();
+    }
   }
 
   // SET PRIMARY IMAGE
@@ -539,14 +565,23 @@ class PropertyModel {
 
   // DELETE PROPERTY IMAGE
   async deleteImage(imageId, userId) {
-    const query = `
-      UPDATE property_images 
-      SET deleted_at = ?, uploaded_by_user_id = ?
-      WHERE id = ? AND deleted_at IS NULL
-    `;
+    const connection = await pool.getConnection();
 
-    const [result] = await pool.execute(query, [new Date(), userId, imageId]);
-    return result.affectedRows > 0;
+    try {
+      const query = `
+        UPDATE property_images 
+        SET deleted_at = ?, uploaded_by_user_id = ?
+        WHERE id = ? AND deleted_at IS NULL
+      `;
+
+      const [result] = await connection.execute(query, [new Date(), userId, imageId]);
+      return result.affectedRows > 0;
+    } catch (error) {
+      console.error("Error deleting property image:", error);
+      throw error;
+    } finally {
+      connection.release();
+    }
   }
 
   // ADD FLOOR PLAN (using property_images table with different category)
@@ -578,7 +613,7 @@ class PropertyModel {
         floorPlanData.uploaded_by_user_id,
       ];
 
-      const [result] = await pool.execute(query, values);
+      const [result] = await connection.execute(query, values);
       const floorPlanId = result.insertId;
 
       await connection.commit();
@@ -599,419 +634,482 @@ class PropertyModel {
 
   // GET FLOOR PLANS (images with specific ordering/caption)
   async getFloorPlans(propertyId) {
-    const query = `
-      SELECT * FROM property_images 
-      WHERE property_id = ? AND deleted_at IS NULL 
-        AND (caption LIKE '%floor plan%' OR caption LIKE '%floorplan%' OR image_order >= 999)
-      ORDER BY image_order ASC
-    `;
+    const connection = await pool.getConnection();
 
-    const [floorPlans] = await pool.execute(query, [propertyId]);
-    return floorPlans.map((plan) => ({
-      ...plan,
-      is_floor_plan: true,
-    }));
+    try {
+      const query = `
+        SELECT * FROM property_images 
+        WHERE property_id = ? AND deleted_at IS NULL 
+          AND (caption LIKE '%floor plan%' OR caption LIKE '%floorplan%' OR image_order >= 999)
+        ORDER BY image_order ASC
+      `;
+
+      const [floorPlans] = await connection.execute(query, [propertyId]);
+      return floorPlans.map((plan) => ({
+        ...plan,
+        is_floor_plan: true,
+      }));
+    } catch (error) {
+      console.error("Error getting floor plans:", error);
+      throw error;
+    } finally {
+      connection.release();
+    }
   }
 
   // GET ALL PROPERTIES WITH FILTERS
   async findAll(filters = {}, page = 1, limit = 20) {
-    let whereClauses = ["p.deleted_at IS NULL"];
-    const values = [];
+    const connection = await pool.getConnection();
 
-    if (filters.city) {
-      whereClauses.push("p.city LIKE ?");
-      values.push(`%${filters.city}%`);
+    try {
+      let whereClauses = ["p.deleted_at IS NULL"];
+      const values = [];
+
+      if (filters.city) {
+        whereClauses.push("p.city LIKE ?");
+        values.push(`%${filters.city}%`);
+      }
+
+      if (filters.property_type) {
+        whereClauses.push("p.property_type = ?");
+        values.push(filters.property_type);
+      }
+
+      if (filters.listing_type) {
+        whereClauses.push("p.listing_type = ?");
+        values.push(filters.listing_type);
+      }
+
+      if (filters.property_status) {
+        whereClauses.push("p.property_status = ?");
+        values.push(filters.property_status);
+      }
+
+      if (filters.min_price) {
+        whereClauses.push("p.price >= ?");
+        values.push(filters.min_price);
+      }
+
+      if (filters.max_price) {
+        whereClauses.push("p.price <= ?");
+        values.push(filters.max_price);
+      }
+
+      if (filters.beds) {
+        whereClauses.push("p.beds >= ?");
+        values.push(filters.beds);
+      }
+
+      if (filters.baths) {
+        whereClauses.push("p.baths >= ?");
+        values.push(filters.baths);
+      }
+
+      if (filters.search) {
+        whereClauses.push(
+          "(p.title LIKE ? OR p.description LIKE ? OR p.address LIKE ? OR p.city LIKE ?)"
+        );
+        values.push(
+          `%${filters.search}%`,
+          `%${filters.search}%`,
+          `%${filters.search}%`,
+          `%${filters.search}%`
+        );
+      }
+
+      const where =
+        whereClauses.length > 0
+          ? `WHERE ${whereClauses.join(" AND ")}`
+          : "WHERE p.deleted_at IS NULL";
+
+      // Count total
+      const countQuery = `
+        SELECT COUNT(*) as total 
+        FROM properties p
+        ${where}
+      `;
+      const [countResult] = await connection.execute(countQuery, values);
+      const total = countResult[0].total;
+
+      // Get paginated results
+      const offset = (page - 1) * limit;
+      const query = `
+    SELECT p.*, 
+      u.username as owner_username,
+      b.username as broker_username,
+      b.email as broker_email,
+      b.phone_number as broker_phone
+    FROM properties p
+    LEFT JOIN users u ON p.owner_user_id = u.id
+    LEFT JOIN users b ON p.assigned_broker_id = b.id
+    ${where}
+    ORDER BY 
+      CASE WHEN p.is_featured = 1 THEN 0 ELSE 1 END,
+      CASE WHEN p.is_premium = 1 THEN 0 ELSE 1 END,
+      p.published_at DESC
+    LIMIT ? OFFSET ?
+  `;
+
+      const [properties] = await connection.execute(query, [...values, limit, offset]);
+
+      // Parse JSON fields and add square_meters mapping
+      const parsedProperties = properties.map((property) => ({
+        ...property,
+        features: safeJsonParse(property.features, []),
+        amenities: safeJsonParse(property.amenities, []),
+        property_tags: safeJsonParse(property.property_tags, []),
+        price_history: safeJsonParse(property.price_history, []),
+        status_history: safeJsonParse(property.status_history, []),
+        square_meters: property.sqft || 0,
+      }));
+
+      return {
+        properties: parsedProperties,
+        pagination: {
+          page: parseInt(page),
+          limit: parseInt(limit),
+          total,
+          pages: Math.ceil(total / limit),
+        },
+      };
+    } catch (error) {
+      console.error("Error finding all properties:", error);
+      throw error;
+    } finally {
+      connection.release();
     }
-
-    if (filters.property_type) {
-      whereClauses.push("p.property_type = ?");
-      values.push(filters.property_type);
-    }
-
-    if (filters.listing_type) {
-      whereClauses.push("p.listing_type = ?");
-      values.push(filters.listing_type);
-    }
-
-    if (filters.property_status) {
-      whereClauses.push("p.property_status = ?");
-      values.push(filters.property_status);
-    }
-
-    if (filters.min_price) {
-      whereClauses.push("p.price >= ?");
-      values.push(filters.min_price);
-    }
-
-    if (filters.max_price) {
-      whereClauses.push("p.price <= ?");
-      values.push(filters.max_price);
-    }
-
-    if (filters.beds) {
-      whereClauses.push("p.beds >= ?");
-      values.push(filters.beds);
-    }
-
-    if (filters.baths) {
-      whereClauses.push("p.baths >= ?");
-      values.push(filters.baths);
-    }
-
-    if (filters.search) {
-      whereClauses.push(
-        "(p.title LIKE ? OR p.description LIKE ? OR p.address LIKE ? OR p.city LIKE ?)"
-      );
-      values.push(
-        `%${filters.search}%`,
-        `%${filters.search}%`,
-        `%${filters.search}%`,
-        `%${filters.search}%`
-      );
-    }
-
-    const where =
-      whereClauses.length > 0
-        ? `WHERE ${whereClauses.join(" AND ")}`
-        : "WHERE p.deleted_at IS NULL";
-
-    // Count total
-    const countQuery = `
-      SELECT COUNT(*) as total 
-      FROM properties p
-      ${where}
-    `;
-    const [countResult] = await pool.execute(countQuery, values);
-    const total = countResult[0].total;
-
-    // Get paginated results
-    const offset = (page - 1) * limit;
-    const query = `
-  SELECT p.*, 
-    u.username as owner_username,
-    b.username as broker_username,
-    b.email as broker_email,
-    b.phone_number as broker_phone
-  FROM properties p
-  LEFT JOIN users u ON p.owner_user_id = u.id
-  LEFT JOIN users b ON p.assigned_broker_id = b.id
-  ${where}
-  ORDER BY 
-    CASE WHEN p.is_featured = 1 THEN 0 ELSE 1 END,
-    CASE WHEN p.is_premium = 1 THEN 0 ELSE 1 END,
-    p.published_at DESC
-  LIMIT ? OFFSET ?
-`;
-
-    const [properties] = await pool.execute(query, [...values, limit, offset]);
-
-    // Parse JSON fields and add square_meters mapping
-    const parsedProperties = properties.map((property) => ({
-      ...property,
-      features: safeJsonParse(property.features, []),
-      amenities: safeJsonParse(property.amenities, []),
-      property_tags: safeJsonParse(property.property_tags, []),
-      price_history: safeJsonParse(property.price_history, []),
-      status_history: safeJsonParse(property.status_history, []),
-      square_meters: property.sqft || 0,
-    }));
-
-    return {
-      properties: parsedProperties,
-      pagination: {
-        page: parseInt(page),
-        limit: parseInt(limit),
-        total,
-        pages: Math.ceil(total / limit),
-      },
-    };
   }
 
   // SEARCH PROPERTIES
   async search(q, filters = {}, page = 1, limit = 20) {
-    let whereClauses = ["p.deleted_at IS NULL", "p.property_status = 'active'"];
-    const values = [];
+    const connection = await pool.getConnection();
 
-    // Add search term
-    if (q) {
-      whereClauses.push(
-        "(p.title LIKE ? OR p.description LIKE ? OR p.address LIKE ? OR p.city LIKE ? OR p.property_tags LIKE ?)"
-      );
-      const searchValue = `%${q}%`;
-      values.push(
-        searchValue,
-        searchValue,
-        searchValue,
-        searchValue,
-        searchValue
-      );
+    try {
+      let whereClauses = ["p.deleted_at IS NULL", "p.property_status = 'active'"];
+      const values = [];
+
+      // Add search term
+      if (q) {
+        whereClauses.push(
+          "(p.title LIKE ? OR p.description LIKE ? OR p.address LIKE ? OR p.city LIKE ? OR p.property_tags LIKE ?)"
+        );
+        const searchValue = `%${q}%`;
+        values.push(
+          searchValue,
+          searchValue,
+          searchValue,
+          searchValue,
+          searchValue
+        );
+      }
+
+      // Apply filters
+      if (filters.city) {
+        whereClauses.push("p.city LIKE ?");
+        values.push(`%${filters.city}%`);
+      }
+
+      if (filters.property_type) {
+        whereClauses.push("p.property_type = ?");
+        values.push(filters.property_type);
+      }
+
+      if (filters.listing_type) {
+        whereClauses.push("p.listing_type = ?");
+        values.push(filters.listing_type);
+      }
+
+      if (filters.min_price) {
+        whereClauses.push("p.price >= ?");
+        values.push(filters.min_price);
+      }
+
+      if (filters.max_price) {
+        whereClauses.push("p.price <= ?");
+        values.push(filters.max_price);
+      }
+
+      if (filters.beds) {
+        whereClauses.push("p.beds >= ?");
+        values.push(filters.beds);
+      }
+
+      if (filters.baths) {
+        whereClauses.push("p.baths >= ?");
+        values.push(filters.baths);
+      }
+
+      const where =
+        whereClauses.length > 0 ? `WHERE ${whereClauses.join(" AND ")}` : "";
+
+      // Count total
+      const countQuery = `SELECT COUNT(*) as total FROM properties p ${where}`;
+      const [countResult] = await connection.execute(countQuery, values);
+      const total = countResult[0].total;
+
+      // Get paginated results
+      const offset = (page - 1) * limit;
+      const query = `
+        SELECT p.*, 
+          u.username as owner_username,
+          b.username as broker_username
+        FROM properties p
+        LEFT JOIN users u ON p.owner_user_id = u.id
+        LEFT JOIN users b ON p.assigned_broker_id = b.id
+        ${where}
+        ORDER BY 
+          CASE WHEN p.is_featured = 1 THEN 0 ELSE 1 END,
+          CASE WHEN p.is_premium = 1 THEN 0 ELSE 1 END,
+          p.published_at DESC
+        LIMIT ? OFFSET ?
+      `;
+
+      const [properties] = await connection.execute(query, [...values, limit, offset]);
+
+      // Parse JSON fields and add square_meters mapping
+      const parsedProperties = properties.map((property) => ({
+        ...property,
+        features: safeJsonParse(property.features, []),
+        amenities: safeJsonParse(property.amenities, []),
+        property_tags: safeJsonParse(property.property_tags, []),
+        price_history: safeJsonParse(property.price_history, []),
+        status_history: safeJsonParse(property.status_history, []),
+        square_meters: property.sqft || 0,
+      }));
+
+      return {
+        properties: parsedProperties,
+        pagination: {
+          page: parseInt(page),
+          limit: parseInt(limit),
+          total,
+          pages: Math.ceil(total / limit),
+        },
+      };
+    } catch (error) {
+      console.error("Error searching properties:", error);
+      throw error;
+    } finally {
+      connection.release();
     }
-
-    // Apply filters
-    if (filters.city) {
-      whereClauses.push("p.city LIKE ?");
-      values.push(`%${filters.city}%`);
-    }
-
-    if (filters.property_type) {
-      whereClauses.push("p.property_type = ?");
-      values.push(filters.property_type);
-    }
-
-    if (filters.listing_type) {
-      whereClauses.push("p.listing_type = ?");
-      values.push(filters.listing_type);
-    }
-
-    if (filters.min_price) {
-      whereClauses.push("p.price >= ?");
-      values.push(filters.min_price);
-    }
-
-    if (filters.max_price) {
-      whereClauses.push("p.price <= ?");
-      values.push(filters.max_price);
-    }
-
-    if (filters.beds) {
-      whereClauses.push("p.beds >= ?");
-      values.push(filters.beds);
-    }
-
-    if (filters.baths) {
-      whereClauses.push("p.baths >= ?");
-      values.push(filters.baths);
-    }
-
-    const where =
-      whereClauses.length > 0 ? `WHERE ${whereClauses.join(" AND ")}` : "";
-
-    // Count total
-    const countQuery = `SELECT COUNT(*) as total FROM properties p ${where}`;
-    const [countResult] = await pool.execute(countQuery, values);
-    const total = countResult[0].total;
-
-    // Get paginated results
-    const offset = (page - 1) * limit;
-    const query = `
-      SELECT p.*, 
-        u.username as owner_username,
-        b.username as broker_username
-      FROM properties p
-      LEFT JOIN users u ON p.owner_user_id = u.id
-      LEFT JOIN users b ON p.assigned_broker_id = b.id
-      ${where}
-      ORDER BY 
-        CASE WHEN p.is_featured = 1 THEN 0 ELSE 1 END,
-        CASE WHEN p.is_premium = 1 THEN 0 ELSE 1 END,
-        p.published_at DESC
-      LIMIT ? OFFSET ?
-    `;
-
-    const [properties] = await pool.execute(query, [...values, limit, offset]);
-
-    // Parse JSON fields and add square_meters mapping
-    const parsedProperties = properties.map((property) => ({
-      ...property,
-      features: safeJsonParse(property.features, []),
-      amenities: safeJsonParse(property.amenities, []),
-      property_tags: safeJsonParse(property.property_tags, []),
-      price_history: safeJsonParse(property.price_history, []),
-      status_history: safeJsonParse(property.status_history, []),
-      square_meters: property.sqft || 0,
-    }));
-
-    return {
-      properties: parsedProperties,
-      pagination: {
-        page: parseInt(page),
-        limit: parseInt(limit),
-        total,
-        pages: Math.ceil(total / limit),
-      },
-    };
   }
 
   // GET FEATURED PROPERTIES
   async getFeatured(limit = 6) {
-    const query = `
-    SELECT p.*, 
-      u.username as owner_username,
-      b.username as broker_username,
-      b.email as broker_email,
-      b.phone_number as broker_phone
-    FROM properties p
-    LEFT JOIN users u ON p.owner_user_id = u.id
-    LEFT JOIN users b ON p.assigned_broker_id = b.id
-    WHERE p.deleted_at IS NULL AND p.property_status = 'active' AND p.is_featured = 1
-    ORDER BY p.published_at DESC
-    LIMIT ?
-  `;
+    const connection = await pool.getConnection();
 
-    const [properties] = await pool.execute(query, [limit]);
+    try {
+      const query = `
+      SELECT p.*, 
+        u.username as owner_username,
+        b.username as broker_username,
+        b.email as broker_email,
+        b.phone_number as broker_phone
+      FROM properties p
+      LEFT JOIN users u ON p.owner_user_id = u.id
+      LEFT JOIN users b ON p.assigned_broker_id = b.id
+      WHERE p.deleted_at IS NULL AND p.property_status = 'active' AND p.is_featured = 1
+      ORDER BY p.published_at DESC
+      LIMIT ?
+    `;
 
-    // Parse JSON fields and add square_meters mapping
-    return properties.map((property) => ({
-      ...property,
-      features: safeJsonParse(property.features, []),
-      amenities: safeJsonParse(property.amenities, []),
-      property_tags: safeJsonParse(property.property_tags, []),
-      price_history: safeJsonParse(property.price_history, []),
-      status_history: safeJsonParse(property.status_history, []),
-      square_meters: property.sqft || 0,
-    }));
+      const [properties] = await connection.execute(query, [limit]);
+
+      // Parse JSON fields and add square_meters mapping
+      return properties.map((property) => ({
+        ...property,
+        features: safeJsonParse(property.features, []),
+        amenities: safeJsonParse(property.amenities, []),
+        property_tags: safeJsonParse(property.property_tags, []),
+        price_history: safeJsonParse(property.price_history, []),
+        status_history: safeJsonParse(property.status_history, []),
+        square_meters: property.sqft || 0,
+      }));
+    } catch (error) {
+      console.error("Error getting featured properties:", error);
+      throw error;
+    } finally {
+      connection.release();
+    }
   }
 
   // GET PREMIUM PROPERTIES
   async getPremium(limit = 6) {
-    const query = `
-    SELECT p.*, 
-      u.username as owner_username,
-      b.username as broker_username,
-      b.email as broker_email,
-      b.phone_number as broker_phone
-    FROM properties p
-    LEFT JOIN users u ON p.owner_user_id = u.id
-    LEFT JOIN users b ON p.assigned_broker_id = b.id
-    WHERE p.deleted_at IS NULL AND p.property_status = 'active' AND p.is_premium = 1
-    ORDER BY p.published_at DESC
-    LIMIT ?
-  `;
+    const connection = await pool.getConnection();
 
-    const [properties] = await pool.execute(query, [limit]);
+    try {
+      const query = `
+      SELECT p.*, 
+        u.username as owner_username,
+        b.username as broker_username,
+        b.email as broker_email,
+        b.phone_number as broker_phone
+      FROM properties p
+      LEFT JOIN users u ON p.owner_user_id = u.id
+      LEFT JOIN users b ON p.assigned_broker_id = b.id
+      WHERE p.deleted_at IS NULL AND p.property_status = 'active' AND p.is_premium = 1
+      ORDER BY p.published_at DESC
+      LIMIT ?
+    `;
 
-    // Parse JSON fields and add square_meters mapping
-    return properties.map((property) => ({
-      ...property,
-      features: safeJsonParse(property.features, []),
-      amenities: safeJsonParse(property.amenities, []),
-      property_tags: safeJsonParse(property.property_tags, []),
-      price_history: safeJsonParse(property.price_history, []),
-      status_history: safeJsonParse(property.status_history, []),
-      square_meters: property.sqft || 0,
-    }));
+      const [properties] = await connection.execute(query, [limit]);
+
+      // Parse JSON fields and add square_meters mapping
+      return properties.map((property) => ({
+        ...property,
+        features: safeJsonParse(property.features, []),
+        amenities: safeJsonParse(property.amenities, []),
+        property_tags: safeJsonParse(property.property_tags, []),
+        price_history: safeJsonParse(property.price_history, []),
+        status_history: safeJsonParse(property.status_history, []),
+        square_meters: property.sqft || 0,
+      }));
+    } catch (error) {
+      console.error("Error getting premium properties:", error);
+      throw error;
+    } finally {
+      connection.release();
+    }
   }
 
   // GET RECENT PROPERTIES
   async getRecent(limit = 10) {
-    const query = `
+    const connection = await pool.getConnection();
+
+    try {
+      const query = `
+      SELECT p.*, 
+        u.username as owner_username,
+        b.username as broker_username,
+        b.email as broker_email,
+        b.phone_number as broker_phone
+      FROM properties p
+      LEFT JOIN users u ON p.owner_user_id = u.id
+      LEFT JOIN users b ON p.assigned_broker_id = b.id
+      WHERE p.deleted_at IS NULL AND p.property_status = 'active'
+      ORDER BY p.created_at DESC
+      LIMIT ?
+    `;
+
+      const [properties] = await connection.execute(query, [limit]);
+
+      // Parse JSON fields and add square_meters mapping
+      return properties.map((property) => ({
+        ...property,
+        features: safeJsonParse(property.features, []),
+        amenities: safeJsonParse(property.amenities, []),
+        property_tags: safeJsonParse(property.property_tags, []),
+        price_history: safeJsonParse(property.price_history, []),
+        status_history: safeJsonParse(property.status_history, []),
+        square_meters: property.sqft || 0,
+      }));
+    } catch (error) {
+      console.error("Error getting recent properties:", error);
+      throw error;
+    } finally {
+      connection.release();
+    }
+  }
+
+  // FIND PROPERTIES BY BROKER ID
+  async findByBrokerId(brokerId, filters = {}, page = 1, limit = 20) {
+    const connection = await pool.getConnection();
+
+    try {
+      let whereClauses = ["p.deleted_at IS NULL", "p.assigned_broker_id = ?"];
+      const values = [brokerId];
+
+      // Apply filters with status mapping
+      if (filters.property_status) {
+        // Map frontend status to database status
+        const statusMap = {
+          pending: ["pending_review", "pending", "draft"],
+          approved: ["approved", "active"],
+          rejected: ["rejected", "inactive"],
+        };
+
+        if (statusMap[filters.property_status]) {
+          const placeholders = statusMap[filters.property_status]
+            .map(() => "?")
+            .join(",");
+          whereClauses.push(`p.property_status IN (${placeholders})`);
+          values.push(...statusMap[filters.property_status]);
+        } else {
+          whereClauses.push("p.property_status = ?");
+          values.push(filters.property_status);
+        }
+      }
+
+      if (filters.listing_type) {
+        whereClauses.push("p.listing_type = ?");
+        values.push(filters.listing_type);
+      }
+
+      if (filters.search) {
+        whereClauses.push(
+          "(p.title LIKE ? OR p.description LIKE ? OR p.address LIKE ? OR p.city LIKE ?)"
+        );
+        const searchValue = `%${filters.search}%`;
+        values.push(searchValue, searchValue, searchValue, searchValue);
+      }
+
+      const where =
+        whereClauses.length > 0 ? `WHERE ${whereClauses.join(" AND ")}` : "";
+
+      // Count total
+      const countQuery = `
+      SELECT COUNT(*) as total 
+      FROM properties p
+      ${where}
+    `;
+      const [countResult] = await connection.execute(countQuery, values);
+      const total = countResult[0].total;
+
+      // Get paginated results
+      const offset = (page - 1) * limit;
+      const query = `
     SELECT p.*, 
       u.username as owner_username,
+      u.email as owner_email,
       b.username as broker_username,
       b.email as broker_email,
       b.phone_number as broker_phone
     FROM properties p
     LEFT JOIN users u ON p.owner_user_id = u.id
     LEFT JOIN users b ON p.assigned_broker_id = b.id
-    WHERE p.deleted_at IS NULL AND p.property_status = 'active'
-    ORDER BY p.created_at DESC
-    LIMIT ?
-  `;
-
-    const [properties] = await pool.execute(query, [limit]);
-
-    // Parse JSON fields and add square_meters mapping
-    return properties.map((property) => ({
-      ...property,
-      features: safeJsonParse(property.features, []),
-      amenities: safeJsonParse(property.amenities, []),
-      property_tags: safeJsonParse(property.property_tags, []),
-      price_history: safeJsonParse(property.price_history, []),
-      status_history: safeJsonParse(property.status_history, []),
-      square_meters: property.sqft || 0,
-    }));
-  }
-
-  // FIND PROPERTIES BY BROKER ID
-  async findByBrokerId(brokerId, filters = {}, page = 1, limit = 20) {
-    let whereClauses = ["p.deleted_at IS NULL", "p.assigned_broker_id = ?"];
-    const values = [brokerId];
-
-    // Apply filters with status mapping
-    if (filters.property_status) {
-      // Map frontend status to database status
-      const statusMap = {
-        pending: ["pending_review", "pending", "draft"],
-        approved: ["approved", "active"],
-        rejected: ["rejected", "inactive"],
-      };
-
-      if (statusMap[filters.property_status]) {
-        const placeholders = statusMap[filters.property_status]
-          .map(() => "?")
-          .join(",");
-        whereClauses.push(`p.property_status IN (${placeholders})`);
-        values.push(...statusMap[filters.property_status]);
-      } else {
-        whereClauses.push("p.property_status = ?");
-        values.push(filters.property_status);
-      }
-    }
-
-    if (filters.listing_type) {
-      whereClauses.push("p.listing_type = ?");
-      values.push(filters.listing_type);
-    }
-
-    if (filters.search) {
-      whereClauses.push(
-        "(p.title LIKE ? OR p.description LIKE ? OR p.address LIKE ? OR p.city LIKE ?)"
-      );
-      const searchValue = `%${filters.search}%`;
-      values.push(searchValue, searchValue, searchValue, searchValue);
-    }
-
-    const where =
-      whereClauses.length > 0 ? `WHERE ${whereClauses.join(" AND ")}` : "";
-
-    // Count total
-    const countQuery = `
-    SELECT COUNT(*) as total 
-    FROM properties p
     ${where}
+    ORDER BY p.updated_at DESC
+    LIMIT ? OFFSET ?
   `;
-    const [countResult] = await pool.execute(countQuery, values);
-    const total = countResult[0].total;
 
-    // Get paginated results
-    const offset = (page - 1) * limit;
-    const query = `
-  SELECT p.*, 
-    u.username as owner_username,
-    u.email as owner_email,
-    b.username as broker_username,
-    b.email as broker_email,
-    b.phone_number as broker_phone
-  FROM properties p
-  LEFT JOIN users u ON p.owner_user_id = u.id
-  LEFT JOIN users b ON p.assigned_broker_id = b.id
-  ${where}
-  ORDER BY p.updated_at DESC
-  LIMIT ? OFFSET ?
-`;
+      const [properties] = await connection.execute(query, [...values, limit, offset]);
 
-    const [properties] = await pool.execute(query, [...values, limit, offset]);
+      // PARSE JSON FIELDS and add square_meters mapping
+      const parsedProperties = properties.map((property) => ({
+        ...property,
+        features: safeJsonParse(property.features, []),
+        amenities: safeJsonParse(property.amenities, []),
+        property_tags: safeJsonParse(property.property_tags, []),
+        price_history: safeJsonParse(property.price_history, []),
+        status_history: safeJsonParse(property.status_history, []),
+        square_meters: property.sqft || 0,
+      }));
 
-    // PARSE JSON FIELDS and add square_meters mapping
-    const parsedProperties = properties.map((property) => ({
-      ...property,
-      features: safeJsonParse(property.features, []),
-      amenities: safeJsonParse(property.amenities, []),
-      property_tags: safeJsonParse(property.property_tags, []),
-      price_history: safeJsonParse(property.price_history, []),
-      status_history: safeJsonParse(property.status_history, []),
-      square_meters: property.sqft || 0,
-    }));
-
-    return {
-      properties: parsedProperties,
-      pagination: {
-        page: parseInt(page),
-        limit: parseInt(limit),
-        total,
-        pages: Math.ceil(total / limit),
-      },
-    };
+      return {
+        properties: parsedProperties,
+        pagination: {
+          page: parseInt(page),
+          limit: parseInt(limit),
+          total,
+          pages: Math.ceil(total / limit),
+        },
+      };
+    } catch (error) {
+      console.error("Error finding properties by broker ID:", error);
+      throw error;
+    } finally {
+      connection.release();
+    }
   }
 
   // UPDATE PROPERTY STATUS
@@ -1127,6 +1225,193 @@ class PropertyModel {
       connection.release();
     }
   }
+
+  // DELETE PROPERTY (soft delete)
+  async delete(id, userId) {
+    const connection = await pool.getConnection();
+
+    try {
+      await connection.beginTransaction();
+
+      const query = `
+        UPDATE properties 
+        SET deleted_at = ?, 
+            last_modified_by_user_id = ?,
+            updated_at = ?
+        WHERE id = ? AND deleted_at IS NULL
+      `;
+
+      const [result] = await connection.execute(query, [
+        new Date(),
+        userId,
+        new Date(),
+        id
+      ]);
+
+      await connection.commit();
+
+      return result.affectedRows > 0;
+
+    } catch (error) {
+      await connection.rollback();
+      console.error("Error deleting property:", error);
+      throw error;
+    } finally {
+      connection.release();
+    }
+  }
+ async getAdminStats() {
+    const connection = await pool.getConnection();
+    try {
+      const query = `
+        SELECT 
+          COUNT(*) as total,
+          SUM(CASE WHEN property_status = 'active' THEN 1 ELSE 0 END) as active,
+          SUM(CASE WHEN property_status = 'pending' THEN 1 ELSE 0 END) as pending,
+          SUM(CASE WHEN property_status = 'draft' THEN 1 ELSE 0 END) as draft,
+          SUM(CASE WHEN property_status IN ('sold', 'rented') THEN 1 ELSE 0 END) as closed,
+          SUM(CASE WHEN deleted_at IS NOT NULL THEN 1 ELSE 0 END) as deleted
+        FROM properties
+      `;
+
+      const [result] = await connection.execute(query);
+      return result[0];
+    } catch (error) {
+      console.error("Error getting admin stats:", error);
+      throw error;
+    } finally {
+      connection.release();
+    }
+  }
+
+  // GET ALL PROPERTIES FOR ADMIN (includes deleted)
+  async findAllAdmin(filters = {}, page = 1, limit = 50) {
+    const connection = await pool.getConnection();
+    try {
+      const { status, broker_id, search, include_deleted = false } = filters;
+      let whereClauses = ['1=1'];
+      const values = [];
+
+      if (!include_deleted) {
+        whereClauses.push('deleted_at IS NULL');
+      }
+
+      if (status) {
+        whereClauses.push('property_status = ?');
+        values.push(status);
+      }
+
+      if (broker_id) {
+        whereClauses.push('assigned_broker_id = ?');
+        values.push(broker_id);
+      }
+
+      if (search) {
+        whereClauses.push('(title LIKE ? OR address LIKE ? OR city LIKE ?)');
+        const searchValue = `%${search}%`;
+        values.push(searchValue, searchValue, searchValue);
+      }
+
+      const where = whereClauses.join(' AND ');
+
+      // Count total
+      const countQuery = `SELECT COUNT(*) as total FROM properties WHERE ${where}`;
+      const [countResult] = await connection.execute(countQuery, values);
+      const total = countResult[0].total;
+
+      // Get paginated results
+      const offset = (page - 1) * limit;
+      const query = `
+        SELECT p.*, 
+          u.username as owner_username,
+          u.email as owner_email,
+          b.username as broker_username,
+          b.email as broker_email
+        FROM properties p
+        LEFT JOIN users u ON p.owner_user_id = u.id
+        LEFT JOIN users b ON p.assigned_broker_id = b.id
+        WHERE ${where}
+        ORDER BY p.created_at DESC
+        LIMIT ? OFFSET ?
+      `;
+
+      const [properties] = await connection.execute(query, [...values, limit, offset]);
+
+      // Parse JSON fields
+      const parsedProperties = properties.map((property) => ({
+        ...property,
+        features: safeJsonParse(property.features, []),
+        amenities: safeJsonParse(property.amenities, []),
+        property_tags: safeJsonParse(property.property_tags, []),
+        price_history: safeJsonParse(property.price_history, []),
+        status_history: safeJsonParse(property.status_history, []),
+        square_meters: property.sqft || 0,
+      }));
+
+      return {
+        properties: parsedProperties,
+        pagination: {
+          page: parseInt(page),
+          limit: parseInt(limit),
+          total,
+          pages: Math.ceil(total / limit),
+        },
+      };
+    } catch (error) {
+      console.error("Error finding admin properties:", error);
+      throw error;
+    } finally {
+      connection.release();
+    }
+  }
+
+  // PERMANENTLY DELETE PROPERTY (admin only)
+  async permanentDelete(id) {
+    const connection = await pool.getConnection();
+    try {
+      await connection.beginTransaction();
+      
+      // Delete related images first
+      await connection.execute(
+        'DELETE FROM property_images WHERE property_id = ?',
+        [id]
+      );
+      
+      // Delete the property
+      const [result] = await connection.execute(
+        'DELETE FROM properties WHERE id = ?',
+        [id]
+      );
+      
+      await connection.commit();
+      return result.affectedRows > 0;
+    } catch (error) {
+      await connection.rollback();
+      console.error("Error permanently deleting property:", error);
+      throw error;
+    } finally {
+      connection.release();
+    }
+  }
+
+  // RESTORE DELETED PROPERTY
+  async restore(id) {
+    const connection = await pool.getConnection();
+    try {
+      const [result] = await connection.execute(
+        'UPDATE properties SET deleted_at = NULL, updated_at = NOW() WHERE id = ? AND deleted_at IS NOT NULL',
+        [id]
+      );
+      return result.affectedRows > 0;
+    } catch (error) {
+      console.error("Error restoring property:", error);
+      throw error;
+    } finally {
+      connection.release();
+    }
+  }
+
+
 } // END OF CLASS
 
 // Export as a singleton instance

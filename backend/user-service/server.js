@@ -9,6 +9,8 @@ import userRoutes from "./routes/user.routes.js";
 import privilegeRoutes from "./routes/privilege.routes.js";
 import path from 'path';
 import { fileURLToPath } from 'url';
+import brokersRoutes from "./routes/brokers.routes.js";
+import { ApiDocs, createHealthCheck } from '../shared/api-docs.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -50,6 +52,25 @@ app.use(express.urlencoded({
   limit: '50mb'
 }));
 app.use(cookieParser());
+
+const userServiceEndpoints = [
+  ApiDocs.createRoute('POST', '/api/auth/register', 'Register new user'),
+  ApiDocs.createRoute('POST', '/api/auth/login', 'Login user'),
+  ApiDocs.createRoute('GET', '/api/auth/check', 'Check authentication', true),
+  ApiDocs.createRoute('POST', '/api/auth/upload-profile-picture', 'Upload profile picture', true),
+  ApiDocs.createRoute('GET', '/api/users/me', 'Get current user', true),
+  ApiDocs.createRoute('GET', '/api/users/brokers', 'Get all brokers'),
+  ApiDocs.createRoute('GET', '/api/brokers', 'Get brokers'),
+  // Add more routes as needed
+];
+
+// API Documentation endpoint
+app.get('/api-docs', (req, res) => {
+  res.json(ApiDocs.generateDocs('user', userServiceEndpoints));
+});
+
+// Update health endpoint
+app.get('/health', createHealthCheck('user'));
 
 // File upload - FIXED configuration
 app.use(fileUpload({
@@ -104,6 +125,7 @@ app.post("/api/test-upload", (req, res) => {
   });
 });
 
+app.use("/api/brokers", brokersRoutes); 
 // ============ MAIN ROUTES ============
 
 app.use("/api/auth", authRoutes);

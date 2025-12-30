@@ -1,4 +1,4 @@
-// backend/shared/populate-db.js - FIXED WITH CLEARING
+// backend/shared/populate-db.js - FIXED VERSION
 import mysql from 'mysql2/promise';
 import seedData from './seed-data.js';
 
@@ -21,21 +21,19 @@ async function populateDatabase() {
     // STEP 0: CLEAR EXISTING DATA
     // =============================================
     console.log('\n🗑️  Clearing existing data...');
-    
+
     try {
       await connection.execute('SET FOREIGN_KEY_CHECKS = 0');
-      
-      // Clear tables in reverse order (child tables first)
+
       const tables = [
         'property_images',
-        'broker_reviews',
+        'broker_availability', // Added this
+        'broker_profiles', // Added this
         'properties',
-        'broker_availability',
-        'broker_profiles',
         'user_preferences',
         'users'
       ];
-      
+
       for (const table of tables) {
         try {
           await connection.execute(`DELETE FROM ${table}`);
@@ -44,13 +42,13 @@ async function populateDatabase() {
           console.log(`   ⚠️  Could not clear ${table}: ${err.message}`);
         }
       }
-      
-      // Reset auto-increment
+
       await connection.execute('ALTER TABLE users AUTO_INCREMENT = 1');
       await connection.execute('ALTER TABLE properties AUTO_INCREMENT = 1');
       await connection.execute('ALTER TABLE broker_profiles AUTO_INCREMENT = 1');
       await connection.execute('ALTER TABLE property_images AUTO_INCREMENT = 1');
-      
+      await connection.execute('ALTER TABLE broker_availability AUTO_INCREMENT = 1');
+
       await connection.execute('SET FOREIGN_KEY_CHECKS = 1');
       console.log('✅ All data cleared successfully');
     } catch (err) {
@@ -61,9 +59,9 @@ async function populateDatabase() {
     // STEP 1: INSERT USERS
     // =============================================
     console.log('\n👥 Inserting users...');
-    
+
     const userIdMap = {};
-    
+
     for (let i = 0; i < seedData.users.length; i++) {
       const user = seedData.users[i];
       try {
@@ -96,176 +94,347 @@ async function populateDatabase() {
             user.status || 'active'
           ]
         );
-        
+
         const userId = result.insertId;
         userIdMap[user.email] = userId;
         console.log(`   ✅ Added user: ${user.username} (ID: ${userId})`);
       } catch (err) {
         console.error(`   ❌ Error inserting user ${user.username}: ${err.message}`);
-        // Try to get existing user ID
-        try {
-          const [existing] = await connection.execute(
-            'SELECT id FROM users WHERE email = ?',
-            [user.email]
-          );
-          if (existing.length > 0) {
-            userIdMap[user.email] = existing[0].id;
-            console.log(`   ⚡ Using existing user: ${user.username} (ID: ${existing[0].id})`);
-          }
-        } catch (lookupErr) {
-          console.error(`   ❌ Could not find existing user: ${lookupErr.message}`);
-        }
       }
     }
 
     // =============================================
-    // STEP 2: GET SELLER USER ID (Critical)
+    // STEP 2: GET SELLER USER ID
     // =============================================
     const sellerUserId = userIdMap['seller@wubland.com'];
     if (!sellerUserId) {
-      // Try to get seller ID from database
-      try {
-        const [seller] = await connection.execute(
-          'SELECT id FROM users WHERE email = ?',
-          ['seller@wubland.com']
-        );
-        if (seller.length > 0) {
-          console.log(`⚡ Found seller user ID: ${seller[0].id}`);
-        } else {
-          console.error('❌ CRITICAL: Seller user not found! Cannot insert properties.');
-          return;
+      console.error('❌ Seller user not found!');
+      return;
+    }
+    console.log(`⚡ Using seller user ID: ${sellerUserId}`);
+
+    // =============================================
+    // STEP 3: INSERT BROKER PROFILES (Check if exists)
+    // =============================================
+    console.log('\n🤵 Inserting broker profiles...');
+
+    if (seedData.brokerProfiles && seedData.brokerProfiles.length > 0) {
+      console.log(`🔍 Found ${seedData.brokerProfiles.length} broker profiles in seed data`);
+
+      for (const broker of seedData.brokerProfiles) {
+        try {
+          // Find the broker's email based on user_id
+          let brokerEmail = null;
+          let brokerUsername = null;
+
+          // Map user_id to email (hardcoded mapping based on your seed data)
+          if (broker.user_id === 3) {
+            brokerEmail = 'beza@wubland.com';
+            brokerUsername = 'beza_hilemariam';
+          } else if (broker.user_id === 9) {
+            brokerEmail = 'elias@wubland.com';
+            brokerUsername = 'elias_kebede';
+          }
+
+          if (!brokerEmail) {
+            console.log(`   ⚠️  Skipping broker profile - unknown user_id ${broker.user_id}`);
+            continue;
+          }
+
+          const userId = userIdMap[brokerEmail];
+          if (!userId) {
+            console.log(`   ⚠️  Skipping broker profile - user not found for email ${brokerEmail}`);
+            continue;
+          }
+
+          console.log(`   Processing broker: ${brokerUsername} (user_id: ${userId})`);
+
+          await connection.execute(
+            `INSERT INTO broker_profiles 
+            (user_id, broker_type, license_number, license_expiry, years_experience, 
+             specialization, total_completed_deals, total_sales, average_rating, 
+             review_count, commission_rate, service_fee, is_available, max_clients, 
+             current_active_clients, languages, service_areas, is_verified, 
+             bio_english, bio_amharic) 
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [
+              userId,
+              broker.broker_type,
+              broker.license_number || null,
+              broker.license_expiry || null,
+              broker.years_experience || 0,
+              broker.specialization || '[]',
+              broker.total_completed_deals || 0,
+              broker.total_sales || 0,
+              broker.average_rating || 0,
+              broker.review_count || 0,
+              broker.commission_rate || 2.5,
+              broker.service_fee || 0,
+              broker.is_available ? 1 : 1, // Default to available
+              broker.max_clients || 10,
+              broker.current_active_clients || 0,
+              broker.languages || '["amharic", "english"]',
+              broker.service_areas || '[]',
+              broker.is_verified ? 1 : 0,
+              broker.bio_english || '',
+              broker.bio_amharic || ''
+            ]
+          );
+          console.log(`   ✅ Added broker profile for ${brokerUsername} (ID: ${userId})`);
+        } catch (err) {
+          console.error(`   ❌ Error inserting broker profile: ${err.message}`);
         }
-      } catch (err) {
-        console.error('❌ Could not find seller user:', err.message);
-        return;
       }
+    } else {
+      console.log('   ⚠️  No brokerProfiles found in seed data');
     }
 
     // =============================================
-    // STEP 3: INSERT PROPERTIES
+    // STEP 4: INSERT BROKER AVAILABILITY (Check if exists)
+    // =============================================
+    console.log('\n📅 Inserting broker availability...');
+
+    if (seedData.brokerAvailability && seedData.brokerAvailability.length > 0) {
+      console.log(`🔍 Found ${seedData.brokerAvailability.length} availability entries in seed data`);
+
+      for (const availability of seedData.brokerAvailability) {
+        try {
+          let brokerEmail = null;
+
+          // Map broker_id to email
+          if (availability.broker_id === 3) {
+            brokerEmail = 'beza@wubland.com';
+          } else if (availability.broker_id === 9) {
+            brokerEmail = 'elias@wubland.com';
+          } else {
+            console.log(`   ⚠️  Skipping availability - unknown broker_id ${availability.broker_id}`);
+            continue;
+          }
+
+          const userId = userIdMap[brokerEmail];
+          if (!userId) {
+            console.log(`   ⚠️  Skipping availability - user not found for email ${brokerEmail}`);
+            continue;
+          }
+
+          await connection.execute(
+            `INSERT INTO broker_availability 
+            (broker_id, day_of_week, start_time, end_time, is_available) 
+            VALUES (?, ?, ?, ?, ?)`,
+            [
+              userId,
+              availability.day_of_week,
+              availability.start_time,
+              availability.end_time,
+              availability.is_available ? 1 : 1
+            ]
+          );
+          console.log(`   ✅ Added availability for broker ${userId} (${availability.day_of_week})`);
+        } catch (err) {
+          console.error(`   ❌ Error inserting broker availability: ${err.message}`);
+        }
+      }
+    } else {
+      console.log('   ⚠️  No brokerAvailability found in seed data');
+    }
+
+    // =============================================
+    // STEP 5: INSERT PROPERTIES
     // =============================================
     console.log('\n🏠 Inserting properties...');
-    
+
     let insertedProperties = 0;
     const propertyIdMap = {};
-    
+
+    console.log(`🔍 Found ${seedData.properties.length} properties in seed data`);
+
     for (let i = 0; i < seedData.properties.length; i++) {
       const property = seedData.properties[i];
+      console.log(`\n📝 Processing property ${i + 1}: "${property.title}"`);
+
       try {
-        // Check if property already exists
-        const [existing] = await connection.execute(
-          'SELECT id FROM properties WHERE title = ? AND address = ?',
-          [property.title, property.address]
-        );
-        
-        if (existing.length > 0) {
-          propertyIdMap[i] = existing[0].id;
-          console.log(`   ⚡ Property already exists: "${property.title}" (ID: ${existing[0].id})`);
-          continue;
+        // Generate UUID if not present
+        if (!property.property_uuid || property.property_uuid === '') {
+          property.property_uuid = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
+            const r = Math.random() * 16 | 0;
+            const v = c === 'x' ? r : (r & 0x3 | 0x8);
+            return v.toString(16);
+          });
         }
-        
+        console.log(`   UUID: ${property.property_uuid}`);
+
+        // CORRECTED INSERT STATEMENT - Count matches your properties table schema
         const [result] = await connection.execute(
           `INSERT INTO properties 
           (property_uuid, title, description, property_type, property_status,
            address, city, state, country, zip_code, neighborhood, latitude, longitude,
-           google_place_id, region, beds, baths, sqft, lot_size, year_built, garage_spaces, parking_spaces,
+           region, beds, baths, sqft, lot_size, year_built, garage_spaces, parking_spaces,
            price, currency, price_per_sqft, is_negotiable, deposit_amount, monthly_rent,
            listing_type, mls_number, mls_source, listing_date, expiration_date,
            owner_user_id, created_by_user_id, assigned_broker_id, is_exclusive,
            features, amenities, property_tags, views_count, saves_count, inquiries_count,
-           is_featured, is_premium, average_rating, total_reviews, tax_amount, hoa_fees,
-           insurance_amount, est_payment, price_history, tax_history, nearby_schools, floor_plans, status_history,
-           published_at, last_modified_by_user_id) 
+           is_featured, is_premium, tax_amount, hoa_fees, insurance_amount, est_payment, 
+           price_history, tax_history, nearby_schools, floor_plans,
+           published_at, last_modified_by_user_id, created_at, updated_at) 
           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 
                   ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-                  ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                  ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,  // 56 question marks total
           [
+            // Basic info (5)
             property.property_uuid,
             property.title,
             property.description,
             property.property_type,
             property.property_status || 'active',
+
+            // Location (11)
             property.address,
             property.city,
             property.state,
             property.country,
-            property.zip_code,
-            property.neighborhood,
-            property.latitude,
-            property.longitude,
-            property.google_place_id,
-            property.region,
-            property.beds,
-            property.baths,
-            property.sqft,
-            property.lot_size,
-            property.year_built,
-            property.garage_spaces,
-            property.parking_spaces,
+            property.zip_code || '',
+            property.neighborhood || '',
+            property.latitude || null,
+            property.longitude || null,
+            property.region || '',
+
+            // Property specs (8)
+            property.beds || 0,
+            property.baths || 0,
+            property.sqft || 0,
+            property.lot_size || 0,
+            property.year_built || null,
+            property.garage_spaces || 0,
+            property.parking_spaces || 0,
+
+            // Pricing (8)
             property.price,
-            property.currency,
-            property.price_per_sqft,
+            property.currency || 'ETB',
+            property.price_per_sqft || 0,
             property.is_negotiable ? 1 : 0,
-            property.deposit_amount,
-            property.monthly_rent,
+            property.deposit_amount || 0,
+            property.monthly_rent || 0,
             property.listing_type,
-            property.mls_number,
-            property.mls_source,
-            property.listing_date,
-            property.expiration_date,
+
+            // Listing info (5)
+            property.mls_number || '',
+            property.mls_source || '',
+            property.listing_date || null,
+            property.expiration_date || null,
+
+            // Ownership (5)
             sellerUserId,
             sellerUserId,
-            property.assigned_broker_id,
+            property.assigned_broker_id || null,
             property.is_exclusive ? 1 : 0,
-            property.features,
-            property.amenities,
-            property.property_tags,
-            property.views_count,
-            property.saves_count,
-            property.inquiries_count,
+
+            // Features (3)
+            property.features || '[]',
+            property.amenities || '[]',
+            property.property_tags || '[]',
+
+            // Stats (3)
+            property.views_count || 0,
+            property.saves_count || 0,
+            property.inquiries_count || 0,
+
+            // Flags (2)
             property.is_featured ? 1 : 0,
             property.is_premium ? 1 : 0,
-            property.average_rating,
-            property.total_reviews,
-            property.tax_amount,
-            property.hoa_fees,
-            property.insurance_amount,
-            property.est_payment,
-            property.price_history,
-            property.tax_history,
-            property.nearby_schools,
-            property.floor_plans,
-            property.status_history,
-            property.published_at,
-            sellerUserId
+
+            // Financials (4) - REMOVED average_rating and total_reviews as they might be auto-calculated
+            property.tax_amount || 0,
+            property.hoa_fees || 0,
+            property.insurance_amount || 0,
+            property.est_payment || 0,
+
+            // Historical data (4)
+            property.price_history || '[]',
+            property.tax_history || '[]',
+            property.nearby_schools || '[]',
+            property.floor_plans || '[]',
+
+            // Timestamps (5)
+            property.published_at || new Date().toISOString().slice(0, 19).replace('T', ' '),
+            sellerUserId,
+            property.created_at || new Date().toISOString().slice(0, 19).replace('T', ' '),
+            property.updated_at || new Date().toISOString().slice(0, 19).replace('T', ' '),
+
+            // NULL for deleted_at
+            null
           ]
         );
-        
+
         const propertyId = result.insertId;
         propertyIdMap[i] = propertyId;
         insertedProperties++;
         console.log(`   ✅ Added property: "${property.title}" (ID: ${propertyId})`);
+
       } catch (err) {
-        console.error(`❌ Error inserting property "${property.title}":`, err.message);
-        if (err.sqlMessage) console.error(`   SQL Error: ${err.sqlMessage}`);
+        console.error(`   ❌ Error inserting property "${property.title}":`, err.message);
+        console.error(`   SQL Error: ${err.sqlMessage}`);
+        console.error(`   Error code: ${err.code}`);
+
+        // Try a simpler insert for debugging
+        console.log('   🔄 Trying simplified insert...');
+        try {
+          const [simpleResult] = await connection.execute(
+            `INSERT INTO properties 
+            (property_uuid, title, description, property_type, property_status,
+             address, city, state, country, price, currency, listing_type,
+             owner_user_id, created_by_user_id, created_at, updated_at) 
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [
+              property.property_uuid,
+              property.title,
+              property.description,
+              property.property_type,
+              property.property_status || 'active',
+              property.address,
+              property.city,
+              property.state,
+              property.country,
+              property.price,
+              property.currency || 'ETB',
+              property.listing_type,
+              sellerUserId,
+              sellerUserId,
+              property.created_at || new Date().toISOString().slice(0, 19).replace('T', ' '),
+              property.updated_at || new Date().toISOString().slice(0, 19).replace('T', ' ')
+            ]
+          );
+
+          const propertyId = simpleResult.insertId;
+          propertyIdMap[i] = propertyId;
+          insertedProperties++;
+          console.log(`   ✅ Added basic property: "${property.title}" (ID: ${propertyId})`);
+
+        } catch (simpleErr) {
+          console.error(`   ❌ Simple insert also failed: ${simpleErr.message}`);
+        }
       }
     }
 
     // =============================================
-    // STEP 4: INSERT PROPERTY IMAGES
+    // STEP 6: INSERT PROPERTY IMAGES
     // =============================================
     console.log('\n🖼️  Inserting property images...');
-    
+
     let insertedImages = 0;
     if (seedData.propertyImages && seedData.propertyImages.length > 0) {
+      console.log(`🔍 Found ${seedData.propertyImages.length} property images in seed data`);
+
       for (const image of seedData.propertyImages) {
         try {
-          const propertyId = propertyIdMap[image.property_id - 1];
+          // Get property ID from map (seed data uses 1-based index, but our map is 0-based)
+          const propertyIndex = image.property_id - 1;
+          const propertyId = propertyIdMap[propertyIndex];
+
           if (!propertyId) {
-            console.log(`   ⚠️  Skipping image - property ID ${image.property_id} not found`);
+            console.log(`   ⚠️  Skipping image - property ID ${image.property_id} not found in map`);
             continue;
           }
-          
+
           await connection.execute(
             `INSERT INTO property_images 
             (property_id, image_url, thumbnail_url, image_order, caption, 
@@ -275,96 +444,71 @@ async function populateDatabase() {
             [
               propertyId,
               image.image_url,
-              image.thumbnail_url,
-              image.image_order,
-              image.caption,
-              image.alt_text,
-              image.file_size,
-              image.mime_type,
-              image.width,
-              image.height,
+              image.thumbnail_url || image.image_url,
+              image.image_order || 0,
+              image.caption || '',
+              image.alt_text || '',
+              image.file_size || 0,
+              image.mime_type || 'image/jpeg',
+              image.width || 0,
+              image.height || 0,
               image.is_primary ? 1 : 0,
               sellerUserId
             ]
           );
           insertedImages++;
+          console.log(`   ✅ Added image ${insertedImages} for property ${propertyId}`);
         } catch (err) {
           console.error(`   ❌ Error inserting image: ${err.message}`);
         }
       }
+    } else {
+      console.log('   ⚠️  No propertyImages found in seed data');
     }
     console.log(`   ✅ Added ${insertedImages} property images`);
 
     // =============================================
-    // STEP 5: VERIFY DATA
+    // STEP 7: VERIFY DATA
     // =============================================
     console.log('\n📊 =============================================');
     console.log('✅ DATABASE POPULATION COMPLETE!');
     console.log('=============================================');
-    
+
     // Count records
     const [userCount] = await connection.execute('SELECT COUNT(*) as count FROM users');
+    const [brokerCount] = await connection.execute('SELECT COUNT(*) as count FROM broker_profiles');
+    const [availabilityCount] = await connection.execute('SELECT COUNT(*) as count FROM broker_availability');
     const [propertyCount] = await connection.execute('SELECT COUNT(*) as count FROM properties');
     const [imageCount] = await connection.execute('SELECT COUNT(*) as count FROM property_images');
-    
+
     console.log(`📈 Summary:`);
     console.log(`   👥 Users: ${userCount[0].count}`);
+    console.log(`   🤵 Broker Profiles: ${brokerCount[0].count}`);
+    console.log(`   📅 Broker Availability: ${availabilityCount[0].count}`);
     console.log(`   🏠 Properties: ${propertyCount[0].count}`);
     console.log(`   🖼️  Property Images: ${imageCount[0].count}`);
-    
-    // Check if properties have the new fields
-    if (propertyCount[0].count > 0) {
-      const [sampleProps] = await connection.execute(
-        `SELECT 
-          id, 
-          title,
-          price_history,
-          tax_history,
-          nearby_schools,
-          floor_plans,
-          status_history
-        FROM properties 
-        LIMIT 2`
+
+    // Show brokers
+    if (brokerCount[0].count > 0) {
+      const [brokers] = await connection.execute(
+        `SELECT bp.user_id, u.first_name, u.last_name, u.role, bp.broker_type, bp.is_verified 
+         FROM broker_profiles bp
+         JOIN users u ON bp.user_id = u.id`
       );
-      
-      console.log('\n🔍 Sample Properties Data Check:');
-      sampleProps.forEach((prop, idx) => {
-        console.log(`\n   Property ${idx + 1}: ${prop.title} (ID: ${prop.id})`);
-        
-        // Check if fields exist and have data
-        console.log(`      ✅ Price History: ${prop.price_history && prop.price_history !== '[]' ? '✓' : '✗'}`);
-        console.log(`      ✅ Tax History: ${prop.tax_history && prop.tax_history !== '[]' ? '✓' : '✗'}`);
-        console.log(`      ✅ Nearby Schools: ${prop.nearby_schools && prop.nearby_schools !== '[]' ? '✓' : '✗'}`);
-        console.log(`      ✅ Floor Plans: ${prop.floor_plans && prop.floor_plans !== '[]' ? '✓' : '✗'}`);
-        console.log(`      ✅ Status History: ${prop.status_history && prop.status_history !== '[]' ? '✓' : '✗'}`);
-        
-        // Parse to show counts
-        try {
-          if (prop.price_history) {
-            const parsed = JSON.parse(prop.price_history);
-            console.log(`         Price History entries: ${parsed.length}`);
-          }
-          if (prop.nearby_schools) {
-            const parsed = JSON.parse(prop.nearby_schools);
-            console.log(`         Nearby schools: ${parsed.length}`);
-          }
-        } catch (e) {
-          // Ignore parse errors
-        }
+
+      console.log('\n🔍 Brokers in database:');
+      brokers.forEach((broker, idx) => {
+        console.log(`   ${idx + 1}. ${broker.first_name} ${broker.last_name} (ID: ${broker.user_id})`);
+        console.log(`      Type: ${broker.broker_type}, Verified: ${broker.is_verified ? 'Yes' : 'No'}`);
       });
     }
-    
+
     console.log('\n🔗 Test your API endpoints:');
+    console.log('   🤵 Brokers: GET http://localhost:5000/api/brokers');
     console.log('   🌐 All Properties: GET http://localhost:5002/api/properties');
     console.log('   🔍 Single Property: GET http://localhost:5002/api/properties/1');
-    
-    console.log('\n💡 Your PropertyDetailsPopup should now show:');
-    console.log('   • Price History Charts');
-    console.log('   • Tax History Information');
-    console.log('   • Nearby Schools Data');
-    console.log('   • Floor Plans');
-    
-    console.log('\n🚀 Database is ready! Restart your backend if needed.');
+
+    console.log('\n🚀 Database is ready!');
 
   } catch (error) {
     console.error('\n❌ CRITICAL ERROR:', error.message);

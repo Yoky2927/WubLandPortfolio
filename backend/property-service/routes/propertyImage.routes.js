@@ -1,4 +1,4 @@
-// routes/propertyImage.routes.js - UPDATED VERSION
+// backend/property-service/routes/propertyImage.routes.js - FIXED
 import express from 'express';
 import multer from 'multer';
 import path from 'path';
@@ -7,6 +7,8 @@ import { checkRole, canManageProperty } from '../middlewares/role.middleware.js'
 import PropertyImageController from '../controllers/propertyImage.controller.js';
 
 const router = express.Router();
+
+console.log('✅ propertyImage.routes.js loading...');
 
 // Configure multer storage
 const storage = multer.diskStorage({
@@ -32,7 +34,7 @@ const imageFileFilter = (req, file, cb) => {
   }
 };
 
-// File filter for floor plans (allow PDF and SVG too)
+// File filter for floor plans
 const floorPlanFileFilter = (req, file, cb) => {
   const allowedTypes = /jpeg|jpg|png|gif|webp|svg|pdf/;
   const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
@@ -49,40 +51,36 @@ const floorPlanFileFilter = (req, file, cb) => {
 const imageUpload = multer({ 
   storage, 
   fileFilter: imageFileFilter,
-  limits: { fileSize: 10 * 1024 * 1024 } // 10MB limit
+  limits: { fileSize: 10 * 1024 * 1024 }
 });
 
 const floorPlanUpload = multer({ 
   storage, 
   fileFilter: floorPlanFileFilter,
-  limits: { fileSize: 5 * 1024 * 1024 } // 5MB limit
+  limits: { fileSize: 5 * 1024 * 1024 }
 });
 
-// Get property images
-router.get('/property/:id', authenticate, async (req, res) => {
-  try {
-    const { id } = req.params;
-    const images = await PropertyImageController.getPropertyImages(id);
-    res.json({
-      success: true,
-      data: images
-    });
-  } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
+// ========== PUBLIC ROUTES (NO AUTH) ==========
 
-// Upload property images (multiple)
+// Get property images - PUBLIC
+router.get('/property/:id', PropertyImageController.getPropertyImages);
+
+// Get floor plans - PUBLIC  
+router.get('/property/:id/floor-plans', PropertyImageController.getFloorPlans);
+
+// ========== PROTECTED ROUTES (REQUIRE AUTH) ==========
+
+// Upload property images - PROTECTED
 router.post(
   '/property/:id/upload', 
-  authenticate, 
+  authenticate,
   checkRole(['internal_broker', 'external_broker', 'admin', 'seller', 'landlord']),
   canManageProperty,
-  imageUpload.array('images', 20), // Allow up to 20 images
+  imageUpload.array('images', 20),
   PropertyImageController.uploadImages
 );
 
-// Upload floor plan
+// Upload floor plan - PROTECTED
 router.post(
   '/property/:id/floor-plan',
   authenticate,
@@ -92,82 +90,48 @@ router.post(
   PropertyImageController.uploadFloorPlan
 );
 
-// Delete property image
+// Delete property image - PROTECTED
 router.delete(
   '/:imageId',
   authenticate,
   checkRole(['internal_broker', 'external_broker', 'admin', 'seller', 'landlord']),
-  async (req, res) => {
+  async (req, res, next) => {
     try {
-      const { imageId } = req.params;
       const { propertyId } = req.body;
-      
       if (!propertyId) {
         return res.status(400).json({ 
           success: false, 
           error: 'Property ID is required' 
         });
       }
-      
-      // Verify user can manage this property
-      await canManageProperty(req, res, async () => {
-        const result = await PropertyImageController.deleteImage(imageId, req.user.id, propertyId);
-        res.json({
-          success: true,
-          message: 'Image deleted successfully',
-          data: result
-        });
-      });
+      await PropertyImageController.deleteImage(req, res, next);
     } catch (error) {
-      res.status(500).json({ success: false, error: error.message });
+      next(error);
     }
   }
 );
 
-// Set primary image
+// Set primary image - PROTECTED
 router.patch(
   '/:imageId/set-primary',
   authenticate,
   checkRole(['internal_broker', 'external_broker', 'admin', 'seller', 'landlord']),
-  async (req, res) => {
+  async (req, res, next) => {
     try {
-      const { imageId } = req.params;
       const { propertyId } = req.body;
-      
       if (!propertyId) {
         return res.status(400).json({ 
           success: false, 
           error: 'Property ID is required' 
         });
       }
-      
-      // Verify user can manage this property
-      await canManageProperty(req, res, async () => {
-        const result = await PropertyImageController.setPrimaryImage(imageId, propertyId);
-        res.json({
-          success: true,
-          message: 'Primary image set successfully',
-          data: result
-        });
-      });
+      await PropertyImageController.setPrimaryImage(req, res, next);
     } catch (error) {
-      res.status(500).json({ success: false, error: error.message });
+      next(error);
     }
   }
 );
 
-// Get floor plans
-router.get('/property/:id/floor-plans', authenticate, async (req, res) => {
-  try {
-    const { id } = req.params;
-    const floorPlans = await PropertyImageController.getFloorPlans(id);
-    res.json({
-      success: true,
-      data: floorPlans
-    });
-  } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
+console.log('✅ propertyImage.routes.js loaded successfully');
 
 export default router;

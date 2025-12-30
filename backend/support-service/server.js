@@ -5,6 +5,7 @@ import { Server } from "socket.io";
 import http from "http";
 import fileUpload from "express-fileupload";
 import axios from "axios";
+import { ApiDocs, createHealthCheck } from '../shared/api-docs.js';
 
 // Import middleware
 import { authenticateToken, requireSupportAgent } from "./middleware/auth.middleware.js";
@@ -61,6 +62,19 @@ app.use(fileUpload({
   createParentPath: true,
   limits: { fileSize: 10 * 1024 * 1024 }
 }));
+
+const supportEndpoints = [
+  ApiDocs.createRoute('GET', '/api/support/tickets', 'Get support tickets', true, ['support_agent', 'admin']),
+  ApiDocs.createRoute('POST', '/api/support/tickets', 'Create ticket', true),
+  // Add more
+];
+
+app.get('/api-docs', (req, res) => {
+  res.json(ApiDocs.generateDocs('support', supportEndpoints));
+});
+
+// Update health endpoint
+app.get('/health', createHealthCheck('support'));
 
 // Make services available to routes
 app.use((req, res, next) => {

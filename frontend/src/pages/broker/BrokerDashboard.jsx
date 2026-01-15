@@ -40,6 +40,22 @@ import {
   UserX,
   Edit,
   Trash2,
+  File,
+  Folder,
+  Download,
+  Printer,
+  Send,
+  Share2,
+  Copy,
+  FileCheck,
+  FileX,
+  Lock,
+  Archive,
+  Landmark,
+  Briefcase,
+  User,
+  Signature,
+  Camera,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useTheme } from "../../contexts/ThemeContext";
@@ -47,6 +63,7 @@ import ErrorBoundary from "../../components/ErrorBoundary";
 import PropertyDetailsModal from "../../components/PropertyDetailsModal";
 import CreatePropertyForm from "../../components/CreatePropertyForm";
 import BrokerRequestsList from "../../components/BrokerRequestsList";
+import BrokerProfessionalTools from "../../components/BrokerProfessionalTools";
 
 // Lazy load components with correct paths
 const BrokerPropertiesList = lazy(() =>
@@ -56,6 +73,7 @@ const BrokerTransactions = lazy(() =>
   import("../../components/BrokerTransactions")
 );
 const BrokerAnalytics = lazy(() => import("../../components/BrokerAnalytics"));
+const BrokerDocuments = lazy(() => import("../../components/BrokerDocuments"));
 const Loader = lazy(() => import("../../components/Loader"));
 const ProfileAvatar = lazy(() => import("../../components/ProfileAvatar"));
 const StaticProfileAvatar = lazy(() =>
@@ -74,7 +92,7 @@ const EditPropertyForm = lazy(() => import("../../components/EditPropertyForm"))
 // Import services
 import { httpClient } from "../../services/http.service";
 import socketService from "../../services/socket.service";
-import { API_CONFIG } from "../../config/api.config";
+import API_CONFIG from "../../config/api.config";
 
 const BrokerDashboard = ({ isInternal = true }) => {
   const { theme, toggleTheme } = useTheme();
@@ -92,6 +110,8 @@ const BrokerDashboard = ({ isInternal = true }) => {
   const [requestCount, setRequestCount] = useState(0);
   const [showEditPropertyForm, setShowEditPropertyForm] = useState(false);
   const [propertyToEdit, setPropertyToEdit] = useState(null);
+  const [showProfessionalTools, setShowProfessionalTools] = useState(false);
+  const [selectedRequestForTools, setSelectedRequestForTools] = useState(null);
   const [brokerStats, setBrokerStats] = useState({
     totalListings: 0,
     pendingReviews: 0,
@@ -104,6 +124,9 @@ const BrokerDashboard = ({ isInternal = true }) => {
     totalTransactions: 0,
     completedTransactions: 0,
     pendingTransactions: 0,
+    totalDocuments: 0,
+    signedContracts: 0,
+    pendingDocuments: 0,
   });
 
   const [toast, setToast] = useState({
@@ -154,7 +177,7 @@ const BrokerDashboard = ({ isInternal = true }) => {
         updatedProperty
       );
 
-      if (response.data.success) {
+      if (response.success || response.data?.success) {
         setShowEditPropertyForm(false);
         setToast({
           show: true,
@@ -190,7 +213,7 @@ const BrokerDashboard = ({ isInternal = true }) => {
         }
       );
 
-      if (response.data.success) {
+      if (response.success || response.data?.success) {
         setToast({
           show: true,
           message: "Images uploaded successfully",
@@ -215,7 +238,7 @@ const BrokerDashboard = ({ isInternal = true }) => {
         propertyData
       );
 
-      if (response.data.success) {
+      if (response.success || response.data?.success) {
         setToast({
           show: true,
           message: "Property created successfully",
@@ -244,16 +267,20 @@ const BrokerDashboard = ({ isInternal = true }) => {
           API_CONFIG.getUrl("GET_BROKER_LISTINGS")
         );
 
-        if (response.data?.success) {
+        if (response.success || response.data?.success) {
           let properties = [];
-          if (response.data.data?.properties) {
+          if (response.data?.properties) {
+            properties = response.data.properties;
+          } else if (response.data?.data?.properties) {
             properties = response.data.data.properties;
-          } else if (Array.isArray(response.data.data)) {
+          } else if (Array.isArray(response.data)) {
+            properties = response.data;
+          } else if (Array.isArray(response.data?.data)) {
             properties = response.data.data;
           }
 
-          setBrokerProperties(properties);
-          calculateBrokerStatsFromProperties(properties);
+          setBrokerProperties(properties || []);
+          calculateBrokerStatsFromProperties(properties || []);
         }
       } catch (error) {
         console.error("Error fetching properties:", error);
@@ -266,14 +293,32 @@ const BrokerDashboard = ({ isInternal = true }) => {
           API_CONFIG.getUrl("BROKER_STATS", { brokerId })
         );
 
-        if (statsResponse.data?.success) {
+        if (statsResponse.success || statsResponse.data?.success) {
           setBrokerStats((prev) => ({
             ...prev,
-            ...statsResponse.data.data,
+            ...(statsResponse.data || statsResponse),
           }));
         }
       } catch (error) {
         console.warn("Could not fetch broker stats:", error.message);
+      }
+
+      // Fetch document stats
+      try {
+        const docsResponse = await httpClient.get(
+          API_CONFIG.getUrl("GET_BROKER_DOCUMENT_STATS", { brokerId })
+        );
+
+        if (docsResponse.success || docsResponse.data?.success) {
+          setBrokerStats((prev) => ({
+            ...prev,
+            totalDocuments: docsResponse.data?.total_documents || 0,
+            signedContracts: docsResponse.data?.signed_contracts || 0,
+            pendingDocuments: docsResponse.data?.pending_documents || 0,
+          }));
+        }
+      } catch (error) {
+        console.warn("Could not fetch document stats:", error.message);
       }
 
       // Fetch requests
@@ -296,10 +341,11 @@ const BrokerDashboard = ({ isInternal = true }) => {
       const response = await httpClient.get(
         API_CONFIG.getUrl("GET_BROKER_REQUESTS")
       );
-      if (response.data.success) {
-        setRequests(response.data.data);
+      if (response.success || response.data?.success) {
+        const requestsData = response.data || response.data?.data || [];
+        setRequests(requestsData);
         setRequestCount(
-          response.data.data.filter((r) => r.status === "pending").length
+          requestsData.filter((r) => r.status === "pending").length
         );
       }
     } catch (error) {
@@ -329,7 +375,7 @@ const BrokerDashboard = ({ isInternal = true }) => {
         const status = p.property_status || p.status || "";
         return status === "rejected" || status === "inactive";
       }).length,
-      totalRevenue: properties.reduce((sum, p) => sum + (p.price || 0), 0),
+      totalRevenue: properties.reduce((sum, p) => sum + (parseFloat(p.price) || 0), 0),
     };
 
     setBrokerStats((prev) => ({
@@ -346,14 +392,14 @@ const BrokerDashboard = ({ isInternal = true }) => {
         { action, notes }
       );
 
-      if (response.data.success) {
+      if (response.success || response.data?.success) {
         // Update local state
         setBrokerProperties((prev) =>
           prev.map((property) =>
             property.id === propertyId
               ? {
                   ...property,
-                  property_status: response.data.data.property_status,
+                  property_status: (response.data || response).property_status,
                 }
               : property
           )
@@ -396,7 +442,7 @@ const BrokerDashboard = ({ isInternal = true }) => {
         { brokerId: user?.id }
       );
 
-      if (response.data.success) {
+      if (response.success || response.data?.success) {
         setToast({
           show: true,
           message: "Request accepted successfully",
@@ -421,7 +467,7 @@ const BrokerDashboard = ({ isInternal = true }) => {
         API_CONFIG.getUrl("REJECT_PROPERTY_REQUEST", { requestId })
       );
 
-      if (response.data.success) {
+      if (response.success || response.data?.success) {
         setToast({
           show: true,
           message: "Request rejected",
@@ -438,6 +484,12 @@ const BrokerDashboard = ({ isInternal = true }) => {
         type: "error",
       });
     }
+  };
+
+  // Handle starting professional tools for a request
+  const handleStartProfessionalTools = (request) => {
+    setSelectedRequestForTools(request);
+    setShowProfessionalTools(true);
   };
 
   const handleMessageClient = (clientId) => {
@@ -474,21 +526,23 @@ const BrokerDashboard = ({ isInternal = true }) => {
           return;
         }
 
-        const response = await apiCall('CHECK_AUTH');
+        const response = await httpClient.get(
+          API_CONFIG.getUrl("CHECK_AUTH")
+        );
 
         // Check if user is a broker
-        const userRole = response.data.role;
+        const userRole = response.data?.role || response.role;
         if (!userRole || !userRole.includes("broker")) {
           navigate("/unauthorized");
           return;
         }
 
-        setUser(response.data);
-        await fetchBrokerDashboardData(response.data.id);
+        setUser(response.data || response);
+        await fetchBrokerDashboardData((response.data || response).id);
 
         // Set up WebSocket connection
         try {
-          socketService.connect(response.data.id, {
+          socketService.connect((response.data || response).id, {
             timeout: 10000,
             retry: true,
             retryDelay: 3000,
@@ -500,23 +554,34 @@ const BrokerDashboard = ({ isInternal = true }) => {
               message: `New listing assigned: ${data.propertyTitle}`,
               type: "info",
             });
-            fetchBrokerDashboardData(response.data.id);
+            fetchBrokerDashboardData((response.data || response).id);
             setNotificationCount((prev) => prev + 1);
           });
 
           socketService.addListener("property_status_changed", (data) => {
-            if (data.brokerId === response.data.id) {
+            if (data.brokerId === (response.data || response).id) {
               setToast({
                 show: true,
                 message: `Property ${data.propertyTitle} status updated to ${data.newStatus}`,
                 type: "info",
               });
-              fetchBrokerDashboardData(response.data.id);
+              fetchBrokerDashboardData((response.data || response).id);
             }
           });
 
           socketService.addListener("new_message", () => {
             setNotificationCount((prev) => prev + 1);
+          });
+
+          socketService.addListener("new_document_uploaded", (data) => {
+            if (data.brokerId === (response.data || response).id) {
+              setToast({
+                show: true,
+                message: `New document uploaded: ${data.documentTitle}`,
+                type: "info",
+              });
+              fetchBrokerDashboardData((response.data || response).id);
+            }
           });
         } catch (socketError) {
           console.warn("WebSocket connection failed:", socketError.message);
@@ -594,6 +659,7 @@ const BrokerDashboard = ({ isInternal = true }) => {
             onAcceptRequest={handleAcceptRequest}
             onRejectRequest={handleRejectRequest}
             onMessageClient={handleMessageClient}
+            onStartProfessionalTools={handleStartProfessionalTools}
           />
         );
       case "transactions":
@@ -621,6 +687,40 @@ const BrokerDashboard = ({ isInternal = true }) => {
               brokerId={user?.id}
             />
           </Suspense>
+        );
+      case "documents":
+        return (
+          <Suspense
+            fallback={
+              <div className="h-96 bg-gray-200 dark:bg-gray-700 rounded-xl animate-pulse" />
+            }
+          >
+            <BrokerDocuments
+              brokerId={user?.id}
+              theme={theme}
+              user={user}
+            />
+          </Suspense>
+        );
+      case "chat":
+        return (
+          <div className="p-6">
+            <h2 className="text-2xl font-bold mb-4">Messages</h2>
+            <p className="text-gray-500">Chat feature is integrated with the main chat system.</p>
+            <button
+              onClick={() => navigate("/chat")}
+              className="mt-4 px-4 py-2 bg-amber-400 hover:bg-amber-500 text-black rounded-lg"
+            >
+              Open Chat
+            </button>
+          </div>
+        );
+      case "settings":
+        return (
+          <div className="p-6">
+            <h2 className="text-2xl font-bold mb-4">Settings</h2>
+            <p className="text-gray-500">Broker settings coming soon.</p>
+          </div>
         );
       default:
         return (
@@ -734,7 +834,7 @@ const BrokerDashboard = ({ isInternal = true }) => {
                 {isInternal ? "Internal Broker" : "External Broker"}
               </p>
               <p className="text-xs text-gray-500 mt-1">
-                Response Rate: {brokerStats.responseRate}%
+                Documents: {brokerStats.signedContracts} signed
               </p>
             </div>
           </div>
@@ -764,7 +864,12 @@ const BrokerDashboard = ({ isInternal = true }) => {
                 },
                 { id: "analytics", label: "Analytics", icon: BarChart3 },
                 { id: "chat", label: "Messages", icon: MessageSquare },
-                { id: "documents", label: "Documents", icon: FileText },
+                {
+                  id: "documents",
+                  label: "Document Vault",
+                  icon: FileText,
+                  badge: brokerStats.pendingDocuments,
+                },
                 { id: "settings", label: "Settings", icon: Settings },
               ].map((item) => (
                 <button
@@ -883,6 +988,12 @@ const BrokerDashboard = ({ isInternal = true }) => {
                     ? "Analytics Dashboard"
                     : activeTab === "transactions"
                     ? "Transaction Management"
+                    : activeTab === "documents"
+                    ? "Document Vault"
+                    : activeTab === "chat"
+                    ? "Messages"
+                    : activeTab === "settings"
+                    ? "Settings"
                     : activeTab.charAt(0).toUpperCase() + activeTab.slice(1)}
                 </h1>
 
@@ -893,7 +1004,7 @@ const BrokerDashboard = ({ isInternal = true }) => {
                       {brokerStats.totalListings}
                     </div>
                     <div className="text-xs text-gray-300 dark:text-gray-400">
-                      Total Listings
+                      Listings
                     </div>
                   </div>
                   <div className="text-center backdrop-blur-sm bg-white/10 dark:bg-gray-800/20 rounded-lg px-4 py-2">
@@ -906,14 +1017,10 @@ const BrokerDashboard = ({ isInternal = true }) => {
                   </div>
                   <div className="text-center backdrop-blur-sm bg-white/10 dark:bg-gray-800/20 rounded-lg px-4 py-2">
                     <div className="font-bold text-lg text-white dark:text-gray-100">
-                      {brokerStats.totalRevenue.toLocaleString("en-ET", {
-                        style: "currency",
-                        currency: "ETB",
-                        minimumFractionDigits: 0,
-                      })}
+                      {brokerStats.signedContracts}
                     </div>
                     <div className="text-xs text-gray-300 dark:text-gray-400">
-                      Revenue
+                      Signed
                     </div>
                   </div>
                 </div>
@@ -1030,6 +1137,56 @@ const BrokerDashboard = ({ isInternal = true }) => {
             theme={theme}
             brokerId={user?.id}
           />
+        )}
+
+        {/* Professional Tools Modal */}
+        {showProfessionalTools && selectedRequestForTools && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className={`rounded-xl max-w-6xl w-full max-h-[90vh] overflow-auto ${
+              theme === "dark" ? "bg-gray-800" : "bg-white"
+            }`}>
+              <div className="p-6">
+                <div className="flex justify-between items-center mb-6">
+                  <div>
+                    <h2 className="text-2xl font-bold">Professional Tools</h2>
+                    <p className="text-gray-500">
+                      Complete Ethiopian property agreement for request #{selectedRequestForTools.id}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => {
+                      setShowProfessionalTools(false);
+                      setSelectedRequestForTools(null);
+                    }}
+                    className="p-2 hover:bg-gray-200 dark:hover:bg-gray-700 rounded"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+                
+                <BrokerProfessionalTools
+                  brokerId={user?.id}
+                  propertyRequestId={selectedRequestForTools.id}
+                  onComplete={() => {
+                    setShowProfessionalTools(false);
+                    setSelectedRequestForTools(null);
+                    fetchBrokerDashboardData(user.id);
+                    setToast({
+                      show: true,
+                      message: "Property agreement completed successfully!",
+                      type: "success",
+                    });
+                  }}
+                  clientData={{
+                    name: selectedRequestForTools.client_name,
+                    phone: selectedRequestForTools.client_phone,
+                    email: selectedRequestForTools.client_email,
+                    id: selectedRequestForTools.client_id,
+                  }}
+                />
+              </div>
+            </div>
+          </div>
         )}
 
         {/* Notifications Panel */}

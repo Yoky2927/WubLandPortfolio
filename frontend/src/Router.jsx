@@ -18,6 +18,8 @@ import SuperAdminDashboard from "./pages/admin/SuperAdminDashboard.jsx";
 import MaintenancePage from "./components/MaintenancePage";
 import InternalBrokerDashboard from "./pages/broker/InternalBrokerDashboard.jsx";
 import ExternalBrokerDashboard from "./pages/broker/ExternalBrokerDashboard.jsx";
+// Add this import at the top of Router.jsx
+import BuyerRenter from "./pages/public/BuyerRenter.jsx";
 
 // Import hooks
 import { useEffect } from "react";
@@ -99,6 +101,16 @@ const ProtectedRoute = ({ children, requiredRole = null, allowedRoles = [] }) =>
   try {
     const payload = JSON.parse(atob(token.split(".")[1]));
     userRole = payload.role;
+
+    // 🚨 IMPORTANT: Check if password change is required
+    if (payload.requiresPasswordChange) {
+      console.log("🔴 ProtectedRoute - Password change required, redirecting to login");
+      // Clear the token and redirect to login to show password change popup
+      localStorage.removeItem("token");
+      localStorage.removeItem("user");
+      return <Navigate to="/login-register" replace />;
+    }
+
     console.log("🔐 ProtectedRoute - User role from token:", userRole);
   } catch (error) {
     console.error("❌ Error decoding token:", error);
@@ -127,6 +139,8 @@ const ProtectedRoute = ({ children, requiredRole = null, allowedRoles = [] }) =>
 };
 
 // Role-Based Route - Automatically redirects to correct dashboard
+// In Router.jsx - Update RoleBasedRoute component
+
 const RoleBasedRoute = ({ children }) => {
   const token = localStorage.getItem("token");
 
@@ -138,9 +152,17 @@ const RoleBasedRoute = ({ children }) => {
     const payload = JSON.parse(atob(token.split(".")[1]));
     const userRole = payload.role;
 
+    // 🚨 IMPORTANT: Check if password change is required
+    if (payload.requiresPasswordChange) {
+      console.log("🔴 RoleBasedRoute - Password change required, redirecting to login");
+      // Clear the token and redirect to login to show password change popup
+      localStorage.removeItem("token");
+      localStorage.removeItem("user");
+      return <Navigate to="/login-register" replace />;
+    }
+
     console.log("🔄 RoleBasedRoute - User role:", userRole);
 
-    // Redirect based on role
     switch (userRole) {
       case "super_admin":
         return <Navigate to="/super-admin-dashboard" replace />;
@@ -157,6 +179,9 @@ const RoleBasedRoute = ({ children }) => {
       case "seller":
       case "leaser":
         return <Navigate to="/seller-leaser" replace />;
+      case "buyer":
+      case "renter":
+        return <Navigate to="/buyer-renter" replace />;
       default:
         return <Navigate to="/user-dashboard" replace />;
     }
@@ -316,6 +341,16 @@ function Router() {
                   </PublicRoute>
                 }
               />
+              <Route
+                path="/buyer-renter"
+                element={
+                  <ProtectedRoute allowedRoles={["buyer", "renter", "user"]}>
+                    <MaintenanceWrapper>
+                      <BuyerRenter />
+                    </MaintenanceWrapper>
+                  </ProtectedRoute>
+                }
+              />
             </Route>
 
             {/* Debug Route - Always accessible */}
@@ -452,7 +487,7 @@ function Router() {
                     >
                       Test Analysis Service Health
                     </button>
-                    
+
                     <button
                       onClick={async () => {
                         try {
@@ -468,7 +503,7 @@ function Router() {
                     >
                       Test Dashboard Analytics
                     </button>
-                    
+
                     <button
                       onClick={async () => {
                         try {

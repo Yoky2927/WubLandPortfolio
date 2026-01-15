@@ -54,8 +54,8 @@ import {
 import PropertyDetailsModal from "./PropertyDetailsModal";
 import CreatePropertyForm from "./CreatePropertyForm";
 import EditPropertyForm from "./EditPropertyForm";
-import { apiCall } from "../utils/api.endpoints";
-import { apiClient } from "../utils/api.client";
+import { apiCall } from "../utils/api.endpoints.js";
+import { apiClient } from "../utils/api.client.js";
 
 const BrokerPropertiesList = ({
   theme,

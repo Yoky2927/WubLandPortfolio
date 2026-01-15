@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { Ruler } from "lucide-react";
-import PropertyDetailsPopup from "./PropertyDetailsPopup";
+import PropertyDetailsModal from "./PropertyDetailsModal";
 
 const BestChoiceSection = ({ theme, brokers = [] }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -615,7 +615,7 @@ const BestChoiceSection = ({ theme, brokers = [] }) => {
       </div>
 
       {/* Property Details Popup */}
-      <PropertyDetailsPopup
+      <PropertyDetailsModal
         property={selectedProperty}
         isOpen={isPopupOpen}
         onClose={() => setIsPopupOpen(false)}

@@ -22,6 +22,7 @@
     "axios": "^1.11.0",
     "chart.js": "^4.5.0",
     "chartjs-plugin-datalabels": "^2.2.0",
+    "date-fns": "^4.1.0",
     "emoji-picker-react": "^4.13.3",
     "leaflet": "^1.9.4",
     "lodash": "^4.17.21",

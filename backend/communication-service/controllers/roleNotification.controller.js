@@ -9,7 +9,7 @@ const VALID_ROLES = [
 
 // List of valid notification types from your database schema
 const VALID_NOTIFICATION_TYPES = [
-  'info', 'success', 'warning', 'error', 'system', 
+  'info', 'success', 'warning', 'error', 'system',
   'transaction', 'property', 'message', 'appointment', 'reminder'
 ];
 
@@ -149,7 +149,7 @@ class RoleNotificationController {
       req.body.notificationData = req.body.notificationData || {};
       req.body.notificationData.type = 'system';
       req.body.notificationData.priority = 'high';
-      
+
       const result = await RoleNotifications.sendSecurityAlert(req.body);
       res.json({ success: true, ...result });
     } catch (error) {
@@ -163,7 +163,7 @@ class RoleNotificationController {
       // Set default type for broker applications
       req.body.notificationData = req.body.notificationData || {};
       req.body.notificationData.type = 'info';
-      
+
       const result = await RoleNotifications.notifyNewBrokerApplication(req.body);
       res.json({ success: true, ...result });
     } catch (error) {
@@ -177,7 +177,7 @@ class RoleNotificationController {
       // Set default type for content flags
       req.body.notificationData = req.body.notificationData || {};
       req.body.notificationData.type = 'warning';
-      
+
       const result = await RoleNotifications.notifyContentFlag(req.body);
       res.json({ success: true, ...result });
     } catch (error) {
@@ -191,7 +191,7 @@ class RoleNotificationController {
       // Set default type for payment issues
       req.body.notificationData = req.body.notificationData || {};
       req.body.notificationData.type = 'error';
-      
+
       const result = await RoleNotifications.notifyPaymentIssue(req.body);
       res.json({ success: true, ...result });
     } catch (error) {
@@ -205,7 +205,7 @@ class RoleNotificationController {
       // Set default type for support tickets
       req.body.notificationData = req.body.notificationData || {};
       req.body.notificationData.type = 'info';
-      
+
       const result = await RoleNotifications.notifyNewSupportTicket(req.body);
       res.json({ success: true, ...result });
     } catch (error) {

@@ -90,26 +90,26 @@ class PropertyModel {
         year_built: parseInt(propertyData.year_built) || null,
         is_negotiable:
           propertyData.is_negotiable === true ||
-          propertyData.is_negotiable === "true" ||
-          propertyData.is_negotiable === 1
+            propertyData.is_negotiable === "true" ||
+            propertyData.is_negotiable === 1
             ? 1
             : 0,
         is_exclusive:
           propertyData.is_exclusive === true ||
-          propertyData.is_exclusive === "true" ||
-          propertyData.is_exclusive === 1
+            propertyData.is_exclusive === "true" ||
+            propertyData.is_exclusive === 1
             ? 1
             : 0,
         is_featured:
           propertyData.is_featured === true ||
-          propertyData.is_featured === "true" ||
-          propertyData.is_featured === 1
+            propertyData.is_featured === "true" ||
+            propertyData.is_featured === 1
             ? 1
             : 0,
         is_premium:
           propertyData.is_premium === true ||
-          propertyData.is_premium === "true" ||
-          propertyData.is_premium === 1
+            propertyData.is_premium === "true" ||
+            propertyData.is_premium === 1
             ? 1
             : 0,
         owner_user_id: parseInt(propertyData.owner_user_id) || 1,
@@ -1260,7 +1260,7 @@ class PropertyModel {
       connection.release();
     }
   }
- async getAdminStats() {
+  async getAdminStats() {
     const connection = await pool.getConnection();
     try {
       const query = `
@@ -1370,19 +1370,19 @@ class PropertyModel {
     const connection = await pool.getConnection();
     try {
       await connection.beginTransaction();
-      
+
       // Delete related images first
       await connection.execute(
         'DELETE FROM property_images WHERE property_id = ?',
         [id]
       );
-      
+
       // Delete the property
       const [result] = await connection.execute(
         'DELETE FROM properties WHERE id = ?',
         [id]
       );
-      
+
       await connection.commit();
       return result.affectedRows > 0;
     } catch (error) {
@@ -1405,6 +1405,404 @@ class PropertyModel {
       return result.affectedRows > 0;
     } catch (error) {
       console.error("Error restoring property:", error);
+      throw error;
+    } finally {
+      connection.release();
+    }
+  }
+  // ========== BUYER/RENTER METHODS ==========
+
+  // Save/unsave property for user
+  async toggleSave(propertyId, userId, save = true) {
+    const connection = await pool.getConnection();
+
+    try {
+      await connection.beginTransaction();
+
+      // Get current saved_by_users and saves_count
+      const [result] = await connection.execute(
+        'SELECT saved_by_users, saves_count FROM properties WHERE id = ?',
+        [propertyId]
+      );
+
+      if (result.length === 0) {
+        throw new Error('Property not found');
+      }
+
+      let savedByUsers = safeJsonParse(result[0].saved_by_users, []);
+      let savesCount = result[0].saves_count || 0;
+
+      console.log(`🔍 Current saves for property ${propertyId}:`, {
+        savedByUsers,
+        savesCount,
+        userId,
+        action: save ? 'save' : 'unsave'
+      });
+
+      if (save) {
+        // Add user to saved list if not already there
+        if (!savedByUsers.includes(userId)) {
+          savedByUsers.push(userId);
+          savesCount++;
+
+          await connection.execute(
+            'UPDATE properties SET saved_by_users = ?, saves_count = ? WHERE id = ?',
+            [JSON.stringify(savedByUsers), savesCount, propertyId]
+          );
+
+          await connection.commit();
+          console.log(`✅ Property ${propertyId} saved by user ${userId}. Total saves: ${savesCount}`);
+          return { success: true, action: 'saved', savesCount };
+        }
+        console.log(`ℹ️ Property ${propertyId} already saved by user ${userId}`);
+        return { success: false, message: 'Already saved', savesCount };
+      } else {
+        // Remove user from saved list
+        const index = savedByUsers.indexOf(userId);
+        if (index > -1) {
+          savedByUsers.splice(index, 1);
+          savesCount = Math.max(0, savesCount - 1);
+
+          await connection.execute(
+            'UPDATE properties SET saved_by_users = ?, saves_count = ? WHERE id = ?',
+            [JSON.stringify(savedByUsers), savesCount, propertyId]
+          );
+
+          await connection.commit();
+          console.log(`✅ Property ${propertyId} unsaved by user ${userId}. Total saves: ${savesCount}`);
+          return { success: true, action: 'unsaved', savesCount };
+        }
+        console.log(`ℹ️ Property ${propertyId} not saved by user ${userId}`);
+        return { success: false, message: 'Not saved yet', savesCount };
+      }
+
+    } catch (error) {
+      await connection.rollback();
+      console.error('❌ Error in toggleSave:', error);
+      throw error;
+    } finally {
+      connection.release();
+    }
+  }
+
+  // Check if property is saved by user
+  async isSavedByUser(propertyId, userId) {
+    const connection = await pool.getConnection();
+
+    try {
+      const [result] = await connection.execute(
+        'SELECT saved_by_users FROM properties WHERE id = ?',
+        [propertyId]
+      );
+
+      if (result.length === 0) return false;
+
+      const savedByUsers = safeJsonParse(result[0].saved_by_users, []);
+      return savedByUsers.includes(userId);
+
+    } catch (error) {
+      throw error;
+    } finally {
+      connection.release();
+    }
+  }
+
+  // Get user's saved properties
+  async getSavedProperties(userId, page = 1, limit = 20) {
+    const connection = await pool.getConnection();
+
+    try {
+      // Using JSON_CONTAINS to find properties saved by this user
+      const query = `
+        SELECT p.*, 
+          u.username as owner_username,
+          u.email as owner_email,
+          TRUE as is_saved
+        FROM properties p
+        LEFT JOIN users u ON p.owner_user_id = u.id
+        WHERE JSON_CONTAINS(p.saved_by_users, ?)
+          AND p.deleted_at IS NULL
+          AND p.property_status = 'active'
+        ORDER BY p.updated_at DESC
+        LIMIT ? OFFSET ?
+      `;
+
+      const offset = (page - 1) * limit;
+
+      const [properties] = await connection.execute(query, [
+        JSON.stringify([userId]),
+        limit,
+        offset
+      ]);
+
+      // Count total
+      const [countResult] = await connection.execute(
+        `SELECT COUNT(*) as total FROM properties 
+         WHERE JSON_CONTAINS(saved_by_users, ?) 
+           AND deleted_at IS NULL 
+           AND property_status = 'active'`,
+        [JSON.stringify([userId])]
+      );
+
+      const total = countResult[0].total;
+
+      // Parse JSON fields
+      const parsedProperties = properties.map((property) => ({
+        ...property,
+        features: safeJsonParse(property.features, []),
+        amenities: safeJsonParse(property.amenities, []),
+        property_tags: safeJsonParse(property.property_tags, []),
+        saved_by_users: safeJsonParse(property.saved_by_users, []),
+        square_meters: property.sqft || 0,
+      }));
+
+      return {
+        properties: parsedProperties,
+        pagination: {
+          page: parseInt(page),
+          limit: parseInt(limit),
+          total,
+          pages: Math.ceil(total / limit),
+        },
+      };
+
+    } catch (error) {
+      console.error("Error getting saved properties:", error);
+      throw error;
+    } finally {
+      connection.release();
+    }
+  }
+
+  // Get recommended properties for user
+  async getRecommendedProperties(userId, limit = 6) {
+    const connection = await pool.getConnection();
+
+    try {
+      // First, get user preferences
+      const userQuery = `
+        SELECT 
+          preferred_regions,
+          preferred_cities,
+          budget_min,
+          budget_max,
+          property_type,
+          bedrooms,
+          bathrooms,
+          currency
+        FROM users 
+        WHERE id = ?
+      `;
+
+      const [userRows] = await connection.execute(userQuery, [userId]);
+
+      if (userRows.length === 0) {
+        return [];
+      }
+
+      const user = userRows[0];
+
+      // Parse user preferences
+      const preferredRegions = safeJsonParse(user.preferred_regions, []);
+      const preferredCities = safeJsonParse(user.preferred_cities, []);
+      const budgetMin = parseFloat(user.budget_min) || 0;
+      const budgetMax = parseFloat(user.budget_max) || 50000000;
+      const preferredPropertyType = user.property_type;
+      const preferredBedrooms = parseInt(user.bedrooms) || 0;
+      const preferredBathrooms = parseInt(user.bathrooms) || 0;
+
+      // Build recommendation query based on user preferences
+      let query = `
+        SELECT DISTINCT p.*,
+          u.username as owner_username
+        FROM properties p
+        LEFT JOIN users u ON p.owner_user_id = u.id
+        WHERE p.deleted_at IS NULL 
+          AND p.property_status = 'active'
+      `;
+
+      const params = [];
+
+      // Exclude already saved properties
+      query += ` AND NOT JSON_CONTAINS(COALESCE(p.saved_by_users, '[]'), ?)`;
+      params.push(JSON.stringify([userId]));
+
+      // Add region filter if user has preferred regions
+      if (preferredRegions.length > 0) {
+        const regionConditions = preferredRegions.map(() => {
+          return `p.region LIKE CONCAT('%', ?, '%')`;
+        }).join(' OR ');
+        query += ` AND (${regionConditions})`;
+        params.push(...preferredRegions);
+      }
+
+      // Add city filter if user has preferred cities
+      if (preferredCities.length > 0) {
+        const cityConditions = preferredCities.map(() => {
+          return `p.city LIKE CONCAT('%', ?, '%')`;
+        }).join(' OR ');
+        query += ` AND (${cityConditions})`;
+        params.push(...preferredCities);
+      }
+
+      // Add budget filter
+      query += ` AND p.price BETWEEN ? AND ?`;
+      params.push(budgetMin, budgetMax);
+
+      // Add property type filter if specified
+      if (preferredPropertyType) {
+        query += ` AND p.property_type = ?`;
+        params.push(preferredPropertyType);
+      }
+
+      // Add bedrooms filter if specified
+      if (preferredBedrooms > 0) {
+        query += ` AND p.beds >= ?`;
+        params.push(preferredBedrooms);
+      }
+
+      // Add bathrooms filter if specified
+      if (preferredBathrooms > 0) {
+        query += ` AND p.baths >= ?`;
+        params.push(preferredBathrooms);
+      }
+
+      // Build ORDER BY clause safely
+      query += ` ORDER BY `;
+      const orderConditions = [];
+
+      // Add region priority if preferredRegions exists
+      if (preferredRegions.length > 0) {
+        orderConditions.push(`CASE WHEN p.region IN (${preferredRegions.map(() => '?').join(',')}) THEN 0 ELSE 1 END`);
+        params.push(...preferredRegions);
+      }
+
+      // Add city priority if preferredCities exists
+      if (preferredCities.length > 0) {
+        orderConditions.push(`CASE WHEN p.city IN (${preferredCities.map(() => '?').join(',')}) THEN 0 ELSE 1 END`);
+        params.push(...preferredCities);
+      }
+
+      // Always add budget proximity and other ordering
+      orderConditions.push(`ABS(p.price - ((? + ?) / 2)) ASC`);
+      params.push(budgetMin, budgetMax);
+      orderConditions.push(`p.is_featured DESC`);
+      orderConditions.push(`p.is_premium DESC`);
+      orderConditions.push(`p.published_at DESC`);
+
+      query += orderConditions.join(', ') + ` LIMIT ?`;
+      params.push(limit);
+
+      console.log('Generated query with params:', { query, params });
+
+      const [properties] = await connection.execute(query, params);
+
+      // If no properties match exact preferences, fallback to broader recommendations
+      if (properties.length === 0) {
+        console.log('No exact matches found, falling back to broader recommendations');
+
+        // Fallback query: show properties without strict filters
+        let fallbackQuery = `
+          SELECT DISTINCT p.*,
+            u.username as owner_username
+          FROM properties p
+          LEFT JOIN users u ON p.owner_user_id = u.id
+          WHERE p.deleted_at IS NULL 
+            AND p.property_status = 'active'
+            AND NOT JSON_CONTAINS(COALESCE(p.saved_by_users, '[]'), ?)
+        `;
+
+        const fallbackParams = [JSON.stringify([userId])];
+
+        // Only filter by region/city if available
+        if (preferredRegions.length > 0 || preferredCities.length > 0) {
+          fallbackQuery += ` AND (`;
+          const conditions = [];
+
+          if (preferredRegions.length > 0) {
+            const regionConds = preferredRegions.map(() => `p.region LIKE CONCAT('%', ?, '%')`);
+            conditions.push(`(${regionConds.join(' OR ')})`);
+            fallbackParams.push(...preferredRegions);
+          }
+
+          if (preferredCities.length > 0) {
+            const cityConds = preferredCities.map(() => `p.city LIKE CONCAT('%', ?, '%')`);
+            conditions.push(`(${cityConds.join(' OR ')})`);
+            fallbackParams.push(...preferredCities);
+          }
+
+          fallbackQuery += conditions.join(' OR ') + `)`;
+        }
+
+        fallbackQuery += `
+          ORDER BY p.is_featured DESC, p.is_premium DESC, p.published_at DESC
+          LIMIT ?
+        `;
+
+        fallbackParams.push(limit);
+
+        const [fallbackProperties] = await connection.execute(fallbackQuery, fallbackParams);
+
+        // Parse JSON fields for fallback properties
+        return fallbackProperties.map((property) => ({
+          ...property,
+          features: safeJsonParse(property.features, []),
+          amenities: safeJsonParse(property.amenities, []),
+          property_tags: safeJsonParse(property.property_tags, []),
+          square_meters: property.sqft || 0,
+        }));
+      }
+
+      // Parse JSON fields for matched properties
+      return properties.map((property) => ({
+        ...property,
+        features: safeJsonParse(property.features, []),
+        amenities: safeJsonParse(property.amenities, []),
+        property_tags: safeJsonParse(property.property_tags, []),
+        square_meters: property.sqft || 0,
+      }));
+
+    } catch (error) {
+      console.error("Error getting recommended properties:", error);
+      throw error;
+    } finally {
+      connection.release();
+    }
+  }
+  // Track property view
+  async trackView(propertyId, userId) {
+    const connection = await pool.getConnection();
+
+    try {
+      // Get current viewed_by_users
+      const [result] = await connection.execute(
+        'SELECT viewed_by_users, views_count FROM properties WHERE id = ?',
+        [propertyId]
+      );
+
+      if (result.length === 0) {
+        throw new Error('Property not found');
+      }
+
+      let viewedByUsers = safeJsonParse(result[0].viewed_by_users, []);
+      let viewsCount = result[0].views_count || 0;
+
+      // Only track unique views per user
+      if (!viewedByUsers.includes(userId)) {
+        viewedByUsers.push(userId);
+        viewsCount++;
+
+        await connection.execute(
+          'UPDATE properties SET viewed_by_users = ?, views_count = ? WHERE id = ?',
+          [JSON.stringify(viewedByUsers), viewsCount, propertyId]
+        );
+
+        return { success: true, viewsCount };
+      }
+
+      return { success: false, message: 'Already viewed' };
+
+    } catch (error) {
       throw error;
     } finally {
       connection.release();

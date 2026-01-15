@@ -1,4 +1,4 @@
-// components/EditPropertyForm.jsx - Matching CreatePropertyForm UI/UX
+// components/EditPropertyForm.jsx - Updated with CalendarPopup
 
 import React, { useState, useRef, useEffect } from "react";
 import {
@@ -12,12 +12,21 @@ import {
   Calendar,
   Users,
   Building,
-  Layers,
-  CheckCircle,
+  Sparkles,
+  Check,
+  Percent,
+  Crown,
+  CloudUpload,
+  ChevronDown,
+  Tag,
+  Award,
+  Hash,
+  LayoutGrid,
+  Trash2,
+  Save,
   AlertCircle,
   ChevronRight,
   ChevronLeft,
-  Sparkles,
   Star,
   Bed,
   Bath,
@@ -25,23 +34,6 @@ import {
   Target,
   Globe,
   Lock,
-  Check,
-  Percent,
-  Crown,
-  Zap,
-  CloudUpload,
-  ChevronDown,
-  Tag,
-  Award,
-  Navigation,
-  Hash,
-  LayoutGrid,
-  Maximize2,
-  Box,
-  FileImage,
-  Trash2,
-  Grid,
-  Save,
   Eye,
   EyeOff,
   RefreshCw,
@@ -49,8 +41,14 @@ import {
   Edit,
   Copy,
   AlertTriangle,
+  Zap,
+  Box,
+  FileImage,
+  Grid,
+  Maximize2,
 } from "lucide-react";
-import { API_CONFIG } from "../config/api.config";
+import CalendarPopup from "./CalendarPopup"; // Updated import path
+import API_CONFIG from "../config/api.config";
 
 const EditPropertyForm = ({ property, isOpen, onClose, onSubmit, theme }) => {
   const [formData, setFormData] = useState({
@@ -122,46 +120,91 @@ const EditPropertyForm = ({ property, isOpen, onClose, onSubmit, theme }) => {
   const [tagsInput, setTagsInput] = useState("");
   const [removedImages, setRemovedImages] = useState([]);
   const [removedFloorPlans, setRemovedFloorPlans] = useState([]);
-  const [imageFiles, setImageFiles] = useState([]);
-  const [floorPlanFiles, setFloorPlanFiles] = useState([]);
+
+  // Calendar states for all date fields
+  const [showListingCalendar, setShowListingCalendar] = useState(false);
+  const [showExpirationCalendar, setShowExpirationCalendar] = useState(false);
+  const calendarListingRef = useRef(null);
+  const calendarExpirationRef = useRef(null);
+
   const imageInputRef = useRef(null);
   const floorPlanInputRef = useRef(null);
 
+  // Close calendar when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (calendarListingRef.current && !calendarListingRef.current.contains(event.target)) {
+        setShowListingCalendar(false);
+      }
+      if (calendarExpirationRef.current && !calendarExpirationRef.current.contains(event.target)) {
+        setShowExpirationCalendar(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
+
   // Initialize form with property data
+  // components/EditPropertyForm.jsx - Fix the initialization
+
+  // Update the useEffect initialization
   useEffect(() => {
     if (property) {
       console.log("📝 Initializing edit form with property:", property);
-      
+
       // Parse features and amenities from JSON string if needed
       let featuresArray = [];
       let amenitiesArray = [];
       let tagsArray = [];
-      
+
       if (property.features) {
-        featuresArray = Array.isArray(property.features) 
-          ? property.features 
+        featuresArray = Array.isArray(property.features)
+          ? property.features
           : JSON.parse(property.features || "[]");
       }
-      
+
       if (property.amenities) {
         amenitiesArray = Array.isArray(property.amenities)
           ? property.amenities
           : JSON.parse(property.amenities || "[]");
       }
-      
+
       if (property.property_tags) {
         tagsArray = Array.isArray(property.property_tags)
           ? property.property_tags
           : JSON.parse(property.property_tags || "[]");
       }
-      
-      // Set form data
+
+      // Convert sqft to square_meters for the form
+      const squareMeters = property.sqft
+        ? (parseFloat(property.sqft) / 10.764).toFixed(2)
+        : property.square_meters || "";
+
+      // Format dates for date inputs (YYYY-MM-DD format)
+      const formatDateForInput = (dateString) => {
+        if (!dateString) return "";
+        try {
+          const date = new Date(dateString);
+          return date.toISOString().split("T")[0];
+        } catch (error) {
+          console.error("Error formatting date:", error);
+          return "";
+        }
+      };
+
+      // Set form data - IMPORTANT: Match the backend field names exactly
       setFormData({
+        // Basic Information
         title: property.title || "",
         description: property.description || "",
         property_type: property.property_type || "house",
         property_status: property.property_status || "draft",
         listing_type: property.listing_type || "sale",
+
+        // Location
         address: property.address || "",
         city: property.city || "",
         region: property.region || "",
@@ -169,96 +212,131 @@ const EditPropertyForm = ({ property, isOpen, onClose, onSubmit, theme }) => {
         latitude: property.latitude || "",
         longitude: property.longitude || "",
         neighborhood: property.neighborhood || "",
-        beds: property.beds || 1,
-        baths: property.baths || 1,
+
+        // Specifications
+        beds: property.beds || 0,
+        baths: property.baths || 0,
         sqft: property.sqft || "",
-        square_meters: property.square_meters || "",
+        square_meters: squareMeters, // Use calculated value
         year_built: property.year_built || new Date().getFullYear(),
         lot_size: property.lot_size || "",
         garage_spaces: property.garage_spaces || 0,
         parking_spaces: property.parking_spaces || 0,
-        price: property.price || "",
+
+        // Pricing
+        price: property.price ? parseFloat(property.price) : "",
         currency: property.currency || "ETB",
         monthly_rent: property.monthly_rent || "",
         deposit_amount: property.deposit_amount || "",
         tax_amount: property.tax_amount || "",
         hoa_fees: property.hoa_fees || "",
         insurance_amount: property.insurance_amount || "",
-        is_negotiable: property.is_negotiable !== undefined ? property.is_negotiable : true,
-        is_exclusive: property.is_exclusive || false,
-        is_featured: property.is_featured || false,
-        is_premium: property.is_premium || false,
+        is_negotiable: property.is_negotiable === 1,
+        is_exclusive: property.is_exclusive === 1,
+        is_featured: property.is_featured === 1,
+        is_premium: property.is_premium === 1,
+
+        // Additional fields
         mls_number: property.mls_number || "",
         mls_source: property.mls_source || "",
-        listing_date: property.listing_date || new Date().toISOString().split("T")[0],
-        expiration_date: property.expiration_date || "",
+        listing_date: formatDateForInput(property.listing_date),
+        expiration_date: formatDateForInput(property.expiration_date),
+
+        // Arrays
         features: featuresArray,
         amenities: amenitiesArray,
         property_tags: tagsArray,
-        existing_images: property.property_images || [],
+
+        // Existing images (for reference)
+        existing_images: [],
         existing_floor_plans: [],
       });
-      
+
       // Set feature/amenity selections
       setSelectedFeatures(featuresArray);
       setSelectedAmenities(amenitiesArray);
       setTagsInput(tagsArray.join(", "));
-      
+
       // Process existing images
-      if (property.property_images && Array.isArray(property.property_images)) {
-        const regularImages = property.property_images.filter(img => 
-          !img.caption?.toLowerCase().includes('floor') && 
-          !img.alt_text?.toLowerCase().includes('floor')
-        );
-        
-        const floorPlanImages = property.property_images.filter(img => 
-          img.caption?.toLowerCase().includes('floor') || 
-          img.alt_text?.toLowerCase().includes('floor')
-        );
-        
-        setExistingImages(regularImages.map((img, index) => ({
+      if (property.images && Array.isArray(property.images)) {
+        const regularImages = property.images.map((img, index) => ({
           id: img.id,
           image_url: img.image_url,
           thumbnail_url: img.thumbnail_url,
           caption: img.caption || "",
           alt_text: img.alt_text || "",
-          is_primary: img.is_primary || false,
+          is_primary: img.is_primary === 1 || img.is_primary === true,
           image_order: img.image_order || index,
           preview: getAbsoluteImageUrl(img.image_url),
           name: img.alt_text || `Image ${index + 1}`,
           size: "Existing",
           type: "existing",
-        })));
-        
-        setExistingFloorPlans(floorPlanImages.map((img, index) => ({
-          id: img.id,
-          image_url: img.image_url,
-          caption: img.caption || "Floor Plan",
-          preview: getAbsoluteImageUrl(img.image_url),
-          name: img.alt_text || `Floor Plan ${index + 1}`,
-          size: "Existing",
-          type: "existing",
-        })));
+        }));
+
+        setExistingImages(regularImages);
+
+        // If you have floor plans in property.floor_plans
+        if (property.floor_plans && Array.isArray(property.floor_plans)) {
+          setExistingFloorPlans(property.floor_plans.map((fp, index) => ({
+            id: fp.id,
+            image_url: fp.image_url,
+            caption: fp.caption || "Floor Plan",
+            preview: getAbsoluteImageUrl(fp.image_url),
+            name: fp.alt_text || `Floor Plan ${index + 1}`,
+            size: "Existing",
+            type: "existing",
+          })));
+        }
       }
+
+      console.log("✅ Form initialized with data:", {
+        beds: property.beds,
+        baths: property.baths,
+        sqft: property.sqft,
+        square_meters: squareMeters,
+        price: property.price,
+        is_negotiable: property.is_negotiable === 1,
+      });
     }
   }, [property]);
 
   if (!isOpen || !property) return null;
 
+  const logFormData = (formDataObj) => {
+    console.group('📋 FORM DATA DEBUG');
+    console.log('Form Data Object:', formDataObj);
+
+    // Check for undefined/null fields
+    Object.keys(formDataObj).forEach(key => {
+      const value = formDataObj[key];
+      if (value === undefined || value === null) {
+        console.warn(`⚠️ Field '${key}' is ${value}`);
+      } else if (typeof value === 'string' && value.trim() === '') {
+        console.log(`📝 Field '${key}' is empty string`);
+      } else if (Array.isArray(value) && value.length === 0) {
+        console.log(`📦 Field '${key}' is empty array`);
+      } else {
+        console.log(`✅ Field '${key}':`, value);
+      }
+    });
+
+    console.groupEnd();
+  };
+
   const getAbsoluteImageUrl = (relativePath) => {
     if (!relativePath) return "";
-    
+
     if (relativePath.startsWith("http://") || relativePath.startsWith("https://")) {
       return relativePath;
     }
-    
+
     const baseUrl = API_CONFIG.PROPERTY_URL || "http://localhost:5002";
-    
+
     // Handle empty paths or arrays
     if (typeof relativePath !== 'string' || relativePath.trim() === '') {
       return "";
     }
-    
+
     const normalizedPath = relativePath.startsWith("/") ? relativePath : `/${relativePath}`;
     return `${baseUrl}${normalizedPath}`;
   };
@@ -268,6 +346,14 @@ const EditPropertyForm = ({ property, isOpen, onClose, onSubmit, theme }) => {
     setFormData((prev) => ({
       ...prev,
       [name]: type === "checkbox" ? checked : value,
+    }));
+  };
+
+  // Handle date changes with CalendarPopup
+  const handleDateSelect = (field, date) => {
+    setFormData((prev) => ({
+      ...prev,
+      [field]: date,
     }));
   };
 
@@ -407,6 +493,49 @@ const EditPropertyForm = ({ property, isOpen, onClose, onSubmit, theme }) => {
     }
   };
 
+  const validateFormData = () => {
+    const errors = [];
+
+    // Check required fields
+    if (!formData.title || formData.title.trim() === '') {
+      errors.push("Property title is required");
+    }
+
+    if (!formData.address || formData.address.trim() === '') {
+      errors.push("Address is required");
+    }
+
+    if (!formData.city || formData.city.trim() === '') {
+      errors.push("City is required");
+    }
+
+    if (!formData.price || formData.price === '') {
+      errors.push("Price is required");
+    }
+
+    if (!formData.square_meters || formData.square_meters === '') {
+      errors.push("Square meters is required");
+    }
+
+    // Ensure arrays are arrays
+    if (!Array.isArray(formData.features)) {
+      console.warn("Features is not an array, converting");
+      formData.features = [];
+    }
+
+    if (!Array.isArray(formData.amenities)) {
+      console.warn("Amenities is not an array, converting");
+      formData.amenities = [];
+    }
+
+    if (!Array.isArray(formData.property_tags)) {
+      console.warn("Property tags is not an array, converting");
+      formData.property_tags = [];
+    }
+
+    return errors;
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -414,139 +543,105 @@ const EditPropertyForm = ({ property, isOpen, onClose, onSubmit, theme }) => {
     setUploadProgress(0);
 
     try {
-      const submitData = new FormData();
-      
-      // Add updated form fields
-      Object.keys(formData).forEach((key) => {
-        const value = formData[key];
-        
-        // Skip fields that shouldn't be sent directly
-        if (key === "existing_images" || key === "existing_floor_plans" || 
-            key === "square_meters" || key === "neighborhood") {
-          return;
-        }
-        
-        // Handle arrays
-        if (key === "features" || key === "amenities" || key === "property_tags") {
-          const arrayData = Array.isArray(value) ? value : [];
-          submitData.append(key, JSON.stringify(arrayData));
-        }
-        // Handle booleans
-        else if (
-          key === "is_negotiable" ||
-          key === "is_exclusive" ||
-          key === "is_featured" ||
-          key === "is_premium"
-        ) {
-          submitData.append(key, value ? "true" : "false");
-        }
-        // Handle numeric fields
-        else if (
-          key === "price" ||
-          key === "beds" ||
-          key === "baths" ||
-          key === "year_built" ||
-          key === "sqft" ||
-          key === "lot_size" ||
-          key === "garage_spaces" ||
-          key === "parking_spaces" ||
-          key === "monthly_rent" ||
-          key === "deposit_amount" ||
-          key === "tax_amount" ||
-          key === "hoa_fees" ||
-          key === "insurance_amount"
-        ) {
-          submitData.append(key, value !== undefined && value !== null ? String(value) : "");
-        }
-        // All other fields
-        else {
-          submitData.append(key, value !== undefined && value !== null ? String(value) : "");
-        }
-      });
+      // Create a clean JSON payload matching backend expectations
+      const payload = {
+        // Basic Information
+        title: formData.title || "",
+        description: formData.description || "",
+        property_type: formData.property_type || "house",
+        property_status: formData.property_status || "draft",
+        listing_type: formData.listing_type || "sale",
 
-      // Handle square_meters conversion
-      if (formData.square_meters) {
-        const sqftValue = parseFloat(formData.square_meters) * 10.764;
-        submitData.append("sqft", sqftValue.toFixed(2));
-      }
+        // Location
+        address: formData.address || "",
+        city: formData.city || "",
+        region: formData.region || "",
+        country: formData.country || "Ethiopia",
+        latitude: formData.latitude || "",
+        longitude: formData.longitude || "",
+        neighborhood: formData.neighborhood || "",
 
-      // Handle neighborhood
-      if (formData.neighborhood) {
-        const currentAddress = formData.address || "";
-        const newAddress =
-          currentAddress + (currentAddress ? ", " : "") + formData.neighborhood;
-        submitData.set("address", newAddress);
+        // Specifications - ensure numbers are sent as numbers
+        beds: parseInt(formData.beds) || 0,
+        baths: parseFloat(formData.baths) || 0,
+        year_built: parseInt(formData.year_built) || new Date().getFullYear(),
+        lot_size: formData.lot_size || "",
+        garage_spaces: parseInt(formData.garage_spaces) || 0,
+        parking_spaces: parseInt(formData.parking_spaces) || 0,
 
-        const currentTags = Array.isArray(formData.property_tags)
-          ? [...formData.property_tags, formData.neighborhood]
-          : [formData.neighborhood];
-        submitData.set("property_tags", JSON.stringify(currentTags));
-      }
+        // Pricing - ensure numbers are sent as numbers
+        price: parseFloat(formData.price) || 0,
+        currency: formData.currency || "ETB",
+        monthly_rent: formData.monthly_rent ? parseFloat(formData.monthly_rent) : null,
+        deposit_amount: formData.deposit_amount ? parseFloat(formData.deposit_amount) : null,
+        tax_amount: formData.tax_amount ? parseFloat(formData.tax_amount) : null,
+        hoa_fees: formData.hoa_fees ? parseFloat(formData.hoa_fees) : null,
+        insurance_amount: formData.insurance_amount ? parseFloat(formData.insurance_amount) : null,
+        is_negotiable: formData.is_negotiable ? 1 : 0,
+        is_exclusive: formData.is_exclusive ? 1 : 0,
+        is_featured: formData.is_featured ? 1 : 0,
+        is_premium: formData.is_premium ? 1 : 0,
 
-      // Add removed images/floor plans
-      if (removedImages.length > 0) {
-        submitData.append("removed_images", JSON.stringify(removedImages));
-      }
-      
-      if (removedFloorPlans.length > 0) {
-        submitData.append("removed_floor_plans", JSON.stringify(removedFloorPlans));
-      }
+        // Additional fields
+        mls_number: formData.mls_number || "",
+        mls_source: formData.mls_source || "",
+        listing_date: formData.listing_date || null,
+        expiration_date: formData.expiration_date || null,
 
-      // Add new images
-      uploadedImages.forEach((image, index) => {
-        if (image.file && image.file instanceof File) {
-          submitData.append("new_images", image.file);
-          submitData.append(
-            `new_image_${index}_is_primary`,
-            image.isPrimary ? "1" : "0"
-          );
-          submitData.append(`new_image_${index}_caption`, image.caption || "");
-        }
-      });
+        // Arrays - convert to JSON strings for backend
+        features: JSON.stringify(Array.isArray(formData.features) ? formData.features : []),
+        amenities: JSON.stringify(Array.isArray(formData.amenities) ? formData.amenities : []),
+        property_tags: JSON.stringify(Array.isArray(formData.property_tags) ? formData.property_tags : []),
 
-      // Add new floor plans
-      uploadedFloorPlans.forEach((floorPlan, index) => {
-        if (floorPlan.file && floorPlan.file instanceof File) {
-          submitData.append("new_floor_plans", floorPlan.file);
-          submitData.append(
-            `new_floor_plan_${index}_caption`,
-            floorPlan.caption || "Floor Plan"
-          );
-        }
-      });
+        // Handle square meters to sqft conversion - CRITICAL!
+        // The backend expects sqft, not square_meters
+        sqft: formData.square_meters
+          ? (parseFloat(formData.square_meters) * 10.764).toFixed(2)
+          : "0",
+      };
 
-      // Update primary images for existing images
-      const primaryExistingImage = existingImages.find(img => img.isPrimary);
-      if (primaryExistingImage) {
-        submitData.append("primary_image_id", primaryExistingImage.id);
-      }
-
-      console.log("📤 Updating property:", property.id);
+      console.log("📤 JSON Payload for backend:", payload);
+      console.log("📊 Original form data square_meters:", formData.square_meters);
+      console.log("📊 Calculated sqft:", payload.sqft);
 
       const token = localStorage.getItem("token");
       if (!token) {
         throw new Error("No authentication token found");
       }
 
+      setUploadProgress(30);
+
+      // Update property data with JSON
       const response = await fetch(`http://localhost:5002/api/properties/${property.id}`, {
         method: "PUT",
         headers: {
-          Authorization: `Bearer ${token}`,
+          "Authorization": `Bearer ${token}`,
+          "Content-Type": "application/json",
         },
-        body: submitData,
+        body: JSON.stringify(payload),
       });
+
+      setUploadProgress(50);
 
       if (!response.ok) {
         let errorMessage = `HTTP ${response.status}`;
         try {
+          const errorData = await response.json();
+          errorMessage = `${errorMessage}: ${JSON.stringify(errorData)}`;
+        } catch (e) {
           const errorText = await response.text();
           errorMessage = `${errorMessage}: ${errorText}`;
-        } catch (e) {}
+        }
         throw new Error(errorMessage);
       }
 
       const data = await response.json();
-      console.log("✅ Property updated successfully:", data);
+      console.log("✅ Property data updated successfully:", data);
+
+      setUploadProgress(70);
+
+      // Handle image updates separately if needed
+      await handleImageUpdates(property.id);
 
       setUploadProgress(100);
 
@@ -563,6 +658,136 @@ const EditPropertyForm = ({ property, isOpen, onClose, onSubmit, theme }) => {
     } finally {
       setIsUploading(false);
       setLoading(false);
+    }
+  };
+
+  const handleImageUpdates = async (propertyId) => {
+    const token = localStorage.getItem("token");
+
+    // Remove images if any
+    if (removedImages.length > 0) {
+      console.log(`🗑️ Removing ${removedImages.length} images`);
+
+      try {
+        await fetch(`http://localhost:5002/api/properties/${propertyId}/images`, {
+          method: "DELETE",
+          headers: {
+            "Authorization": `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ image_ids: removedImages }),
+        });
+        console.log("✅ Images removed successfully");
+      } catch (error) {
+        console.error("❌ Failed to remove images:", error);
+        // Continue anyway - this might be a non-critical error
+      }
+    }
+
+    // Upload new images
+    if (uploadedImages.length > 0) {
+      console.log(`📸 Uploading ${uploadedImages.length} new images`);
+
+      const imageFormData = new FormData();
+      let primaryImageIndex = -1;
+
+      uploadedImages.forEach((image, index) => {
+        if (image.file && image.file instanceof File) {
+          imageFormData.append("images", image.file);
+
+          // Track primary image
+          if (image.isPrimary) {
+            primaryImageIndex = index;
+          }
+
+          // Add caption if exists
+          if (image.caption) {
+            imageFormData.append(`image_${index}_caption`, image.caption);
+          }
+        }
+      });
+
+      // Add primary image flag if found
+      if (primaryImageIndex >= 0) {
+        imageFormData.append("primary_image_index", primaryImageIndex.toString());
+      }
+
+      try {
+        const imageResponse = await fetch(`http://localhost:5002/api/properties/${propertyId}/images`, {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${token}`,
+            // Don't set Content-Type for FormData
+          },
+          body: imageFormData,
+        });
+
+        if (!imageResponse.ok) {
+          throw new Error(`Image upload failed: ${imageResponse.status}`);
+        }
+
+        console.log("✅ Images uploaded successfully");
+      } catch (error) {
+        console.error("❌ Failed to upload images:", error);
+        // Continue anyway - this might be a non-critical error
+      }
+    }
+
+    // Update floor plans
+    if (uploadedFloorPlans.length > 0) {
+      console.log(`📐 Uploading ${uploadedFloorPlans.length} floor plans`);
+
+      const floorPlanFormData = new FormData();
+
+      uploadedFloorPlans.forEach((floorPlan, index) => {
+        if (floorPlan.file && floorPlan.file instanceof File) {
+          floorPlanFormData.append("floor_plans", floorPlan.file);
+
+          // Add caption if exists
+          if (floorPlan.caption) {
+            floorPlanFormData.append(`floor_plan_${index}_caption`, floorPlan.caption);
+          }
+        }
+      });
+
+      try {
+        const floorPlanResponse = await fetch(`http://localhost:5002/api/properties/${propertyId}/floor-plans`, {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${token}`,
+          },
+          body: floorPlanFormData,
+        });
+
+        if (!floorPlanResponse.ok) {
+          throw new Error(`Floor plan upload failed: ${floorPlanResponse.status}`);
+        }
+
+        console.log("✅ Floor plans uploaded successfully");
+      } catch (error) {
+        console.error("❌ Failed to upload floor plans:", error);
+        // Continue anyway - this might be a non-critical error
+      }
+    }
+
+    // Remove floor plans if any
+    if (removedFloorPlans.length > 0) {
+      console.log(`🗑️ Removing ${removedFloorPlans.length} floor plans`);
+
+      try {
+        await fetch(`http://localhost:5002/api/properties/${propertyId}/floor-plans`, {
+          method: "DELETE",
+          headers: {
+            "Authorization": `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ floor_plan_ids: removedFloorPlans }),
+        });
+        console.log("✅ Floor plans removed successfully");
+      } catch (error) {
+        console.error("❌ Failed to remove floor plans:", error);
+        // Continue anyway
+      }
     }
   };
 
@@ -657,28 +882,23 @@ const EditPropertyForm = ({ property, isOpen, onClose, onSubmit, theme }) => {
   return (
     <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
       <div
-        className={`relative w-full max-w-5xl max-h-[90vh] rounded-2xl overflow-hidden shadow-2xl ${
-          theme === "dark" ? "bg-gray-900" : "bg-white"
-        }`}
+        className={`relative w-full max-w-5xl max-h-[90vh] rounded-2xl overflow-hidden shadow-2xl ${theme === "dark" ? "bg-gray-900" : "bg-white"
+          }`}
       >
         {/* Header */}
         <div
-          className={`p-6 border-b ${
-            theme === "dark" ? "border-gray-800" : "border-gray-200"
-          } flex justify-between items-center`}
+          className={`p-6 border-b ${theme === "dark" ? "border-gray-800" : "border-gray-200"
+            } flex justify-between items-center`}
         >
           <div className="flex items-center gap-3">
             <div
-              className={`p-2 rounded-xl ${
-                theme === "dark" ? "bg-amber-900/30" : "bg-amber-100"
-              } border ${
-                theme === "dark" ? "border-amber-800/50" : "border-amber-200"
-              }`}
+              className={`p-2 rounded-xl ${theme === "dark" ? "bg-amber-900/30" : "bg-amber-100"
+                } border ${theme === "dark" ? "border-amber-800/50" : "border-amber-200"
+                }`}
             >
               <Edit
-                className={`w-6 h-6 ${
-                  theme === "dark" ? "text-amber-400" : "text-amber-600"
-                }`}
+                className={`w-6 h-6 ${theme === "dark" ? "text-amber-400" : "text-amber-600"
+                  }`}
               />
             </div>
             <div>
@@ -686,26 +906,24 @@ const EditPropertyForm = ({ property, isOpen, onClose, onSubmit, theme }) => {
                 Edit Property
               </h2>
               <p
-                className={`text-sm mt-1 ${
-                  theme === "dark" ? "text-gray-400" : "text-gray-600"
-                }`}
+                className={`text-sm mt-1 ${theme === "dark" ? "text-gray-400" : "text-gray-600"
+                  }`}
               >
                 Step {step} of 4 •{" "}
                 {step === 1
                   ? "Basic Information"
                   : step === 2
-                  ? "Property Details"
-                  : step === 3
-                  ? "Pricing & Description"
-                  : "Media Upload"}
+                    ? "Property Details"
+                    : step === 3
+                      ? "Pricing & Description"
+                      : "Media Upload"}
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className={`p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors ${
-              theme === "dark" ? "text-white" : "text-gray-600"
-            }`}
+            className={`p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors ${theme === "dark" ? "text-white" : "text-gray-600"
+              }`}
             disabled={loading || isUploading}
           >
             <X className="w-5 h-5" />
@@ -719,47 +937,44 @@ const EditPropertyForm = ({ property, isOpen, onClose, onSubmit, theme }) => {
               <div key={num} className="flex items-center flex-1">
                 <div className="flex flex-col items-center">
                   <div
-                    className={`w-10 h-10 rounded-full flex items-center justify-center transition-all duration-300 ${
-                      num < step
-                        ? "bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-lg"
-                        : num === step
+                    className={`w-10 h-10 rounded-full flex items-center justify-center transition-all duration-300 ${num < step
+                      ? "bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-lg"
+                      : num === step
                         ? "bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-lg ring-4 ring-amber-500/20"
                         : theme === "dark"
-                        ? "bg-gray-800 text-gray-400 border border-gray-700"
-                        : "bg-gray-100 text-gray-400 border border-gray-200"
-                    }`}
+                          ? "bg-gray-800 text-gray-400 border border-gray-700"
+                          : "bg-gray-100 text-gray-400 border border-gray-200"
+                      }`}
                   >
                     {num < step ? <Check className="w-5 h-5" /> : num}
                   </div>
                   <span
-                    className={`text-xs mt-2 font-medium ${
-                      num <= step
-                        ? theme === "dark"
-                          ? "text-gray-300"
-                          : "text-gray-700"
-                        : theme === "dark"
+                    className={`text-xs mt-2 font-medium ${num <= step
+                      ? theme === "dark"
+                        ? "text-gray-300"
+                        : "text-gray-700"
+                      : theme === "dark"
                         ? "text-gray-500"
                         : "text-gray-400"
-                    }`}
+                      }`}
                   >
                     {num === 1
                       ? "Basic Info"
                       : num === 2
-                      ? "Details"
-                      : num === 3
-                      ? "Pricing"
-                      : "Media"}
+                        ? "Details"
+                        : num === 3
+                          ? "Pricing"
+                          : "Media"}
                   </span>
                 </div>
                 {num < 4 && (
                   <div
-                    className={`flex-1 h-1 mx-4 ${
-                      num < step
-                        ? "bg-gradient-to-r from-emerald-500 to-teal-500"
-                        : theme === "dark"
+                    className={`flex-1 h-1 mx-4 ${num < step
+                      ? "bg-gradient-to-r from-emerald-500 to-teal-500"
+                      : theme === "dark"
                         ? "bg-gray-800"
                         : "bg-gray-200"
-                    }`}
+                      }`}
                   />
                 )}
               </div>
@@ -779,28 +994,24 @@ const EditPropertyForm = ({ property, isOpen, onClose, onSubmit, theme }) => {
               <div>
                 <div className="flex items-center gap-3 mb-6">
                   <div
-                    className={`p-2 rounded-lg ${
-                      theme === "dark" ? "bg-blue-900/30" : "bg-blue-100"
-                    }`}
+                    className={`p-2 rounded-lg ${theme === "dark" ? "bg-blue-900/30" : "bg-blue-100"
+                      }`}
                   >
                     <Home
-                      className={`w-5 h-5 ${
-                        theme === "dark" ? "text-blue-400" : "text-blue-600"
-                      }`}
+                      className={`w-5 h-5 ${theme === "dark" ? "text-blue-400" : "text-blue-600"
+                        }`}
                     />
                   </div>
                   <div>
                     <h3
-                      className={`text-semibold ${
-                        theme === "dark" ? "text-white" : "text-gray-800"
-                      }`}
+                      className={`text-semibold ${theme === "dark" ? "text-white" : "text-gray-800"
+                        }`}
                     >
                       Basic Information
                     </h3>
                     <p
-                      className={`text-sm ${
-                        theme === "dark" ? "text-gray-400" : "text-gray-600"
-                      }`}
+                      className={`text-sm ${theme === "dark" ? "text-gray-400" : "text-gray-600"
+                        }`}
                     >
                       Update the basic details of your property
                     </p>
@@ -809,9 +1020,8 @@ const EditPropertyForm = ({ property, isOpen, onClose, onSubmit, theme }) => {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="md:col-span-2">
                     <label
-                      className={`block text-sm font-semibold mb-3 ${
-                        theme === "dark" ? "text-gray-300" : "text-gray-700"
-                      }`}
+                      className={`block text-sm font-semibold mb-3 ${theme === "dark" ? "text-gray-300" : "text-gray-700"
+                        }`}
                     >
                       Property Title *
                     </label>
@@ -822,19 +1032,17 @@ const EditPropertyForm = ({ property, isOpen, onClose, onSubmit, theme }) => {
                       onChange={handleChange}
                       required
                       placeholder="e.g., Modern 3BR Apartment in Bole"
-                      className={`w-full px-4 py-3.5 rounded-xl border focus:ring-2 focus:ring-amber-500 focus:border-transparent transition-all ${
-                        theme === "dark"
-                          ? "bg-gray-800 border-gray-700 text-white placeholder-gray-500"
-                          : "bg-white border-gray-300 text-gray-900 placeholder-gray-400"
-                      }`}
+                      className={`w-full px-4 py-3.5 rounded-xl border focus:ring-2 focus:ring-amber-500 focus:border-transparent transition-all ${theme === "dark"
+                        ? "bg-gray-800 border-gray-700 text-white placeholder-gray-500"
+                        : "bg-white border-gray-300 text-gray-900 placeholder-gray-400"
+                        }`}
                     />
                   </div>
 
                   <div>
                     <label
-                      className={`block text-sm font-semibold mb-3 ${
-                        theme === "dark" ? "text-gray-300" : "text-gray-700"
-                      }`}
+                      className={`block text-sm font-semibold mb-3 ${theme === "dark" ? "text-gray-300" : "text-gray-700"
+                        }`}
                     >
                       Property Type *
                     </label>
@@ -843,11 +1051,10 @@ const EditPropertyForm = ({ property, isOpen, onClose, onSubmit, theme }) => {
                         name="property_type"
                         value={formData.property_type}
                         onChange={handleChange}
-                        className={`w-full px-4 py-3.5 rounded-xl border focus:ring-2 focus:ring-amber-500 focus:border-transparent appearance-none ${
-                          theme === "dark"
-                            ? "bg-gray-800 border-gray-700 text-white"
-                            : "bg-white border-gray-300 text-gray-900"
-                        }`}
+                        className={`w-full px-4 py-3.5 rounded-xl border focus:ring-2 focus:ring-amber-500 focus:border-transparent appearance-none ${theme === "dark"
+                          ? "bg-gray-800 border-gray-700 text-white"
+                          : "bg-white border-gray-300 text-gray-900"
+                          }`}
                       >
                         {propertyTypes.map((type) => (
                           <option key={type.value} value={type.value}>
@@ -861,9 +1068,8 @@ const EditPropertyForm = ({ property, isOpen, onClose, onSubmit, theme }) => {
 
                   <div>
                     <label
-                      className={`block text-sm font-semibold mb-3 ${
-                        theme === "dark" ? "text-gray-300" : "text-gray-700"
-                      }`}
+                      className={`block text-sm font-semibold mb-3 ${theme === "dark" ? "text-gray-300" : "text-gray-700"
+                        }`}
                     >
                       Listing Type *
                     </label>
@@ -872,11 +1078,10 @@ const EditPropertyForm = ({ property, isOpen, onClose, onSubmit, theme }) => {
                         name="listing_type"
                         value={formData.listing_type}
                         onChange={handleChange}
-                        className={`w-full px-4 py-3.5 rounded-xl border focus:ring-2 focus:ring-amber-500 focus:border-transparent appearance-none ${
-                          theme === "dark"
-                            ? "bg-gray-800 border-gray-700 text-white"
-                            : "bg-white border-gray-300 text-gray-900"
-                        }`}
+                        className={`w-full px-4 py-3.5 rounded-xl border focus:ring-2 focus:ring-amber-500 focus:border-transparent appearance-none ${theme === "dark"
+                          ? "bg-gray-800 border-gray-700 text-white"
+                          : "bg-white border-gray-300 text-gray-900"
+                          }`}
                       >
                         {listingTypes.map((type) => (
                           <option key={type.value} value={type.value}>
@@ -890,9 +1095,8 @@ const EditPropertyForm = ({ property, isOpen, onClose, onSubmit, theme }) => {
 
                   <div>
                     <label
-                      className={`block text-sm font-semibold mb-3 ${
-                        theme === "dark" ? "text-gray-300" : "text-gray-700"
-                      }`}
+                      className={`block text-sm font-semibold mb-3 ${theme === "dark" ? "text-gray-300" : "text-gray-700"
+                        }`}
                     >
                       Status *
                     </label>
@@ -901,11 +1105,10 @@ const EditPropertyForm = ({ property, isOpen, onClose, onSubmit, theme }) => {
                         name="property_status"
                         value={formData.property_status}
                         onChange={handleChange}
-                        className={`w-full px-4 py-3.5 rounded-xl border focus:ring-2 focus:ring-amber-500 focus:border-transparent appearance-none ${
-                          theme === "dark"
-                            ? "bg-gray-800 border-gray-700 text-white"
-                            : "bg-white border-gray-300 text-gray-900"
-                        }`}
+                        className={`w-full px-4 py-3.5 rounded-xl border focus:ring-2 focus:ring-amber-500 focus:border-transparent appearance-none ${theme === "dark"
+                          ? "bg-gray-800 border-gray-700 text-white"
+                          : "bg-white border-gray-300 text-gray-900"
+                          }`}
                       >
                         {statuses.map((status) => (
                           <option key={status.value} value={status.value}>
@@ -923,28 +1126,24 @@ const EditPropertyForm = ({ property, isOpen, onClose, onSubmit, theme }) => {
               <div>
                 <div className="flex items-center gap-3 mb-6">
                   <div
-                    className={`p-2 rounded-lg ${
-                      theme === "dark" ? "bg-green-900/30" : "bg-green-100"
-                    }`}
+                    className={`p-2 rounded-lg ${theme === "dark" ? "bg-green-900/30" : "bg-green-100"
+                      }`}
                   >
                     <MapPin
-                      className={`w-5 h-5 ${
-                        theme === "dark" ? "text-green-400" : "text-green-600"
-                      }`}
+                      className={`w-5 h-5 ${theme === "dark" ? "text-green-400" : "text-green-600"
+                        }`}
                     />
                   </div>
                   <div>
                     <h3
-                      className={`text-semibold ${
-                        theme === "dark" ? "text-white" : "text-gray-800"
-                      }`}
+                      className={`text-semibold ${theme === "dark" ? "text-white" : "text-gray-800"
+                        }`}
                     >
                       Location Details
                     </h3>
                     <p
-                      className={`text-sm ${
-                        theme === "dark" ? "text-gray-400" : "text-gray-600"
-                      }`}
+                      className={`text-sm ${theme === "dark" ? "text-gray-400" : "text-gray-600"
+                        }`}
                     >
                       Update property location
                     </p>
@@ -953,9 +1152,8 @@ const EditPropertyForm = ({ property, isOpen, onClose, onSubmit, theme }) => {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="md:col-span-2">
                     <label
-                      className={`block text-sm font-semibold mb-3 ${
-                        theme === "dark" ? "text-gray-300" : "text-gray-700"
-                      }`}
+                      className={`block text-sm font-semibold mb-3 ${theme === "dark" ? "text-gray-300" : "text-gray-700"
+                        }`}
                     >
                       Full Address *
                     </label>
@@ -966,19 +1164,17 @@ const EditPropertyForm = ({ property, isOpen, onClose, onSubmit, theme }) => {
                       onChange={handleChange}
                       required
                       placeholder="Street address, house number, building name"
-                      className={`w-full px-4 py-3.5 rounded-xl border focus:ring-2 focus:ring-amber-500 focus:border-transparent transition-all ${
-                        theme === "dark"
-                          ? "bg-gray-800 border-gray-700 text-white placeholder-gray-500"
-                          : "bg-white border-gray-300 text-gray-900 placeholder-gray-400"
-                      }`}
+                      className={`w-full px-4 py-3.5 rounded-xl border focus:ring-2 focus:ring-amber-500 focus:border-transparent transition-all ${theme === "dark"
+                        ? "bg-gray-800 border-gray-700 text-white placeholder-gray-500"
+                        : "bg-white border-gray-300 text-gray-900 placeholder-gray-400"
+                        }`}
                     />
                   </div>
 
                   <div>
                     <label
-                      className={`block text-sm font-semibold mb-3 ${
-                        theme === "dark" ? "text-gray-300" : "text-gray-700"
-                      }`}
+                      className={`block text-sm font-semibold mb-3 ${theme === "dark" ? "text-gray-300" : "text-gray-700"
+                        }`}
                     >
                       City *
                     </label>
@@ -989,19 +1185,17 @@ const EditPropertyForm = ({ property, isOpen, onClose, onSubmit, theme }) => {
                       onChange={handleChange}
                       required
                       placeholder="e.g., Addis Ababa"
-                      className={`w-full px-4 py-3.5 rounded-xl border focus:ring-2 focus:ring-amber-500 focus:border-transparent ${
-                        theme === "dark"
-                          ? "bg-gray-800 border-gray-700 text-white placeholder-gray-500"
-                          : "bg-white border-gray-300 text-gray-900 placeholder-gray-400"
-                      }`}
+                      className={`w-full px-4 py-3.5 rounded-xl border focus:ring-2 focus:ring-amber-500 focus:border-transparent ${theme === "dark"
+                        ? "bg-gray-800 border-gray-700 text-white placeholder-gray-500"
+                        : "bg-white border-gray-300 text-gray-900 placeholder-gray-400"
+                        }`}
                     />
                   </div>
 
                   <div>
                     <label
-                      className={`block text-sm font-semibold mb-3 ${
-                        theme === "dark" ? "text-gray-300" : "text-gray-700"
-                      }`}
+                      className={`block text-sm font-semibold mb-3 ${theme === "dark" ? "text-gray-300" : "text-gray-700"
+                        }`}
                     >
                       Region
                     </label>
@@ -1010,11 +1204,10 @@ const EditPropertyForm = ({ property, isOpen, onClose, onSubmit, theme }) => {
                         name="region"
                         value={formData.region}
                         onChange={handleChange}
-                        className={`w-full px-4 py-3.5 rounded-xl border focus:ring-2 focus:ring-amber-500 focus:border-transparent appearance-none ${
-                          theme === "dark"
-                            ? "bg-gray-800 border-gray-700 text-white"
-                            : "bg-white border-gray-300 text-gray-900"
-                        }`}
+                        className={`w-full px-4 py-3.5 rounded-xl border focus:ring-2 focus:ring-amber-500 focus:border-transparent appearance-none ${theme === "dark"
+                          ? "bg-gray-800 border-gray-700 text-white"
+                          : "bg-white border-gray-300 text-gray-900"
+                          }`}
                       >
                         <option value="">Select Region</option>
                         {regions.map((region) => (
@@ -1029,9 +1222,8 @@ const EditPropertyForm = ({ property, isOpen, onClose, onSubmit, theme }) => {
 
                   <div>
                     <label
-                      className={`block text-sm font-semibold mb-3 ${
-                        theme === "dark" ? "text-gray-300" : "text-gray-700"
-                      }`}
+                      className={`block text-sm font-semibold mb-3 ${theme === "dark" ? "text-gray-300" : "text-gray-700"
+                        }`}
                     >
                       Neighborhood/Sub-city
                     </label>
@@ -1041,19 +1233,17 @@ const EditPropertyForm = ({ property, isOpen, onClose, onSubmit, theme }) => {
                       value={formData.neighborhood}
                       onChange={handleChange}
                       placeholder="e.g., Bole, CMC, Kazanchis"
-                      className={`w-full px-4 py-3.5 rounded-xl border focus:ring-2 focus:ring-amber-500 focus:border-transparent ${
-                        theme === "dark"
-                          ? "bg-gray-800 border-gray-700 text-white placeholder-gray-500"
-                          : "bg-white border-gray-300 text-gray-900 placeholder-gray-400"
-                      }`}
+                      className={`w-full px-4 py-3.5 rounded-xl border focus:ring-2 focus:ring-amber-500 focus:border-transparent ${theme === "dark"
+                        ? "bg-gray-800 border-gray-700 text-white placeholder-gray-500"
+                        : "bg-white border-gray-300 text-gray-900 placeholder-gray-400"
+                        }`}
                     />
                   </div>
 
                   <div>
                     <label
-                      className={`block text-sm font-semibold mb-3 ${
-                        theme === "dark" ? "text-gray-300" : "text-gray-700"
-                      }`}
+                      className={`block text-sm font-semibold mb-3 ${theme === "dark" ? "text-gray-300" : "text-gray-700"
+                        }`}
                     >
                       Country
                     </label>
@@ -1062,20 +1252,18 @@ const EditPropertyForm = ({ property, isOpen, onClose, onSubmit, theme }) => {
                       name="country"
                       value={formData.country}
                       onChange={handleChange}
-                      className={`w-full px-4 py-3.5 rounded-xl border focus:ring-2 focus:ring-amber-500 focus:border-transparent ${
-                        theme === "dark"
-                          ? "bg-gray-800 border-gray-700 text-white"
-                          : "bg-white border-gray-300 text-gray-900"
-                      }`}
+                      className={`w-full px-4 py-3.5 rounded-xl border focus:ring-2 focus:ring-amber-500 focus:border-transparent ${theme === "dark"
+                        ? "bg-gray-800 border-gray-700 text-white"
+                        : "bg-white border-gray-300 text-gray-900"
+                        }`}
                     />
                   </div>
 
                   <div className="grid grid-cols-2 gap-4 md:col-span-2">
                     <div>
                       <label
-                        className={`block text-sm font-semibold mb-3 ${
-                          theme === "dark" ? "text-gray-300" : "text-gray-700"
-                        }`}
+                        className={`block text-sm font-semibold mb-3 ${theme === "dark" ? "text-gray-300" : "text-gray-700"
+                          }`}
                       >
                         Latitude (Optional)
                       </label>
@@ -1086,18 +1274,16 @@ const EditPropertyForm = ({ property, isOpen, onClose, onSubmit, theme }) => {
                         value={formData.latitude}
                         onChange={handleChange}
                         placeholder="e.g., 9.0320"
-                        className={`w-full px-4 py-3.5 rounded-xl border focus:ring-2 focus:ring-amber-500 focus:border-transparent ${
-                          theme === "dark"
-                            ? "bg-gray-800 border-gray-700 text-white"
-                            : "bg-white border-gray-300 text-gray-900"
-                        }`}
+                        className={`w-full px-4 py-3.5 rounded-xl border focus:ring-2 focus:ring-amber-500 focus:border-transparent ${theme === "dark"
+                          ? "bg-gray-800 border-gray-700 text-white"
+                          : "bg-white border-gray-300 text-gray-900"
+                          }`}
                       />
                     </div>
                     <div>
                       <label
-                        className={`block text-sm font-semibold mb-3 ${
-                          theme === "dark" ? "text-gray-300" : "text-gray-700"
-                        }`}
+                        className={`block text-sm font-semibold mb-3 ${theme === "dark" ? "text-gray-300" : "text-gray-700"
+                          }`}
                       >
                         Longitude (Optional)
                       </label>
@@ -1108,11 +1294,10 @@ const EditPropertyForm = ({ property, isOpen, onClose, onSubmit, theme }) => {
                         value={formData.longitude}
                         onChange={handleChange}
                         placeholder="e.g., 38.7469"
-                        className={`w-full px-4 py-3.5 rounded-xl border focus:ring-2 focus:ring-amber-500 focus:border-transparent ${
-                          theme === "dark"
-                            ? "bg-gray-800 border-gray-700 text-white"
-                            : "bg-white border-gray-300 text-gray-900"
-                        }`}
+                        className={`w-full px-4 py-3.5 rounded-xl border focus:ring-2 focus:ring-amber-500 focus:border-transparent ${theme === "dark"
+                          ? "bg-gray-800 border-gray-700 text-white"
+                          : "bg-white border-gray-300 text-gray-900"
+                          }`}
                       />
                     </div>
                   </div>
@@ -1140,28 +1325,24 @@ const EditPropertyForm = ({ property, isOpen, onClose, onSubmit, theme }) => {
               <div>
                 <div className="flex items-center gap-3 mb-6">
                   <div
-                    className={`p-2 rounded-lg ${
-                      theme === "dark" ? "bg-purple-900/30" : "bg-purple-100"
-                    }`}
+                    className={`p-2 rounded-lg ${theme === "dark" ? "bg-purple-900/30" : "bg-purple-100"
+                      }`}
                   >
                     <Building
-                      className={`w-5 h-5 ${
-                        theme === "dark" ? "text-purple-400" : "text-purple-600"
-                      }`}
+                      className={`w-5 h-5 ${theme === "dark" ? "text-purple-400" : "text-purple-600"
+                        }`}
                     />
                   </div>
                   <div>
                     <h3
-                      className={`text-semibold ${
-                        theme === "dark" ? "text-white" : "text-gray-800"
-                      }`}
+                      className={`text-semibold ${theme === "dark" ? "text-white" : "text-gray-800"
+                        }`}
                     >
                       Property Specifications
                     </h3>
                     <p
-                      className={`text-sm ${
-                        theme === "dark" ? "text-gray-400" : "text-gray-600"
-                      }`}
+                      className={`text-sm ${theme === "dark" ? "text-gray-400" : "text-gray-600"
+                        }`}
                     >
                       Update property structure and features
                     </p>
@@ -1170,9 +1351,8 @@ const EditPropertyForm = ({ property, isOpen, onClose, onSubmit, theme }) => {
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                   <div>
                     <label
-                      className={`block text-sm font-semibold mb-3 ${
-                        theme === "dark" ? "text-gray-300" : "text-gray-700"
-                      }`}
+                      className={`block text-sm font-semibold mb-3 ${theme === "dark" ? "text-gray-300" : "text-gray-700"
+                        }`}
                     >
                       Bedrooms
                     </label>
@@ -1181,23 +1361,21 @@ const EditPropertyForm = ({ property, isOpen, onClose, onSubmit, theme }) => {
                       <input
                         type="number"
                         name="beds"
-                        value={formData.beds}
+                        value={formData.beds || 0}
                         onChange={handleChange}
                         min="0"
-                        className={`w-full pl-12 pr-4 py-3.5 rounded-xl border focus:ring-2 focus:ring-amber-500 focus:border-transparent ${
-                          theme === "dark"
-                            ? "bg-gray-800 border-gray-700 text-white"
-                            : "bg-white border-gray-300 text-gray-900"
-                        }`}
+                        className={`w-full pl-12 pr-4 py-3.5 rounded-xl border focus:ring-2 focus:ring-amber-500 focus:border-transparent ${theme === "dark"
+                          ? "bg-gray-800 border-gray-700 text-white"
+                          : "bg-white border-gray-300 text-gray-900"
+                          }`}
                       />
                     </div>
                   </div>
 
                   <div>
                     <label
-                      className={`block text-sm font-semibold mb-3 ${
-                        theme === "dark" ? "text-gray-300" : "text-gray-700"
-                      }`}
+                      className={`block text-sm font-semibold mb-3 ${theme === "dark" ? "text-gray-300" : "text-gray-700"
+                        }`}
                     >
                       Bathrooms
                     </label>
@@ -1206,24 +1384,22 @@ const EditPropertyForm = ({ property, isOpen, onClose, onSubmit, theme }) => {
                       <input
                         type="number"
                         name="baths"
-                        value={formData.baths}
+                        value={formData.baths || 0}
                         onChange={handleChange}
                         min="0"
                         step="0.5"
-                        className={`w-full pl-12 pr-4 py-3.5 rounded-xl border focus:ring-2 focus:ring-amber-500 focus:border-transparent ${
-                          theme === "dark"
+                        className={`w-full pl-12 pr-4 py-3.5 rounded-xl border focus:ring-2 focus:ring-amber-500 focus:border-transparent ${theme === "dark"
                             ? "bg-gray-800 border-gray-700 text-white"
                             : "bg-white border-gray-300 text-gray-900"
-                        }`}
+                          }`}
                       />
                     </div>
                   </div>
 
                   <div>
                     <label
-                      className={`block text-sm font-semibold mb-3 ${
-                        theme === "dark" ? "text-gray-300" : "text-gray-700"
-                      }`}
+                      className={`block text-sm font-semibold mb-3 ${theme === "dark" ? "text-gray-300" : "text-gray-700"
+                        }`}
                     >
                       Year Built
                     </label>
@@ -1236,20 +1412,18 @@ const EditPropertyForm = ({ property, isOpen, onClose, onSubmit, theme }) => {
                         onChange={handleChange}
                         min="1800"
                         max={new Date().getFullYear()}
-                        className={`w-full pl-12 pr-4 py-3.5 rounded-xl border focus:ring-2 focus:ring-amber-500 focus:border-transparent ${
-                          theme === "dark"
-                            ? "bg-gray-800 border-gray-700 text-white"
-                            : "bg-white border-gray-300 text-gray-900"
-                        }`}
+                        className={`w-full pl-12 pr-4 py-3.5 rounded-xl border focus:ring-2 focus:ring-amber-500 focus:border-transparent ${theme === "dark"
+                          ? "bg-gray-800 border-gray-700 text-white"
+                          : "bg-white border-gray-300 text-gray-900"
+                          }`}
                       />
                     </div>
                   </div>
 
                   <div>
                     <label
-                      className={`block text-sm font-semibold mb-3 ${
-                        theme === "dark" ? "text-gray-300" : "text-gray-700"
-                      }`}
+                      className={`block text-sm font-semibold mb-3 ${theme === "dark" ? "text-gray-300" : "text-gray-700"
+                        }`}
                     >
                       Area (Square Meters)*
                     </label>
@@ -1262,20 +1436,18 @@ const EditPropertyForm = ({ property, isOpen, onClose, onSubmit, theme }) => {
                         onChange={handleChange}
                         required
                         placeholder="e.g., 150"
-                        className={`w-full pl-12 pr-4 py-3.5 rounded-xl border focus:ring-2 focus:ring-amber-500 focus:border-transparent ${
-                          theme === "dark"
-                            ? "bg-gray-800 border-gray-700 text-white"
-                            : "bg-white border-gray-300 text-gray-900"
-                        }`}
+                        className={`w-full pl-12 pr-4 py-3.5 rounded-xl border focus:ring-2 focus:ring-amber-500 focus:border-transparent ${theme === "dark"
+                          ? "bg-gray-800 border-gray-700 text-white"
+                          : "bg-white border-gray-300 text-gray-900"
+                          }`}
                       />
                     </div>
                   </div>
 
                   <div>
                     <label
-                      className={`block text-sm font-semibold mb-3 ${
-                        theme === "dark" ? "text-gray-300" : "text-gray-700"
-                      }`}
+                      className={`block text-sm font-semibold mb-3 ${theme === "dark" ? "text-gray-300" : "text-gray-700"
+                        }`}
                     >
                       Lot Size (Sqm)
                     </label>
@@ -1285,19 +1457,17 @@ const EditPropertyForm = ({ property, isOpen, onClose, onSubmit, theme }) => {
                       value={formData.lot_size}
                       onChange={handleChange}
                       placeholder="For land/houses"
-                      className={`w-full px-4 py-3.5 rounded-xl border focus:ring-2 focus:ring-amber-500 focus:border-transparent ${
-                        theme === "dark"
-                          ? "bg-gray-800 border-gray-700 text-white"
-                          : "bg-white border-gray-300 text-gray-900"
-                      }`}
+                      className={`w-full px-4 py-3.5 rounded-xl border focus:ring-2 focus:ring-amber-500 focus:border-transparent ${theme === "dark"
+                        ? "bg-gray-800 border-gray-700 text-white"
+                        : "bg-white border-gray-300 text-gray-900"
+                        }`}
                     />
                   </div>
 
                   <div>
                     <label
-                      className={`block text-sm font-semibold mb-3 ${
-                        theme === "dark" ? "text-gray-300" : "text-gray-700"
-                      }`}
+                      className={`block text-sm font-semibold mb-3 ${theme === "dark" ? "text-gray-300" : "text-gray-700"
+                        }`}
                     >
                       Parking Spaces
                     </label>
@@ -1307,11 +1477,10 @@ const EditPropertyForm = ({ property, isOpen, onClose, onSubmit, theme }) => {
                       value={formData.parking_spaces}
                       onChange={handleChange}
                       min="0"
-                      className={`w-full px-4 py-3.5 rounded-xl border focus:ring-2 focus:ring-amber-500 focus:border-transparent ${
-                        theme === "dark"
-                          ? "bg-gray-800 border-gray-700 text-white"
-                          : "bg-white border-gray-300 text-gray-900"
-                      }`}
+                      className={`w-full px-4 py-3.5 rounded-xl border focus:ring-2 focus:ring-amber-500 focus:border-transparent ${theme === "dark"
+                        ? "bg-gray-800 border-gray-700 text-white"
+                        : "bg-white border-gray-300 text-gray-900"
+                        }`}
                     />
                   </div>
                 </div>
@@ -1323,30 +1492,26 @@ const EditPropertyForm = ({ property, isOpen, onClose, onSubmit, theme }) => {
                 <div>
                   <div className="flex items-center gap-3 mb-4">
                     <div
-                      className={`p-2 rounded-lg ${
-                        theme === "dark" ? "bg-amber-900/30" : "bg-amber-100"
-                      }`}
+                      className={`p-2 rounded-lg ${theme === "dark" ? "bg-amber-900/30" : "bg-amber-100"
+                        }`}
                     >
                       <Sparkles
-                        className={`w-5 h-5 ${
-                          theme === "dark" ? "text-amber-400" : "text-amber-600"
-                        }`}
+                        className={`w-5 h-5 ${theme === "dark" ? "text-amber-400" : "text-amber-600"
+                          }`}
                       />
                     </div>
                     <h4
-                      className={`font-semibold ${
-                        theme === "dark" ? "text-amber-600" : "text-gray-800"
-                      }`}
+                      className={`font-semibold ${theme === "dark" ? "text-amber-600" : "text-gray-800"
+                        }`}
                     >
                       Property Features
                     </h4>
                   </div>
                   <div
-                    className={`p-4 rounded-xl border max-h-64 overflow-y-auto ${
-                      theme === "dark"
-                        ? "border-gray-700 bg-gray-800/30"
-                        : "border-gray-200 bg-gray-50"
-                    }`}
+                    className={`p-4 rounded-xl border max-h-64 overflow-y-auto ${theme === "dark"
+                      ? "border-gray-700 bg-gray-800/30"
+                      : "border-gray-200 bg-gray-50"
+                      }`}
                   >
                     <div className="grid grid-cols-1 gap-3">
                       {featuresList.map((feature, index) => (
@@ -1362,13 +1527,12 @@ const EditPropertyForm = ({ property, isOpen, onClose, onSubmit, theme }) => {
                               className="sr-only"
                             />
                             <div
-                              className={`w-5 h-5 rounded border flex items-center justify-center transition-all duration-300 ${
-                                selectedFeatures.includes(feature)
-                                  ? "bg-amber-500 border-amber-500"
-                                  : theme === "dark"
+                              className={`w-5 h-5 rounded border flex items-center justify-center transition-all duration-300 ${selectedFeatures.includes(feature)
+                                ? "bg-amber-500 border-amber-500"
+                                : theme === "dark"
                                   ? "border-gray-600 bg-gray-700"
                                   : "border-gray-400 bg-white"
-                              }`}
+                                }`}
                             >
                               {selectedFeatures.includes(feature) && (
                                 <Check className="w-3 h-3 text-white" />
@@ -1376,11 +1540,10 @@ const EditPropertyForm = ({ property, isOpen, onClose, onSubmit, theme }) => {
                             </div>
                           </div>
                           <span
-                            className={`text-sm ${
-                              theme === "dark"
-                                ? "text-gray-300"
-                                : "text-gray-700"
-                            }`}
+                            className={`text-sm ${theme === "dark"
+                              ? "text-gray-300"
+                              : "text-gray-700"
+                              }`}
                           >
                             {feature}
                           </span>
@@ -1394,30 +1557,26 @@ const EditPropertyForm = ({ property, isOpen, onClose, onSubmit, theme }) => {
                 <div>
                   <div className="flex items-center gap-3 mb-4">
                     <div
-                      className={`p-2 rounded-lg ${
-                        theme === "dark" ? "bg-blue-900/30" : "bg-blue-100"
-                      }`}
+                      className={`p-2 rounded-lg ${theme === "dark" ? "bg-blue-900/30" : "bg-blue-100"
+                        }`}
                     >
                       <Award
-                        className={`w-5 h-5 ${
-                          theme === "dark" ? "text-blue-400" : "text-blue-600"
-                        }`}
+                        className={`w-5 h-5 ${theme === "dark" ? "text-blue-400" : "text-blue-600"
+                          }`}
                       />
                     </div>
                     <h4
-                      className={`font-semibold ${
-                        theme === "dark" ? "text-blue-600" : "text-gray-800"
-                      }`}
+                      className={`font-semibold ${theme === "dark" ? "text-blue-600" : "text-gray-800"
+                        }`}
                     >
                       Building Amenities
                     </h4>
                   </div>
                   <div
-                    className={`p-4 rounded-xl border max-h-64 overflow-y-auto ${
-                      theme === "dark"
-                        ? "border-gray-700 bg-gray-800/30"
-                        : "border-gray-200 bg-gray-50"
-                    }`}
+                    className={`p-4 rounded-xl border max-h-64 overflow-y-auto ${theme === "dark"
+                      ? "border-gray-700 bg-gray-800/30"
+                      : "border-gray-200 bg-gray-50"
+                      }`}
                   >
                     <div className="grid grid-cols-1 gap-3">
                       {amenitiesList.map((amenity, index) => (
@@ -1433,13 +1592,12 @@ const EditPropertyForm = ({ property, isOpen, onClose, onSubmit, theme }) => {
                               className="sr-only"
                             />
                             <div
-                              className={`w-5 h-5 rounded border flex items-center justify-center transition-all duration-300 ${
-                                selectedAmenities.includes(amenity)
-                                  ? "bg-blue-500 border-blue-500"
-                                  : theme === "dark"
+                              className={`w-5 h-5 rounded border flex items-center justify-center transition-all duration-300 ${selectedAmenities.includes(amenity)
+                                ? "bg-blue-500 border-blue-500"
+                                : theme === "dark"
                                   ? "border-gray-600 bg-gray-700"
                                   : "border-gray-400 bg-white"
-                              }`}
+                                }`}
                             >
                               {selectedAmenities.includes(amenity) && (
                                 <Check className="w-3 h-3 text-white" />
@@ -1447,11 +1605,10 @@ const EditPropertyForm = ({ property, isOpen, onClose, onSubmit, theme }) => {
                             </div>
                           </div>
                           <span
-                            className={`text-sm ${
-                              theme === "dark"
-                                ? "text-gray-300"
-                                : "text-gray-700"
-                            }`}
+                            className={`text-sm ${theme === "dark"
+                              ? "text-gray-300"
+                              : "text-gray-700"
+                              }`}
                           >
                             {amenity}
                           </span>
@@ -1466,24 +1623,22 @@ const EditPropertyForm = ({ property, isOpen, onClose, onSubmit, theme }) => {
               <div>
                 <div className="flex items-center gap-3 mb-4">
                   <div
-                    className={`p-2 rounded-lg ${
-                      theme === "dark" ? "bg-green-900/30" : "bg-green-100"
-                    }`}
+                    className={`p-2 rounded-lg ${theme === "dark" ? "bg-green-900/30" : "bg-green-100"
+                      }`}
                   >
                     <Tag
-                      className={`w-5 h-5 ${
-                        theme === "dark" ? "text-green-400" : "text-green-600"
-                      }`}
+                      className={`w-5 h-5 ${theme === "dark" ? "text-green-400" : "text-green-600"
+                        }`}
                     />
                   </div>
                   <div>
-                    <h4 className="font-semibold text-gray-900 dark:text-white">
+                    <h4 className={`font-semibold ${theme === "dark" ? "text-gray-300" : "text-gray-800"
+                      }`}>
                       Property Tags
                     </h4>
                     <p
-                      className={`text-sm ${
-                        theme === "dark" ? "text-gray-400" : "text-gray-600"
-                      }`}
+                      className={`text-sm ${theme === "dark" ? "text-gray-400" : "text-gray-600"
+                        }`}
                     >
                       Update keywords separated by commas
                     </p>
@@ -1494,22 +1649,20 @@ const EditPropertyForm = ({ property, isOpen, onClose, onSubmit, theme }) => {
                   onChange={handleTagsChange}
                   placeholder="modern, luxury, pool, garden, furnished, pet-friendly"
                   rows="2"
-                  className={`w-full px-4 py-3 rounded-xl border focus:ring-2 focus:ring-amber-500 focus:border-transparent resize-none ${
-                    theme === "dark"
-                      ? "bg-gray-800 border-gray-700 text-white placeholder-gray-500"
-                      : "bg-white border-gray-300 text-gray-900 placeholder-gray-400"
-                  }`}
+                  className={`w-full px-4 py-3 rounded-xl border focus:ring-2 focus:ring-amber-500 focus:border-transparent resize-none ${theme === "dark"
+                    ? "bg-gray-800 border-gray-700 text-white placeholder-gray-500"
+                    : "bg-white border-gray-300 text-gray-900 placeholder-gray-400"
+                    }`}
                 />
                 {formData.property_tags.length > 0 && (
                   <div className="flex flex-wrap gap-2 mt-3">
                     {formData.property_tags.map((tag, index) => (
                       <span
                         key={index}
-                        className={`px-3 py-1.5 rounded-full text-sm ${
-                          theme === "dark"
-                            ? "bg-green-900/30 text-green-400 border border-green-800/50"
-                            : "bg-green-100 text-green-700 border border-green-200"
-                        }`}
+                        className={`px-3 py-1.5 rounded-full text-sm ${theme === "dark"
+                          ? "bg-green-900/30 text-green-400 border border-green-800/50"
+                          : "bg-green-100 text-green-700 border border-green-200"
+                          }`}
                       >
                         {tag}
                       </span>
@@ -1523,11 +1676,10 @@ const EditPropertyForm = ({ property, isOpen, onClose, onSubmit, theme }) => {
                 <button
                   type="button"
                   onClick={() => setStep(1)}
-                  className={`px-6 py-3.5 rounded-xl flex items-center gap-2 transition-all duration-300 hover:scale-105 ${
-                    theme === "dark"
-                      ? "bg-gray-800 hover:bg-gray-700 text-gray-300 border border-gray-700"
-                      : "bg-gray-100 hover:bg-gray-200 text-gray-700 border border-gray-200"
-                  }`}
+                  className={`px-6 py-3.5 rounded-xl flex items-center gap-2 transition-all duration-300 hover:scale-105 ${theme === "dark"
+                    ? "bg-gray-800 hover:bg-gray-700 text-gray-300 border border-gray-700"
+                    : "bg-gray-100 hover:bg-gray-200 text-gray-700 border border-gray-200"
+                    }`}
                 >
                   <ChevronLeft className="w-4 h-4" />
                   Back
@@ -1551,28 +1703,24 @@ const EditPropertyForm = ({ property, isOpen, onClose, onSubmit, theme }) => {
               <div>
                 <div className="flex items-center gap-3 mb-6">
                   <div
-                    className={`p-2 rounded-lg ${
-                      theme === "dark" ? "bg-amber-900/30" : "bg-amber-100"
-                    }`}
+                    className={`p-2 rounded-lg ${theme === "dark" ? "bg-amber-900/30" : "bg-amber-100"
+                      }`}
                   >
                     <DollarSign
-                      className={`w-5 h-5 ${
-                        theme === "dark" ? "text-amber-400" : "text-amber-600"
-                      }`}
+                      className={`w-5 h-5 ${theme === "dark" ? "text-amber-400" : "text-amber-600"
+                        }`}
                     />
                   </div>
                   <div>
                     <h3
-                      className={`text-semibold ${
-                        theme === "dark" ? "text-white" : "text-gray-800"
-                      }`}
+                      className={`text-semibold ${theme === "dark" ? "text-white" : "text-gray-800"
+                        }`}
                     >
                       Pricing Information
                     </h3>
                     <p
-                      className={`text-sm ${
-                        theme === "dark" ? "text-gray-400" : "text-gray-600"
-                      }`}
+                      className={`text-sm ${theme === "dark" ? "text-gray-400" : "text-gray-600"
+                        }`}
                     >
                       Update pricing and conditions
                     </p>
@@ -1581,9 +1729,8 @@ const EditPropertyForm = ({ property, isOpen, onClose, onSubmit, theme }) => {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
                     <label
-                      className={`block text-sm font-semibold mb-3 ${
-                        theme === "dark" ? "text-gray-300" : "text-gray-700"
-                      }`}
+                      className={`block text-sm font-semibold mb-3 ${theme === "dark" ? "text-gray-300" : "text-gray-700"
+                        }`}
                     >
                       Price * ({formData.currency})
                     </label>
@@ -1598,11 +1745,10 @@ const EditPropertyForm = ({ property, isOpen, onClose, onSubmit, theme }) => {
                         onChange={handleChange}
                         required
                         placeholder="Enter price amount"
-                        className={`w-full pl-16 pr-4 py-3.5 rounded-xl border focus:ring-2 focus:ring-amber-500 focus:border-transparent ${
-                          theme === "dark"
-                            ? "bg-gray-800 border-gray-700 text-white placeholder-gray-500"
-                            : "bg-white border-gray-300 text-gray-900 placeholder-gray-400"
-                        }`}
+                        className={`w-full pl-16 pr-4 py-3.5 rounded-xl border focus:ring-2 focus:ring-amber-500 focus:border-transparent ${theme === "dark"
+                          ? "bg-gray-800 border-gray-700 text-white placeholder-gray-500"
+                          : "bg-white border-gray-300 text-gray-900 placeholder-gray-400"
+                          }`}
                       />
                     </div>
                   </div>
@@ -1610,9 +1756,8 @@ const EditPropertyForm = ({ property, isOpen, onClose, onSubmit, theme }) => {
                   {formData.listing_type === "rent" && (
                     <div>
                       <label
-                        className={`block text-sm font-semibold mb-3 ${
-                          theme === "dark" ? "text-gray-300" : "text-gray-700"
-                        }`}
+                        className={`block text-sm font-semibold mb-3 ${theme === "dark" ? "text-gray-300" : "text-gray-700"
+                          }`}
                       >
                         Monthly Rent ({formData.currency})
                       </label>
@@ -1622,20 +1767,18 @@ const EditPropertyForm = ({ property, isOpen, onClose, onSubmit, theme }) => {
                         value={formData.monthly_rent}
                         onChange={handleChange}
                         placeholder="For rental properties"
-                        className={`w-full px-4 py-3.5 rounded-xl border focus:ring-2 focus:ring-amber-500 focus:border-transparent ${
-                          theme === "dark"
-                            ? "bg-gray-800 border-gray-700 text-white"
-                            : "bg-white border-gray-300 text-gray-900"
-                        }`}
+                        className={`w-full px-4 py-3.5 rounded-xl border focus:ring-2 focus:ring-amber-500 focus:border-transparent ${theme === "dark"
+                          ? "bg-gray-800 border-gray-700 text-white"
+                          : "bg-white border-gray-300 text-gray-900"
+                          }`}
                       />
                     </div>
                   )}
 
                   <div>
                     <label
-                      className={`block text-sm font-semibold mb-3 ${
-                        theme === "dark" ? "text-gray-300" : "text-gray-700"
-                      }`}
+                      className={`block text-sm font-semibold mb-3 ${theme === "dark" ? "text-gray-300" : "text-gray-700"
+                        }`}
                     >
                       Deposit Amount ({formData.currency})
                     </label>
@@ -1645,19 +1788,17 @@ const EditPropertyForm = ({ property, isOpen, onClose, onSubmit, theme }) => {
                       value={formData.deposit_amount}
                       onChange={handleChange}
                       placeholder="Security deposit"
-                      className={`w-full px-4 py-3.5 rounded-xl border focus:ring-2 focus:ring-amber-500 focus:border-transparent ${
-                        theme === "dark"
-                          ? "bg-gray-800 border-gray-700 text-white"
-                          : "bg-white border-gray-300 text-gray-900"
-                      }`}
+                      className={`w-full px-4 py-3.5 rounded-xl border focus:ring-2 focus:ring-amber-500 focus:border-transparent ${theme === "dark"
+                        ? "bg-gray-800 border-gray-700 text-white"
+                        : "bg-white border-gray-300 text-gray-900"
+                        }`}
                     />
                   </div>
 
                   <div>
                     <label
-                      className={`block text-sm font-semibold mb-3 ${
-                        theme === "dark" ? "text-gray-300" : "text-gray-700"
-                      }`}
+                      className={`block text-sm font-semibold mb-3 ${theme === "dark" ? "text-gray-300" : "text-gray-700"
+                        }`}
                     >
                       Tax Amount ({formData.currency})
                     </label>
@@ -1667,11 +1808,10 @@ const EditPropertyForm = ({ property, isOpen, onClose, onSubmit, theme }) => {
                       value={formData.tax_amount}
                       onChange={handleChange}
                       placeholder="Annual property tax"
-                      className={`w-full px-4 py-3.5 rounded-xl border focus:ring-2 focus:ring-amber-500 focus:border-transparent ${
-                        theme === "dark"
-                          ? "bg-gray-800 border-gray-700 text-white"
-                          : "bg-white border-gray-300 text-gray-900"
-                      }`}
+                      className={`w-full px-4 py-3.5 rounded-xl border focus:ring-2 focus:ring-amber-500 focus:border-transparent ${theme === "dark"
+                        ? "bg-gray-800 border-gray-700 text-white"
+                        : "bg-white border-gray-300 text-gray-900"
+                        }`}
                     />
                   </div>
                 </div>
@@ -1679,15 +1819,14 @@ const EditPropertyForm = ({ property, isOpen, onClose, onSubmit, theme }) => {
                 {/* Pricing Options */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6">
                   <label
-                    className={`flex items-center space-x-3 p-4 rounded-xl cursor-pointer transition-all duration-300 ${
-                      formData.is_negotiable
-                        ? theme === "dark"
-                          ? "bg-emerald-900/20 border border-emerald-800"
-                          : "bg-emerald-50 border border-emerald-200"
-                        : theme === "dark"
+                    className={`flex items-center space-x-3 p-4 rounded-xl cursor-pointer transition-all duration-300 ${formData.is_negotiable
+                      ? theme === "dark"
+                        ? "bg-emerald-900/20 border border-emerald-800"
+                        : "bg-emerald-50 border border-emerald-200"
+                      : theme === "dark"
                         ? "bg-gray-800 hover:bg-gray-700 border border-gray-700"
                         : "bg-gray-50 hover:bg-gray-100 border border-gray-200"
-                    }`}
+                      }`}
                   >
                     <div className="relative">
                       <input
@@ -1698,13 +1837,12 @@ const EditPropertyForm = ({ property, isOpen, onClose, onSubmit, theme }) => {
                         className="sr-only"
                       />
                       <div
-                        className={`w-6 h-6 rounded-lg border flex items-center justify-center transition-all duration-300 ${
-                          formData.is_negotiable
-                            ? "bg-emerald-500 border-emerald-500"
-                            : theme === "dark"
+                        className={`w-6 h-6 rounded-lg border flex items-center justify-center transition-all duration-300 ${formData.is_negotiable
+                          ? "bg-emerald-500 border-emerald-500"
+                          : theme === "dark"
                             ? "border-gray-600 bg-gray-700"
                             : "border-gray-400 bg-white"
-                        }`}
+                          }`}
                       >
                         {formData.is_negotiable && (
                           <Check className="w-4 h-4 text-white" />
@@ -1713,9 +1851,8 @@ const EditPropertyForm = ({ property, isOpen, onClose, onSubmit, theme }) => {
                     </div>
                     <div>
                       <span
-                        className={`font-medium ${
-                          theme === "dark" ? "text-gray-300" : "text-gray-700"
-                        }`}
+                        className={`font-medium ${theme === "dark" ? "text-gray-300" : "text-gray-700"
+                          }`}
                       >
                         Price Negotiable
                       </span>
@@ -1726,15 +1863,14 @@ const EditPropertyForm = ({ property, isOpen, onClose, onSubmit, theme }) => {
                   </label>
 
                   <label
-                    className={`flex items-center space-x-3 p-4 rounded-xl cursor-pointer transition-all duration-300 ${
-                      formData.is_exclusive
-                        ? theme === "dark"
-                          ? "bg-purple-900/20 border border-purple-800"
-                          : "bg-purple-50 border border-purple-200"
-                        : theme === "dark"
+                    className={`flex items-center space-x-3 p-4 rounded-xl cursor-pointer transition-all duration-300 ${formData.is_exclusive
+                      ? theme === "dark"
+                        ? "bg-purple-900/20 border border-purple-800"
+                        : "bg-purple-50 border border-purple-200"
+                      : theme === "dark"
                         ? "bg-gray-800 hover:bg-gray-700 border border-gray-700"
                         : "bg-gray-50 hover:bg-gray-100 border border-gray-200"
-                    }`}
+                      }`}
                   >
                     <div className="relative">
                       <input
@@ -1745,13 +1881,12 @@ const EditPropertyForm = ({ property, isOpen, onClose, onSubmit, theme }) => {
                         className="sr-only"
                       />
                       <div
-                        className={`w-6 h-6 rounded-lg border flex items-center justify-center transition-all duration-300 ${
-                          formData.is_exclusive
-                            ? "bg-purple-500 border-purple-500"
-                            : theme === "dark"
+                        className={`w-6 h-6 rounded-lg border flex items-center justify-center transition-all duration-300 ${formData.is_exclusive
+                          ? "bg-purple-500 border-purple-500"
+                          : theme === "dark"
                             ? "border-gray-600 bg-gray-700"
                             : "border-gray-400 bg-white"
-                        }`}
+                          }`}
                       >
                         {formData.is_exclusive && (
                           <Check className="w-4 h-4 text-white" />
@@ -1760,9 +1895,8 @@ const EditPropertyForm = ({ property, isOpen, onClose, onSubmit, theme }) => {
                     </div>
                     <div>
                       <span
-                        className={`font-medium ${
-                          theme === "dark" ? "text-gray-300" : "text-gray-700"
-                        }`}
+                        className={`font-medium ${theme === "dark" ? "text-gray-300" : "text-gray-700"
+                          }`}
                       >
                         Exclusive Listing
                       </span>
@@ -1773,15 +1907,14 @@ const EditPropertyForm = ({ property, isOpen, onClose, onSubmit, theme }) => {
                   </label>
 
                   <label
-                    className={`flex items-center space-x-3 p-4 rounded-xl cursor-pointer transition-all duration-300 ${
-                      formData.is_featured
-                        ? theme === "dark"
-                          ? "bg-amber-900/20 border border-amber-800"
-                          : "bg-amber-50 border border-amber-200"
-                        : theme === "dark"
+                    className={`flex items-center space-x-3 p-4 rounded-xl cursor-pointer transition-all duration-300 ${formData.is_featured
+                      ? theme === "dark"
+                        ? "bg-amber-900/20 border border-amber-800"
+                        : "bg-amber-50 border border-amber-200"
+                      : theme === "dark"
                         ? "bg-gray-800 hover:bg-gray-700 border border-gray-700"
                         : "bg-gray-50 hover:bg-gray-100 border border-gray-200"
-                    }`}
+                      }`}
                   >
                     <div className="relative">
                       <input
@@ -1792,13 +1925,12 @@ const EditPropertyForm = ({ property, isOpen, onClose, onSubmit, theme }) => {
                         className="sr-only"
                       />
                       <div
-                        className={`w-6 h-6 rounded-lg border flex items-center justify-center transition-all duration-300 ${
-                          formData.is_featured
-                            ? "bg-amber-500 border-amber-500"
-                            : theme === "dark"
+                        className={`w-6 h-6 rounded-lg border flex items-center justify-center transition-all duration-300 ${formData.is_featured
+                          ? "bg-amber-500 border-amber-500"
+                          : theme === "dark"
                             ? "border-gray-600 bg-gray-700"
                             : "border-gray-400 bg-white"
-                        }`}
+                          }`}
                       >
                         {formData.is_featured && (
                           <Check className="w-4 h-4 text-white" />
@@ -1807,9 +1939,8 @@ const EditPropertyForm = ({ property, isOpen, onClose, onSubmit, theme }) => {
                     </div>
                     <div>
                       <span
-                        className={`font-medium ${
-                          theme === "dark" ? "text-gray-300" : "text-gray-700"
-                        }`}
+                        className={`font-medium ${theme === "dark" ? "text-gray-300" : "text-gray-700"
+                          }`}
                       >
                         Featured Listing
                       </span>
@@ -1820,15 +1951,14 @@ const EditPropertyForm = ({ property, isOpen, onClose, onSubmit, theme }) => {
                   </label>
 
                   <label
-                    className={`flex items-center space-x-3 p-4 rounded-xl cursor-pointer transition-all duration-300 ${
-                      formData.is_premium
-                        ? theme === "dark"
-                          ? "bg-blue-900/20 border border-blue-800"
-                          : "bg-blue-50 border border-blue-200"
-                        : theme === "dark"
+                    className={`flex items-center space-x-3 p-4 rounded-xl cursor-pointer transition-all duration-300 ${formData.is_premium
+                      ? theme === "dark"
+                        ? "bg-blue-900/20 border border-blue-800"
+                        : "bg-blue-50 border border-blue-200"
+                      : theme === "dark"
                         ? "bg-gray-800 hover:bg-gray-700 border border-gray-700"
                         : "bg-gray-50 hover:bg-gray-100 border border-gray-200"
-                    }`}
+                      }`}
                   >
                     <div className="relative">
                       <input
@@ -1839,13 +1969,12 @@ const EditPropertyForm = ({ property, isOpen, onClose, onSubmit, theme }) => {
                         className="sr-only"
                       />
                       <div
-                        className={`w-6 h-6 rounded-lg border flex items-center justify-center transition-all duration-300 ${
-                          formData.is_premium
-                            ? "bg-blue-500 border-blue-500"
-                            : theme === "dark"
+                        className={`w-6 h-6 rounded-lg border flex items-center justify-center transition-all duration-300 ${formData.is_premium
+                          ? "bg-blue-500 border-blue-500"
+                          : theme === "dark"
                             ? "border-gray-600 bg-gray-700"
                             : "border-gray-400 bg-white"
-                        }`}
+                          }`}
                       >
                         {formData.is_premium && (
                           <Check className="w-4 h-4 text-white" />
@@ -1854,9 +1983,8 @@ const EditPropertyForm = ({ property, isOpen, onClose, onSubmit, theme }) => {
                     </div>
                     <div>
                       <span
-                        className={`font-medium ${
-                          theme === "dark" ? "text-gray-300" : "text-gray-700"
-                        }`}
+                        className={`font-medium ${theme === "dark" ? "text-gray-300" : "text-gray-700"
+                          }`}
                       >
                         Premium Listing
                       </span>
@@ -1872,28 +2000,24 @@ const EditPropertyForm = ({ property, isOpen, onClose, onSubmit, theme }) => {
               <div>
                 <div className="flex items-center gap-3 mb-6">
                   <div
-                    className={`p-2 rounded-lg ${
-                      theme === "dark" ? "bg-blue-900/30" : "bg-blue-100"
-                    }`}
+                    className={`p-2 rounded-lg ${theme === "dark" ? "bg-blue-900/30" : "bg-blue-100"
+                      }`}
                   >
                     <FileText
-                      className={`w-5 h-5 ${
-                        theme === "dark" ? "text-blue-400" : "text-blue-600"
-                      }`}
+                      className={`w-5 h-5 ${theme === "dark" ? "text-blue-400" : "text-blue-600"
+                        }`}
                     />
                   </div>
                   <div>
                     <h3
-                      className={`text-semibold ${
-                        theme === "dark" ? "text-white" : "text-gray-800"
-                      }`}
+                      className={`text-semibold ${theme === "dark" ? "text-white" : "text-gray-800"
+                        }`}
                     >
                       Property Description
                     </h3>
                     <p
-                      className={`text-sm ${
-                        theme === "dark" ? "text-gray-400" : "text-gray-600"
-                      }`}
+                      className={`text-sm ${theme === "dark" ? "text-gray-400" : "text-gray-600"
+                        }`}
                     >
                       Update property description
                     </p>
@@ -1905,40 +2029,35 @@ const EditPropertyForm = ({ property, isOpen, onClose, onSubmit, theme }) => {
                   onChange={handleChange}
                   rows="6"
                   placeholder="Describe the property features, amenities, unique selling points, nearby attractions, and any special characteristics..."
-                  className={`w-full px-4 py-3.5 rounded-xl border focus:ring-2 focus:ring-amber-500 focus:border-transparent resize-none ${
-                    theme === "dark"
-                      ? "bg-gray-800 border-gray-700 text-white placeholder-gray-500"
-                      : "bg-white border-gray-300 text-gray-900 placeholder-gray-400"
-                  }`}
+                  className={`w-full px-4 py-3.5 rounded-xl border focus:ring-2 focus:ring-amber-500 focus:border-transparent resize-none ${theme === "dark"
+                    ? "bg-gray-800 border-gray-700 text-white placeholder-gray-500"
+                    : "bg-white border-gray-300 text-gray-900 placeholder-gray-400"
+                    }`}
                 />
               </div>
 
-              {/* MLS Information */}
+              {/* MLS Information with CalendarPopup */}
               <div>
                 <div className="flex items-center gap-3 mb-6">
                   <div
-                    className={`p-2 rounded-lg ${
-                      theme === "dark" ? "bg-indigo-900/30" : "bg-indigo-100"
-                    }`}
+                    className={`p-2 rounded-lg ${theme === "dark" ? "bg-indigo-900/30" : "bg-indigo-100"
+                      }`}
                   >
                     <Hash
-                      className={`w-5 h-5 ${
-                        theme === "dark" ? "text-indigo-400" : "text-indigo-600"
-                      }`}
+                      className={`w-5 h-5 ${theme === "dark" ? "text-indigo-400" : "text-indigo-600"
+                        }`}
                     />
                   </div>
                   <div>
                     <h3
-                      className={`text-semibold ${
-                        theme === "dark" ? "text-white" : "text-gray-800"
-                      }`}
+                      className={`text-semibold ${theme === "dark" ? "text-white" : "text-gray-800"
+                        }`}
                     >
                       MLS Information (Optional)
                     </h3>
                     <p
-                      className={`text-sm ${
-                        theme === "dark" ? "text-gray-400" : "text-gray-600"
-                      }`}
+                      className={`text-sm ${theme === "dark" ? "text-gray-400" : "text-gray-600"
+                        }`}
                     >
                       Multiple Listing Service details
                     </p>
@@ -1947,9 +2066,8 @@ const EditPropertyForm = ({ property, isOpen, onClose, onSubmit, theme }) => {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
                     <label
-                      className={`block text-sm font-semibold mb-3 ${
-                        theme === "dark" ? "text-gray-300" : "text-gray-700"
-                      }`}
+                      className={`block text-sm font-semibold mb-3 ${theme === "dark" ? "text-gray-300" : "text-gray-700"
+                        }`}
                     >
                       MLS Number
                     </label>
@@ -1959,19 +2077,17 @@ const EditPropertyForm = ({ property, isOpen, onClose, onSubmit, theme }) => {
                       value={formData.mls_number}
                       onChange={handleChange}
                       placeholder="e.g., MLS123456"
-                      className={`w-full px-4 py-3.5 rounded-xl border focus:ring-2 focus:ring-amber-500 focus:border-transparent ${
-                        theme === "dark"
-                          ? "bg-gray-800 border-gray-700 text-white"
-                          : "bg-white border-gray-300 text-gray-900"
-                      }`}
+                      className={`w-full px-4 py-3.5 rounded-xl border focus:ring-2 focus:ring-amber-500 focus:border-transparent ${theme === "dark"
+                        ? "bg-gray-800 border-gray-700 text-white"
+                        : "bg-white border-gray-300 text-gray-900"
+                        }`}
                     />
                   </div>
 
                   <div>
                     <label
-                      className={`block text-sm font-semibold mb-3 ${
-                        theme === "dark" ? "text-gray-300" : "text-gray-700"
-                      }`}
+                      className={`block text-sm font-semibold mb-3 ${theme === "dark" ? "text-gray-300" : "text-gray-700"
+                        }`}
                     >
                       MLS Source
                     </label>
@@ -1981,55 +2097,86 @@ const EditPropertyForm = ({ property, isOpen, onClose, onSubmit, theme }) => {
                       value={formData.mls_source}
                       onChange={handleChange}
                       placeholder="e.g., WubLand, Other MLS"
-                      className={`w-full px-4 py-3.5 rounded-xl border focus:ring-2 focus:ring-amber-500 focus:border-transparent ${
-                        theme === "dark"
-                          ? "bg-gray-800 border-gray-700 text-white"
-                          : "bg-white border-gray-300 text-gray-900"
-                      }`}
+                      className={`w-full px-4 py-3.5 rounded-xl border focus:ring-2 focus:ring-amber-500 focus:border-transparent ${theme === "dark"
+                        ? "bg-gray-800 border-gray-700 text-white"
+                        : "bg-white border-gray-300 text-gray-900"
+                        }`}
                     />
                   </div>
 
+                  {/* Listing Date with CalendarPopup */}
                   <div>
                     <label
-                      className={`block text-sm font-semibold mb-3 ${
-                        theme === "dark" ? "text-gray-300" : "text-gray-700"
-                      }`}
+                      className={`block text-sm font-semibold mb-3 ${theme === "dark" ? "text-gray-300" : "text-gray-700"
+                        }`}
                     >
                       Listing Date
                     </label>
-                    <input
-                      type="date"
-                      name="listing_date"
-                      value={formData.listing_date}
-                      onChange={handleChange}
-                      className={`w-full px-4 py-3.5 rounded-xl border focus:ring-2 focus:ring-amber-500 focus:border-transparent ${
-                        theme === "dark"
-                          ? "bg-gray-800 border-gray-700 text-white"
-                          : "bg-white border-gray-300 text-gray-900"
-                      }`}
-                    />
+                    <div className="relative" ref={calendarListingRef}>
+                      <Calendar className="absolute left-4 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-500 dark:text-gray-400" />
+                      <input
+                        type="text"
+                        name="listing_date"
+                        value={formData.listing_date}
+                        onChange={handleChange}
+                        onFocus={() => setShowListingCalendar(true)}
+                        placeholder="YYYY-MM-DD"
+                        className={`w-full pl-12 pr-4 py-3.5 rounded-xl border focus:ring-2 focus:ring-amber-500 focus:border-transparent ${theme === "dark"
+                          ? "bg-gray-800 border-gray-700 text-white placeholder-gray-500"
+                          : "bg-white border-gray-300 text-gray-900 placeholder-gray-400"
+                          }`}
+                      />
+                      {showListingCalendar && (
+                        <CalendarPopup
+                          selectedDate={formData.listing_date ? new Date(formData.listing_date) : null}
+                          onDateSelect={(date) => {
+                            handleDateSelect("listing_date", date);
+                            setShowListingCalendar(false);
+                          }}
+                          onClose={() => setShowListingCalendar(false)}
+                          theme={theme}
+                          calendarRef={calendarListingRef}
+                        />
+                      )}
+                    </div>
                   </div>
 
+                  {/* Expiration Date with CalendarPopup */}
                   <div>
                     <label
-                      className={`block text-sm font-semibold mb-3 ${
-                        theme === "dark" ? "text-gray-300" : "text-gray-700"
-                      }`}
+                      className={`block text-sm font-semibold mb-3 ${theme === "dark" ? "text-gray-300" : "text-gray-700"
+                        }`}
                     >
                       Expiration Date
                     </label>
-                    <input
-                      type="date"
-                      name="expiration_date"
-                      value={formData.expiration_date}
-                      onChange={handleChange}
-                      min={formData.listing_date}
-                      className={`w-full px-4 py-3.5 rounded-xl border focus:ring-2 focus:ring-amber-500 focus:border-transparent ${
-                        theme === "dark"
-                          ? "bg-gray-800 border-gray-700 text-white"
-                          : "bg-white border-gray-300 text-gray-900"
-                      }`}
-                    />
+                    <div className="relative" ref={calendarExpirationRef}>
+                      <Calendar className="absolute left-4 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-500 dark:text-gray-400" />
+                      <input
+                        type="text"
+                        name="expiration_date"
+                        value={formData.expiration_date}
+                        onChange={handleChange}
+                        onFocus={() => setShowExpirationCalendar(true)}
+                        placeholder="YYYY-MM-DD"
+                        min={formData.listing_date}
+                        className={`w-full pl-12 pr-4 py-3.5 rounded-xl border focus:ring-2 focus:ring-amber-500 focus:border-transparent ${theme === "dark"
+                          ? "bg-gray-800 border-gray-700 text-white placeholder-gray-500"
+                          : "bg-white border-gray-300 text-gray-900 placeholder-gray-400"
+                          }`}
+                      />
+                      {showExpirationCalendar && (
+                        <CalendarPopup
+                          selectedDate={formData.expiration_date ? new Date(formData.expiration_date) : null}
+                          onDateSelect={(date) => {
+                            handleDateSelect("expiration_date", date);
+                            setShowExpirationCalendar(false);
+                          }}
+                          onClose={() => setShowExpirationCalendar(false)}
+                          theme={theme}
+                          calendarRef={calendarExpirationRef}
+                        />
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -2039,11 +2186,10 @@ const EditPropertyForm = ({ property, isOpen, onClose, onSubmit, theme }) => {
                 <button
                   type="button"
                   onClick={() => setStep(2)}
-                  className={`px-6 py-3.5 rounded-xl flex items-center gap-2 transition-all duration-300 hover:scale-105 ${
-                    theme === "dark"
-                      ? "bg-gray-800 hover:bg-gray-700 text-gray-300 border border-gray-700"
-                      : "bg-gray-100 hover:bg-gray-200 text-gray-700 border border-gray-200"
-                  }`}
+                  className={`px-6 py-3.5 rounded-xl flex items-center gap-2 transition-all duration-300 hover:scale-105 ${theme === "dark"
+                    ? "bg-gray-800 hover:bg-gray-700 text-gray-300 border border-gray-700"
+                    : "bg-gray-100 hover:bg-gray-200 text-gray-700 border border-gray-200"
+                    }`}
                 >
                   <ChevronLeft className="w-4 h-4" />
                   Back
@@ -2068,28 +2214,24 @@ const EditPropertyForm = ({ property, isOpen, onClose, onSubmit, theme }) => {
                 <div>
                   <div className="flex items-center gap-3 mb-6">
                     <div
-                      className={`p-2 rounded-lg ${
-                        theme === "dark" ? "bg-amber-900/30" : "bg-amber-100"
-                      }`}
+                      className={`p-2 rounded-lg ${theme === "dark" ? "bg-amber-900/30" : "bg-amber-100"
+                        }`}
                     >
                       <ImageIcon
-                        className={`w-5 h-5 ${
-                          theme === "dark" ? "text-amber-400" : "text-amber-600"
-                        }`}
+                        className={`w-5 h-5 ${theme === "dark" ? "text-amber-400" : "text-amber-600"
+                          }`}
                       />
                     </div>
                     <div>
                       <h3
-                        className={`text-semibold ${
-                          theme === "dark" ? "text-white" : "text-gray-800"
-                        }`}
+                        className={`text-semibold ${theme === "dark" ? "text-white" : "text-gray-800"
+                          }`}
                       >
                         Existing Images ({existingImages.length})
                       </h3>
                       <p
-                        className={`text-sm ${
-                          theme === "dark" ? "text-gray-400" : "text-gray-600"
-                        }`}
+                        className={`text-sm ${theme === "dark" ? "text-gray-400" : "text-gray-600"
+                          }`}
                       >
                         Current property images. You can remove or set as primary.
                       </p>
@@ -2100,13 +2242,12 @@ const EditPropertyForm = ({ property, isOpen, onClose, onSubmit, theme }) => {
                     {existingImages.map((image, index) => (
                       <div
                         key={image.id}
-                        className={`relative group rounded-xl overflow-hidden border-2 transition-all duration-300 ${
-                          image.is_primary
-                            ? "border-amber-500 ring-2 ring-amber-500/20"
-                            : theme === "dark"
+                        className={`relative group rounded-xl overflow-hidden border-2 transition-all duration-300 ${image.is_primary
+                          ? "border-amber-500 ring-2 ring-amber-500/20"
+                          : theme === "dark"
                             ? "border-gray-700 hover:border-gray-600"
                             : "border-gray-200 hover:border-gray-300"
-                        }`}
+                          }`}
                       >
                         <div className="aspect-square overflow-hidden">
                           <img
@@ -2129,11 +2270,10 @@ const EditPropertyForm = ({ property, isOpen, onClose, onSubmit, theme }) => {
                                 type="button"
                                 onClick={() => setPrimaryImage(image.id, "existing")}
                                 disabled={image.is_primary}
-                                className={`p-1.5 rounded-full transition-colors ${
-                                  image.is_primary
-                                    ? "bg-amber-500 text-white cursor-default"
-                                    : "bg-emerald-500/80 hover:bg-emerald-500 text-white"
-                                }`}
+                                className={`p-1.5 rounded-full transition-colors ${image.is_primary
+                                  ? "bg-amber-500 text-white cursor-default"
+                                  : "bg-emerald-500/80 hover:bg-emerald-500 text-white"
+                                  }`}
                                 title={
                                   image.is_primary
                                     ? "Already primary"
@@ -2155,21 +2295,18 @@ const EditPropertyForm = ({ property, isOpen, onClose, onSubmit, theme }) => {
 
                           <div className="transform translate-y-4 group-hover:translate-y-0 transition-transform duration-300">
                             <div
-                              className={`p-2 rounded-lg backdrop-blur-sm ${
-                                theme === "dark" ? "bg-black/60" : "bg-white/80"
-                              }`}
+                              className={`p-2 rounded-lg backdrop-blur-sm ${theme === "dark" ? "bg-black/60" : "bg-white/80"
+                                }`}
                             >
                               <p
-                                className={`text-xs font-medium truncate ${
-                                  theme === "dark" ? "text-white" : "text-gray-900"
-                                }`}
+                                className={`text-xs font-medium truncate ${theme === "dark" ? "text-white" : "text-gray-900"
+                                  }`}
                               >
                                 Existing Image {index + 1}
                               </p>
                               <p
-                                className={`text-xs ${
-                                  theme === "dark" ? "text-gray-300" : "text-gray-600"
-                                }`}
+                                className={`text-xs ${theme === "dark" ? "text-gray-300" : "text-gray-600"
+                                  }`}
                               >
                                 {image.size}
                               </p>
@@ -2197,28 +2334,24 @@ const EditPropertyForm = ({ property, isOpen, onClose, onSubmit, theme }) => {
               <div>
                 <div className="flex items-center gap-3 mb-6">
                   <div
-                    className={`p-2 rounded-lg ${
-                      theme === "dark" ? "bg-blue-900/30" : "bg-blue-100"
-                    }`}
+                    className={`p-2 rounded-lg ${theme === "dark" ? "bg-blue-900/30" : "bg-blue-100"
+                      }`}
                   >
                     <Upload
-                      className={`w-5 h-5 ${
-                        theme === "dark" ? "text-blue-400" : "text-blue-600"
-                      }`}
+                      className={`w-5 h-5 ${theme === "dark" ? "text-blue-400" : "text-blue-600"
+                        }`}
                     />
                   </div>
                   <div>
                     <h3
-                      className={`text-semibold ${
-                        theme === "dark" ? "text-white" : "text-gray-800"
-                      }`}
+                      className={`text-semibold ${theme === "dark" ? "text-white" : "text-gray-800"
+                        }`}
                     >
                       Add New Images
                     </h3>
                     <p
-                      className={`text-sm ${
-                        theme === "dark" ? "text-gray-400" : "text-gray-600"
-                      }`}
+                      className={`text-sm ${theme === "dark" ? "text-gray-400" : "text-gray-600"
+                        }`}
                     >
                       Upload additional property images
                     </p>
@@ -2228,43 +2361,37 @@ const EditPropertyForm = ({ property, isOpen, onClose, onSubmit, theme }) => {
                 {/* Image Upload Area */}
                 <div
                   onClick={() => imageInputRef.current?.click()}
-                  className={`border-2 border-dashed rounded-2xl p-8 text-center cursor-pointer transition-all duration-300 hover:border-amber-500 hover:scale-[1.01] ${
-                    theme === "dark"
-                      ? "border-amber-700 bg-amber-800/30 hover:bg-amber-800/50"
-                      : "border-amber-300 bg-amber-50 hover:bg-amber-100"
-                  }`}
+                  className={`border-2 border-dashed rounded-2xl p-8 text-center cursor-pointer transition-all duration-300 hover:border-amber-500 hover:scale-[1.01] ${theme === "dark"
+                    ? "border-amber-700 bg-amber-800/30 hover:bg-amber-800/50"
+                    : "border-amber-300 bg-amber-50 hover:bg-amber-100"
+                    }`}
                 >
                   <div className="flex flex-col items-center justify-center gap-4">
                     <div
-                      className={`p-4 rounded-full ${
-                        theme === "dark" ? "bg-amber-900/20" : "bg-amber-200"
-                      }`}
+                      className={`p-4 rounded-full ${theme === "dark" ? "bg-amber-900/20" : "bg-amber-200"
+                        }`}
                     >
                       <CloudUpload
-                        className={`w-8 h-8 ${
-                          theme === "dark" ? "text-amber-400" : "text-amber-600"
-                        }`}
+                        className={`w-8 h-8 ${theme === "dark" ? "text-amber-400" : "text-amber-600"
+                          }`}
                       />
                     </div>
                     <div>
                       <h4
-                        className={`font-semibold ${
-                          theme === "dark" ? "text-amber-400" : "text-amber-600"
-                        }`}
+                        className={`font-semibold ${theme === "dark" ? "text-amber-400" : "text-amber-600"
+                          }`}
                       >
                         Upload New Images
                       </h4>
                       <p
-                        className={`text-sm ${
-                          theme === "dark" ? "text-gray-400" : "text-gray-600"
-                        }`}
+                        className={`text-sm ${theme === "dark" ? "text-gray-400" : "text-gray-600"
+                          }`}
                       >
                         Click to browse or drag and drop images (JPG, PNG, WEBP)
                       </p>
                       <p
-                        className={`text-xs mt-2 ${
-                          theme === "dark" ? "text-gray-500" : "text-gray-500"
-                        }`}
+                        className={`text-xs mt-2 ${theme === "dark" ? "text-gray-500" : "text-gray-500"
+                          }`}
                       >
                         Maximum file size: 10MB • Recommended: 1920x1080px
                       </p>
@@ -2295,9 +2422,8 @@ const EditPropertyForm = ({ property, isOpen, onClose, onSubmit, theme }) => {
                       </h4>
                       <div className="flex items-center gap-4">
                         <span
-                          className={`text-sm ${
-                            theme === "dark" ? "text-gray-400" : "text-gray-600"
-                          }`}
+                          className={`text-sm ${theme === "dark" ? "text-gray-400" : "text-gray-600"
+                            }`}
                         >
                           {uploadedImages.filter((img) => img.isPrimary).length}{" "}
                           primary image
@@ -2317,11 +2443,10 @@ const EditPropertyForm = ({ property, isOpen, onClose, onSubmit, theme }) => {
                                 setUploadedImages([]);
                               }
                             }}
-                            className={`px-3 py-1.5 text-sm rounded-lg transition-colors ${
-                              theme === "dark"
-                                ? "bg-red-900/30 text-red-400 hover:bg-red-900/50 border border-red-800/50"
-                                : "bg-red-50 text-red-600 hover:bg-red-100 border border-red-200"
-                            }`}
+                            className={`px-3 py-1.5 text-sm rounded-lg transition-colors ${theme === "dark"
+                              ? "bg-red-900/30 text-red-400 hover:bg-red-900/50 border border-red-800/50"
+                              : "bg-red-50 text-red-600 hover:bg-red-100 border border-red-200"
+                              }`}
                           >
                             Remove All
                           </button>
@@ -2332,13 +2457,12 @@ const EditPropertyForm = ({ property, isOpen, onClose, onSubmit, theme }) => {
                       {uploadedImages.map((image, index) => (
                         <div
                           key={image.id}
-                          className={`relative group rounded-xl overflow-hidden border-2 transition-all duration-300 ${
-                            image.isPrimary
-                              ? "border-amber-500 ring-2 ring-amber-500/20"
-                              : theme === "dark"
+                          className={`relative group rounded-xl overflow-hidden border-2 transition-all duration-300 ${image.isPrimary
+                            ? "border-amber-500 ring-2 ring-amber-500/20"
+                            : theme === "dark"
                               ? "border-gray-700 hover:border-gray-600"
                               : "border-gray-200 hover:border-gray-300"
-                          }`}
+                            }`}
                         >
                           <div className="aspect-square overflow-hidden">
                             <img
@@ -2361,11 +2485,10 @@ const EditPropertyForm = ({ property, isOpen, onClose, onSubmit, theme }) => {
                                   type="button"
                                   onClick={() => setPrimaryImage(image.id, "new")}
                                   disabled={image.isPrimary}
-                                  className={`p-1.5 rounded-full transition-colors ${
-                                    image.isPrimary
-                                      ? "bg-amber-500 text-white cursor-default"
-                                      : "bg-emerald-500/80 hover:bg-emerald-500 text-white"
-                                  }`}
+                                  className={`p-1.5 rounded-full transition-colors ${image.isPrimary
+                                    ? "bg-amber-500 text-white cursor-default"
+                                    : "bg-emerald-500/80 hover:bg-emerald-500 text-white"
+                                    }`}
                                   title={
                                     image.isPrimary
                                       ? "Already primary"
@@ -2387,21 +2510,18 @@ const EditPropertyForm = ({ property, isOpen, onClose, onSubmit, theme }) => {
 
                             <div className="transform translate-y-4 group-hover:translate-y-0 transition-transform duration-300">
                               <div
-                                className={`p-2 rounded-lg backdrop-blur-sm ${
-                                  theme === "dark" ? "bg-black/60" : "bg-white/80"
-                                }`}
+                                className={`p-2 rounded-lg backdrop-blur-sm ${theme === "dark" ? "bg-black/60" : "bg-white/80"
+                                  }`}
                               >
                                 <p
-                                  className={`text-xs font-medium truncate ${
-                                    theme === "dark" ? "text-white" : "text-gray-900"
-                                  }`}
+                                  className={`text-xs font-medium truncate ${theme === "dark" ? "text-white" : "text-gray-900"
+                                    }`}
                                 >
                                   {image.name}
                                 </p>
                                 <p
-                                  className={`text-xs ${
-                                    theme === "dark" ? "text-gray-300" : "text-gray-600"
-                                  }`}
+                                  className={`text-xs ${theme === "dark" ? "text-gray-300" : "text-gray-600"
+                                    }`}
                                 >
                                   {image.size}
                                 </p>
@@ -2439,30 +2559,26 @@ const EditPropertyForm = ({ property, isOpen, onClose, onSubmit, theme }) => {
                 <div>
                   <div className="flex items-center gap-3 mb-6">
                     <div
-                      className={`p-2 rounded-lg ${
-                        theme === "dark" ? "bg-emerald-900/30" : "bg-emerald-100"
-                      }`}
+                      className={`p-2 rounded-lg ${theme === "dark" ? "bg-emerald-900/30" : "bg-emerald-100"
+                        }`}
                     >
                       <LayoutGrid
-                        className={`w-5 h-5 ${
-                          theme === "dark"
-                            ? "text-emerald-400"
-                            : "text-emerald-600"
-                        }`}
+                        className={`w-5 h-5 ${theme === "dark"
+                          ? "text-emerald-400"
+                          : "text-emerald-600"
+                          }`}
                       />
                     </div>
                     <div>
                       <h3
-                        className={`text-semibold ${
-                          theme === "dark" ? "text-white" : "text-gray-800"
-                        }`}
+                        className={`text-semibold ${theme === "dark" ? "text-white" : "text-gray-800"
+                          }`}
                       >
                         Existing Floor Plans ({existingFloorPlans.length})
                       </h3>
                       <p
-                        className={`text-sm ${
-                          theme === "dark" ? "text-gray-400" : "text-gray-600"
-                        }`}
+                        className={`text-sm ${theme === "dark" ? "text-gray-400" : "text-gray-600"
+                          }`}
                       >
                         Current floor plans. You can update captions or remove.
                       </p>
@@ -2473,11 +2589,10 @@ const EditPropertyForm = ({ property, isOpen, onClose, onSubmit, theme }) => {
                     {existingFloorPlans.map((floorPlan) => (
                       <div
                         key={floorPlan.id}
-                        className={`rounded-xl overflow-hidden border transition-all duration-300 group ${
-                          theme === "dark"
-                            ? "border-gray-700 bg-gray-800/30 hover:border-gray-600 hover:bg-gray-800/50"
-                            : "border-gray-200 bg-gray-50 hover:border-gray-300 hover:bg-gray-100"
-                        }`}
+                        className={`rounded-xl overflow-hidden border transition-all duration-300 group ${theme === "dark"
+                          ? "border-gray-700 bg-gray-800/30 hover:border-gray-600 hover:bg-gray-800/50"
+                          : "border-gray-200 bg-gray-50 hover:border-gray-300 hover:bg-gray-100"
+                          }`}
                       >
                         <div className="grid grid-cols-3 gap-0">
                           <div className="col-span-1 bg-gray-100 dark:bg-gray-900 p-4 relative">
@@ -2515,11 +2630,10 @@ const EditPropertyForm = ({ property, isOpen, onClose, onSubmit, theme }) => {
                                   updateFloorPlanCaption(floorPlan.id, e.target.value, "existing")
                                 }
                                 placeholder="Floor plan caption..."
-                                className={`w-full px-3 py-2 rounded-lg border focus:ring-2 focus:ring-purple-500 focus:border-transparent ${
-                                  theme === "dark"
-                                    ? "bg-gray-800 border-gray-700 text-white placeholder-gray-500"
-                                    : "bg-white border-gray-300 text-gray-900 placeholder-gray-400"
-                                }`}
+                                className={`w-full px-3 py-2 rounded-lg border focus:ring-2 focus:ring-purple-500 focus:border-transparent ${theme === "dark"
+                                  ? "bg-gray-800 border-gray-700 text-white placeholder-gray-500"
+                                  : "bg-white border-gray-300 text-gray-900 placeholder-gray-400"
+                                  }`}
                               />
                             </div>
                           </div>
@@ -2534,28 +2648,24 @@ const EditPropertyForm = ({ property, isOpen, onClose, onSubmit, theme }) => {
               <div>
                 <div className="flex items-center gap-3 mb-6">
                   <div
-                    className={`p-2 rounded-lg ${
-                      theme === "dark" ? "bg-teal-900/30" : "bg-teal-100"
-                    }`}
+                    className={`p-2 rounded-lg ${theme === "dark" ? "bg-teal-900/30" : "bg-teal-100"
+                      }`}
                   >
                     <LayoutGrid
-                      className={`w-5 h-5 ${
-                        theme === "dark" ? "text-teal-400" : "text-teal-600"
-                      }`}
+                      className={`w-5 h-5 ${theme === "dark" ? "text-teal-400" : "text-teal-600"
+                        }`}
                     />
                   </div>
                   <div>
                     <h3
-                      className={`text-semibold ${
-                        theme === "dark" ? "text-white" : "text-gray-800"
-                      }`}
+                      className={`text-semibold ${theme === "dark" ? "text-white" : "text-gray-800"
+                        }`}
                     >
                       Add New Floor Plans
                     </h3>
                     <p
-                      className={`text-sm ${
-                        theme === "dark" ? "text-gray-400" : "text-gray-600"
-                      }`}
+                      className={`text-sm ${theme === "dark" ? "text-gray-400" : "text-gray-600"
+                        }`}
                     >
                       Upload additional floor plans
                     </p>
@@ -2565,47 +2675,41 @@ const EditPropertyForm = ({ property, isOpen, onClose, onSubmit, theme }) => {
                 {/* Floor Plan Upload Area */}
                 <div
                   onClick={() => floorPlanInputRef.current?.click()}
-                  className={`border-2 border-dashed rounded-2xl p-8 text-center cursor-pointer transition-all duration-300 hover:border-emerald-500 hover:scale-[1.01] ${
-                    theme === "dark"
-                      ? "border-emerald-700 bg-emerald-800/30 hover:bg-emerald-800/50"
-                      : "border-emerald-300 bg-emerald-50 hover:bg-emerald-100"
-                  }`}
+                  className={`border-2 border-dashed rounded-2xl p-8 text-center cursor-pointer transition-all duration-300 hover:border-emerald-500 hover:scale-[1.01] ${theme === "dark"
+                    ? "border-emerald-700 bg-emerald-800/30 hover:bg-emerald-800/50"
+                    : "border-emerald-300 bg-emerald-50 hover:bg-emerald-100"
+                    }`}
                 >
                   <div className="flex flex-col items-center justify-center gap-4">
                     <div
-                      className={`p-4 rounded-full ${
-                        theme === "dark" ? "bg-emerald-900/20" : "bg-emerald-200"
-                      }`}
+                      className={`p-4 rounded-full ${theme === "dark" ? "bg-emerald-900/20" : "bg-emerald-200"
+                        }`}
                     >
                       <LayoutGrid
-                        className={`w-8 h-8 ${
-                          theme === "dark"
-                            ? "text-emerald-400"
-                            : "text-emerald-600"
-                        }`}
+                        className={`w-8 h-8 ${theme === "dark"
+                          ? "text-emerald-400"
+                          : "text-emerald-600"
+                          }`}
                       />
                     </div>
                     <div>
                       <h4
-                        className={`font-semibold ${
-                          theme === "dark"
-                            ? "text-emerald-400"
-                            : "text-emerald-800"
-                        }`}
+                        className={`font-semibold ${theme === "dark"
+                          ? "text-emerald-400"
+                          : "text-emerald-800"
+                          }`}
                       >
                         Upload New Floor Plans
                       </h4>
                       <p
-                        className={`text-sm ${
-                          theme === "dark" ? "text-gray-400" : "text-gray-600"
-                        }`}
+                        className={`text-sm ${theme === "dark" ? "text-gray-400" : "text-gray-600"
+                          }`}
                       >
                         Click to browse or drag and drop floor plans (JPG, PNG, PDF)
                       </p>
                       <p
-                        className={`text-xs mt-2 ${
-                          theme === "dark" ? "text-gray-500" : "text-gray-500"
-                        }`}
+                        className={`text-xs mt-2 ${theme === "dark" ? "text-gray-500" : "text-gray-500"
+                          }`}
                       >
                         Maximum file size: 20MB • Recommended formats: PDF, SVG, PNG
                       </p>
@@ -2651,11 +2755,10 @@ const EditPropertyForm = ({ property, isOpen, onClose, onSubmit, theme }) => {
                               setUploadedFloorPlans([]);
                             }
                           }}
-                          className={`px-3 py-1.5 text-sm rounded-lg transition-colors ${
-                            theme === "dark"
-                              ? "bg-red-900/30 text-red-400 hover:bg-red-900/50 border border-red-800/50"
-                              : "bg-red-50 text-red-600 hover:bg-red-100 border border-red-200"
-                          }`}
+                          className={`px-3 py-1.5 text-sm rounded-lg transition-colors ${theme === "dark"
+                            ? "bg-red-900/30 text-red-400 hover:bg-red-900/50 border border-red-800/50"
+                            : "bg-red-50 text-red-600 hover:bg-red-100 border border-red-200"
+                            }`}
                         >
                           Remove All Floor Plans
                         </button>
@@ -2665,11 +2768,10 @@ const EditPropertyForm = ({ property, isOpen, onClose, onSubmit, theme }) => {
                       {uploadedFloorPlans.map((floorPlan) => (
                         <div
                           key={floorPlan.id}
-                          className={`rounded-xl overflow-hidden border transition-all duration-300 group ${
-                            theme === "dark"
-                              ? "border-gray-700 bg-gray-800/30 hover:border-gray-600 hover:bg-gray-800/50"
-                              : "border-gray-200 bg-gray-50 hover:border-gray-300 hover:bg-gray-100"
-                          }`}
+                          className={`rounded-xl overflow-hidden border transition-all duration-300 group ${theme === "dark"
+                            ? "border-gray-700 bg-gray-800/30 hover:border-gray-600 hover:bg-gray-800/50"
+                            : "border-gray-200 bg-gray-50 hover:border-gray-300 hover:bg-gray-100"
+                            }`}
                         >
                           <div className="grid grid-cols-3 gap-0">
                             <div className="col-span-1 bg-gray-100 dark:bg-gray-900 p-4 relative">
@@ -2707,11 +2809,10 @@ const EditPropertyForm = ({ property, isOpen, onClose, onSubmit, theme }) => {
                                     updateFloorPlanCaption(floorPlan.id, e.target.value, "new")
                                   }
                                   placeholder="Floor plan caption..."
-                                  className={`w-full px-3 py-2 rounded-lg border focus:ring-2 focus:ring-purple-500 focus:border-transparent ${
-                                    theme === "dark"
-                                      ? "bg-gray-800 border-gray-700 text-white placeholder-gray-500"
-                                      : "bg-white border-gray-300 text-gray-900 placeholder-gray-400"
-                                  }`}
+                                  className={`w-full px-3 py-2 rounded-lg border focus:ring-2 focus:ring-purple-500 focus:border-transparent ${theme === "dark"
+                                    ? "bg-gray-800 border-gray-700 text-white placeholder-gray-500"
+                                    : "bg-white border-gray-300 text-gray-900 placeholder-gray-400"
+                                    }`}
                                 />
                               </div>
                             </div>
@@ -2726,27 +2827,24 @@ const EditPropertyForm = ({ property, isOpen, onClose, onSubmit, theme }) => {
               {/* Upload Progress */}
               {(isUploading || loading) && (
                 <div
-                  className={`p-6 rounded-2xl ${
-                    theme === "dark"
-                      ? "bg-gray-800/50 border border-gray-700"
-                      : "bg-gray-50 border border-gray-200"
-                  }`}
+                  className={`p-6 rounded-2xl ${theme === "dark"
+                    ? "bg-gray-800/50 border border-gray-700"
+                    : "bg-gray-50 border border-gray-200"
+                    }`}
                 >
                   <div className="flex items-center justify-between mb-4">
                     <div className="flex items-center gap-3">
                       <div
-                        className={`p-2 rounded-lg ${
-                          theme === "dark"
-                            ? "bg-emerald-900/30"
-                            : "bg-emerald-100"
-                        }`}
+                        className={`p-2 rounded-lg ${theme === "dark"
+                          ? "bg-emerald-900/30"
+                          : "bg-emerald-100"
+                          }`}
                       >
                         <CloudUpload
-                          className={`w-5 h-5 ${
-                            theme === "dark"
-                              ? "text-emerald-400"
-                              : "text-emerald-600"
-                          }`}
+                          className={`w-5 h-5 ${theme === "dark"
+                            ? "text-emerald-400"
+                            : "text-emerald-600"
+                            }`}
                         />
                       </div>
                       <div>
@@ -2763,9 +2861,8 @@ const EditPropertyForm = ({ property, isOpen, onClose, onSubmit, theme }) => {
                     </span>
                   </div>
                   <div
-                    className={`h-2 rounded-full overflow-hidden ${
-                      theme === "dark" ? "bg-gray-700" : "bg-gray-200"
-                    }`}
+                    className={`h-2 rounded-full overflow-hidden ${theme === "dark" ? "bg-gray-700" : "bg-gray-200"
+                      }`}
                   >
                     <div
                       className="h-full bg-gradient-to-r from-emerald-500 to-teal-500 transition-all duration-300"
@@ -2778,29 +2875,26 @@ const EditPropertyForm = ({ property, isOpen, onClose, onSubmit, theme }) => {
               {/* Summary Stats */}
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <div
-                  className={`p-4 rounded-xl border ${
-                    theme === "dark"
-                      ? "border-gray-700 bg-gray-800/30"
-                      : "border-gray-200 bg-gray-50"
-                  }`}
+                  className={`p-4 rounded-xl border ${theme === "dark"
+                    ? "border-gray-700 bg-gray-800/30"
+                    : "border-gray-200 bg-gray-50"
+                    }`}
                 >
                   <div className="flex items-center gap-3">
                     <div
-                      className={`p-2 rounded-lg ${
-                        theme === "dark" ? "bg-blue-900/20" : "bg-blue-100"
-                      }`}
+                      className={`p-2 rounded-lg ${theme === "dark" ? "bg-blue-900/20" : "bg-blue-100"
+                        }`}
                     >
                       <ImageIcon
-                        className={`w-4 h-4 ${
-                          theme === "dark" ? "text-blue-400" : "text-blue-600"
-                        }`}
+                        className={`w-4 h-4 ${theme === "dark" ? "text-blue-400" : "text-blue-600"
+                          }`}
                       />
                     </div>
                     <div>
                       <p className="text-sm text-gray-600 dark:text-gray-400">
                         Total Images
                       </p>
-                      <p className="text-xl font-bold text-gray-900 dark:text-white">
+                      <p className="text-xl font-bold text-blue-900 dark:text-blue-600">
                         {allImages.length}
                       </p>
                     </div>
@@ -2808,31 +2902,28 @@ const EditPropertyForm = ({ property, isOpen, onClose, onSubmit, theme }) => {
                 </div>
 
                 <div
-                  className={`p-4 rounded-xl border ${
-                    theme === "dark"
-                      ? "border-gray-700 bg-gray-800/30"
-                      : "border-gray-200 bg-gray-50"
-                  }`}
+                  className={`p-4 rounded-xl border ${theme === "dark"
+                    ? "border-gray-700 bg-gray-800/30"
+                    : "border-gray-200 bg-gray-50"
+                    }`}
                 >
                   <div className="flex items-center gap-3">
                     <div
-                      className={`p-2 rounded-lg ${
-                        theme === "dark" ? "bg-emerald-900/20" : "bg-emerald-100"
-                      }`}
+                      className={`p-2 rounded-lg ${theme === "dark" ? "bg-emerald-900/20" : "bg-emerald-100"
+                        }`}
                     >
                       <LayoutGrid
-                        className={`w-4 h-4 ${
-                          theme === "dark"
-                            ? "text-emerald-400"
-                            : "text-emerald-600"
-                        }`}
+                        className={`w-4 h-4 ${theme === "dark"
+                          ? "text-emerald-400"
+                          : "text-emerald-600"
+                          }`}
                       />
                     </div>
                     <div>
-                      <p className="text-sm text-gray-600 dark:text-gray-400">
+                      <p className="text-sm text-gray-900 dark:text-gray-400">
                         Floor Plans
                       </p>
-                      <p className="text-xl font-bold text-gray-900 dark:text-white">
+                      <p className="text-xl font-bold text-emerald-600 dark:text-emerald-400">
                         {allFloorPlans.length}
                       </p>
                     </div>
@@ -2840,26 +2931,23 @@ const EditPropertyForm = ({ property, isOpen, onClose, onSubmit, theme }) => {
                 </div>
 
                 <div
-                  className={`p-4 rounded-xl border ${
-                    theme === "dark"
-                      ? "border-gray-700 bg-gray-800/30"
-                      : "border-gray-200 bg-gray-50"
-                  }`}
+                  className={`p-4 rounded-xl border ${theme === "dark"
+                    ? "border-gray-700 bg-gray-800/30"
+                    : "border-gray-200 bg-gray-50"
+                    }`}
                 >
                   <div className="flex items-center gap-3">
                     <div
-                      className={`p-2 rounded-lg ${
-                        theme === "dark" ? "bg-red-900/20" : "bg-red-100"
-                      }`}
+                      className={`p-2 rounded-lg ${theme === "dark" ? "bg-red-900/20" : "bg-red-100"
+                        }`}
                     >
                       <Trash2
-                        className={`w-4 h-4 ${
-                          theme === "dark" ? "text-red-400" : "text-red-600"
-                        }`}
+                        className={`w-4 h-4 ${theme === "dark" ? "text-red-400" : "text-red-600"
+                          }`}
                       />
                     </div>
                     <div>
-                      <p className="text-sm text-gray-600 dark:text-gray-400">
+                      <p className="text-sm text-gray-900 dark:text-gray-400">
                         Removed
                       </p>
                       <p className="text-xl font-bold text-red-600 dark:text-red-400">
@@ -2870,29 +2958,26 @@ const EditPropertyForm = ({ property, isOpen, onClose, onSubmit, theme }) => {
                 </div>
 
                 <div
-                  className={`p-4 rounded-xl border ${
-                    theme === "dark"
-                      ? "border-gray-700 bg-gray-800/30"
-                      : "border-gray-200 bg-gray-50"
-                  }`}
+                  className={`p-4 rounded-xl border ${theme === "dark"
+                    ? "border-gray-700 bg-gray-800/30"
+                    : "border-gray-200 bg-gray-50"
+                    }`}
                 >
                   <div className="flex items-center gap-3">
                     <div
-                      className={`p-2 rounded-lg ${
-                        theme === "dark" ? "bg-purple-900/20" : "bg-purple-100"
-                      }`}
+                      className={`p-2 rounded-lg ${theme === "dark" ? "bg-purple-900/20" : "bg-purple-100"
+                        }`}
                     >
                       <FileText
-                        className={`w-4 h-4 ${
-                          theme === "dark" ? "text-purple-400" : "text-purple-600"
-                        }`}
+                        className={`w-4 h-4 ${theme === "dark" ? "text-purple-400" : "text-purple-600"
+                          }`}
                       />
                     </div>
                     <div>
                       <p className="text-sm text-gray-600 dark:text-gray-400">
                         New Files
                       </p>
-                      <p className="text-xl font-bold text-gray-900 dark:text-white">
+                      <p className="text-xl font-bold text-purple-600 dark:text-purple-500">
                         {uploadedImages.length + uploadedFloorPlans.length}
                       </p>
                     </div>
@@ -2906,9 +2991,8 @@ const EditPropertyForm = ({ property, isOpen, onClose, onSubmit, theme }) => {
                   <div className="flex items-center gap-2">
                     <AlertCircle className="w-5 h-5 text-amber-500" />
                     <p
-                      className={`text-sm ${
-                        theme === "dark" ? "text-gray-400" : "text-gray-600"
-                      }`}
+                      className={`text-sm ${theme === "dark" ? "text-gray-400" : "text-gray-600"
+                        }`}
                     >
                       Review all changes before saving
                     </p>
@@ -2918,11 +3002,10 @@ const EditPropertyForm = ({ property, isOpen, onClose, onSubmit, theme }) => {
                   <button
                     type="button"
                     onClick={() => setStep(3)}
-                    className={`px-6 py-3.5 rounded-xl flex items-center gap-2 transition-all duration-300 hover:scale-105 ${
-                      theme === "dark"
-                        ? "bg-gray-800 hover:bg-gray-700 text-gray-300 border border-gray-700"
-                        : "bg-gray-100 hover:bg-gray-200 text-gray-700 border border-gray-200"
-                    }`}
+                    className={`px-6 py-3.5 rounded-xl flex items-center gap-2 transition-all duration-300 hover:scale-105 ${theme === "dark"
+                      ? "bg-gray-800 hover:bg-gray-700 text-gray-300 border border-gray-700"
+                      : "bg-gray-100 hover:bg-gray-200 text-gray-700 border border-gray-200"
+                      }`}
                   >
                     <ChevronLeft className="w-4 h-4" />
                     Back

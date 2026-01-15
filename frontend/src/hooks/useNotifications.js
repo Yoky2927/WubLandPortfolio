@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import { notificationsClient } from '../services/http.service';
 import socketService from '../services/socket.service';
-import { API_CONFIG } from '../config/api.config';
+import API_CONFIG from '../config/api.config';
 
 export const useNotifications = (userId, initialCount = 0) => {
   const [notifications, setNotifications] = useState([]);

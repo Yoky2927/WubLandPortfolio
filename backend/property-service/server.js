@@ -1,4 +1,4 @@
-// backend/property-service/server.js - FIXED ORDER VERSION
+// backend/property-service/server.js - FIXED VERSION
 import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
@@ -56,21 +56,17 @@ app.use((req, res, next) => {
 });
 
 const propertyServiceEndpoints = [
-  ApiDocs.createRoute('POST', '/api/properties/requests', 'Submit property request', true, ['seller', 'landlord']),
-  ApiDocs.createRoute('POST', '/api/properties/requests/:id/assign', 'Assign broker to request', true, ['seller', 'landlord', 'broker', 'admin']),
-  ApiDocs.createRoute('POST', '/api/properties/requests/:id/upload-image', 'Upload property image', true, ['seller', 'landlord']),
-  ApiDocs.createRoute('GET', '/api/properties', 'Get all properties'),
-  ApiDocs.createRoute('GET', '/api/properties/:id', 'Get property by ID'),
-  ApiDocs.createRoute('GET', '/api/properties/requests/my', 'Get my property requests', true, ['seller', 'landlord']),
-  ApiDocs.createRoute('GET', '/api/properties/requests/pending', 'Get pending requests', true, ['broker', 'admin']),
-  // Add more routes from your property.routes.js
+  ApiDocs.createRoute('POST', '/api/buyer/properties/:propertyId/save', 'Save/unsave property', true, ['buyer', 'renter', 'user']),
+  ApiDocs.createRoute('GET', '/api/buyer/saved-properties', 'Get saved properties', true, ['buyer', 'renter', 'user']),
+  ApiDocs.createRoute('GET', '/api/buyer/recommended-properties', 'Get recommended properties', true, ['buyer', 'renter', 'user']),
+  // Add more routes...
 ];
 
 // API Documentation endpoint
 app.get('/api-docs', (req, res) => {
   res.json(ApiDocs.generateDocs('property', propertyServiceEndpoints));
 });
- 
+
 // ============================================
 // 2. STATIC FILES (BEFORE ROUTES)
 // ============================================
@@ -116,8 +112,18 @@ app.get("/", (req, res) => {
 });
 
 app.get("/api/test-simple", (req, res) => {
-  res.json({ 
+  res.json({
     message: "Simple test route works",
+    timestamp: new Date().toISOString()
+  });
+});
+
+// ADD A TEST BUYER ROUTE
+app.get("/api/buyer/test", (req, res) => {
+  console.log('✅ Buyer test route hit');
+  res.json({
+    success: true,
+    message: 'Buyer routes are working!',
     timestamp: new Date().toISOString()
   });
 });
@@ -129,33 +135,61 @@ app.get("/api/test-simple", (req, res) => {
 console.log('\n🔧 LOADING API ROUTES...\n');
 
 async function loadRoutes() {
-  const routes = [
-    { name: 'propertyRoutes', path: './routes/property.routes.js', mount: '/api/properties' },
-    { name: 'propertyImageRoutes', path: './routes/propertyImage.routes.js', mount: '/api/properties/images' },
-    { name: 'propertyDocumentRoutes', path: './routes/propertyDocument.routes.js', mount: '/api/properties/documents' },
-    { name: 'availabilityRoutes', path: './routes/availability.routes.js', mount: '/api/availability' },
-    { name: 'adminRoutes', path: './routes/admin.routes.js', mount: '/api/admin' },
-  ];
+  try {
+    // Load buyer routes FIRST
+    console.log('📦 Loading buyerRoutes...');
+    const buyerModule = await import('./routes/buyer.routes.js');
+    app.use('/api/buyer', buyerModule.default);
+    console.log('   ✅ Buyer routes mounted at /api/buyer');
+    
+    // Load other routes
+    const routes = [
+      { name: 'propertyRoutes', path: './routes/property.routes.js', mount: '/api/properties' },
+      { name: 'propertyImageRoutes', path: './routes/propertyImage.routes.js', mount: '/api/properties/images' },
+      { name: 'propertyDocumentRoutes', path: './routes/propertyDocument.routes.js', mount: '/api/properties/documents' },
+      { name: 'availabilityRoutes', path: './routes/availability.routes.js', mount: '/api/availability' },
+      { name: 'adminRoutes', path: './routes/admin.routes.js', mount: '/api/admin' },
+      { name: 'applicationRoutes', path: './routes/application.routes.js', mount: '/api/applications' },
+    ];
 
-  for (const route of routes) {
-    try {
-      console.log(`📦 Loading ${route.name}...`);
-      const module = await import(route.path);
-      app.use(route.mount, module.default);
-      console.log(`   ✅ Mounted at ${route.mount}`);
-    } catch (error) {
-      console.log(`   ❌ FAILED: ${error.message}`);
-      // Don't crash - continue loading other routes
+    for (const route of routes) {
+      try {
+        console.log(`📦 Loading ${route.name}...`);
+        const module = await import(route.path);
+        app.use(route.mount, module.default);
+        console.log(`   ✅ Mounted at ${route.mount}`);
+      } catch (error) {
+        console.log(`   ❌ FAILED to load ${route.name}: ${error.message}`);
+      }
     }
+
+    console.log('\n✅ ALL ROUTES LOADED!\n');
+    
+  } catch (error) {
+    console.error('❌ ERROR loading routes:', error);
   }
-  
-  console.log('\n✅ ALL ROUTES LOADED!\n');
 }
 
 await loadRoutes();
 
 // ============================================
-// 5. DATABASE CONNECTION (AFTER ROUTES)
+// 5. ROUTE DEBUGGING MIDDLEWARE
+// ============================================
+
+// Add route debugging to see what's happening
+app.use((req, res, next) => {
+  console.log(`📡 ${req.method} ${req.originalUrl} - ${new Date().toISOString()}`);
+  
+  // Log buyer routes specifically
+  if (req.originalUrl.includes('/api/buyer')) {
+    console.log(`   👤 Buyer route accessed: ${req.originalUrl}`);
+  }
+  
+  next();
+});
+
+// ============================================
+// 6. DATABASE CONNECTION (AFTER ROUTES)
 // ============================================
 
 try {
@@ -167,21 +201,18 @@ try {
 }
 
 // ============================================
-// 6. DEBUG MIDDLEWARE (AFTER ROUTES)
-// ============================================
-
-// Add route debugging to see what's happening
-app.use((req, res, next) => {
-  console.log(`📡 ${req.method} ${req.originalUrl}`);
-  next();
-});
-
-// ============================================
 // 7. 404 HANDLER (LAST - CATCHES UNMATCHED ROUTES)
 // ============================================
 
 app.use((req, res) => {
   console.log(`❌ 404: ${req.method} ${req.originalUrl}`);
+  
+  // Special debug for buyer routes
+  if (req.originalUrl.includes('/api/buyer')) {
+    console.log(`   🔍 Buyer route 404 - Check route mounting`);
+    console.log(`   🔍 Available buyer routes should be at: /api/buyer/saved-properties, /api/buyer/properties/:id/save`);
+  }
+  
   res.status(404).json({
     success: false,
     message: "Route not found",
@@ -191,9 +222,10 @@ app.use((req, res) => {
     debugInfo: {
       testRoutes: [
         "/health",
-        "/api/test-simple", 
-        "/api/properties/images/property/1",
-        "/api/properties/documents/1/documents"
+        "/api/test-simple",
+        "/api/buyer/test",
+        "/api/buyer/saved-properties",
+        "/api/buyer/properties/1/save"
       ]
     }
   });
@@ -224,11 +256,12 @@ app.listen(PORT, () => {
   console.log(`✅ Port: ${PORT}`);
   console.log(`🔗 URL: http://localhost:${PORT}`);
   console.log(`🏥 Health: http://localhost:${PORT}/health`);
-  console.log(`🧪 Test: http://localhost:${PORT}/api/test-simple`);
-  console.log(`\n🔍 TEST THESE CRITICAL ROUTES:`);
-  console.log(`   1. ${`http://localhost:${PORT}/api/test-simple`}`);
-  console.log(`   2. ${`http://localhost:${PORT}/api/properties/images/property/1`}`);
-  console.log(`   3. ${`http://localhost:${PORT}/api/properties/documents/1/documents`}`);
-  console.log(`\n🎯 Then run: node final-comprehensive-test.js`);
-  console.log(`✨ ========================================\n`);
+  console.log(`🧪 Simple Test: http://localhost:${PORT}/api/test-simple`);
+  console.log(`👤 Buyer Test: http://localhost:${PORT}/api/buyer/test`);
+  console.log(`\n🔍 TEST THESE BUYER ROUTES:`);
+  console.log(`   1. GET  ${`http://localhost:${PORT}/api/buyer/test`}`);
+  console.log(`   2. GET  ${`http://localhost:${PORT}/api/buyer/saved-properties`}`);
+  console.log(`   3. POST ${`http://localhost:${PORT}/api/buyer/properties/1/save`}`);
+  console.log(`   4. GET  ${`http://localhost:${PORT}/api/buyer/properties/1/saved`}`);
+  console.log(`\n✨ ========================================\n`);
 });

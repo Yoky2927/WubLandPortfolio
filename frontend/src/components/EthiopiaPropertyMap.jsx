@@ -21,7 +21,7 @@ import {
   Maximize2,
 } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
-import PropertyDetailsPopup from "./PropertyDetailsPopup";
+import PropertyDetailsModel from "./PropertyDetailsModal";
 // REMOVE THIS: import { sampleProperties } from "../data/sampleProperties";
 
 // Fix for default markers
@@ -595,7 +595,7 @@ const EthiopiaPropertyMap = ({
       </div>
 
       {/* Property Details Popup */}
-      <PropertyDetailsPopup
+      <PropertyDetailsModel
         property={selectedProperty}
         isOpen={isPopupOpen}
         onClose={() => setIsPopupOpen(false)}

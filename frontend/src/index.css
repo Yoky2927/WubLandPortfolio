@@ -216,13 +216,22 @@ h1, h2, h3, h4, h5, h6 {
 .dark .NavBarBottom { @apply bg-[#332500]/50; }
 
 /* Navigation link styling with hover effects */
-.NavBarBottom a {
+.NavBarBottom a,
+.NavBarBottom button.nav-bottom-link {
   position: relative;
   display: inline-block;
   padding-bottom: 4px;
   @apply transition-all duration-300 ease-in-out text-sm sm:text-base font-medium;
+  cursor: pointer;
+  background: none;
+  border: none;
+  font-family: inherit;
+  font-size: inherit;
+  color: inherit;
 }
-.NavBarBottom a::after {
+
+.NavBarBottom a::after,
+.NavBarBottom button.nav-bottom-link::after {
   content: '';
   position: absolute;
   bottom: 0;
@@ -232,12 +241,35 @@ h1, h2, h3, h4, h5, h6 {
   background-color: transparent;
   transition: all 0.3s ease-in-out;
 }
-.NavBarBottom a:hover { @apply text-white; }
-.NavBarBottom a:hover::after {
+
+.NavBarBottom a:hover,
+.NavBarBottom button.nav-bottom-link:hover { 
+  @apply text-white; 
+}
+
+/* Add to your global CSS or component CSS */
+.typing-animation {
+  display: inline-block;
+}
+
+.typing-animation .cursor {
+  display: inline-block;
+  width: 2px;
+  background-color: currentColor;
+  margin-left: 2px;
+  animation: blink 1s infinite;
+}
+
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+.NavBarBottom a:hover::after,
+.NavBarBottom button.nav-bottom-link:hover::after {
   width: 100%;
   background-color: white;
 }
-
 /* Navigation responsive adjustments */
 @media (max-width: 640px) {
   .NavBarBottom { @apply py-3; }
@@ -299,9 +331,7 @@ h6 {
 }
 
 /* Amber text for both themes */
-span { 
-  @apply text-amber-600 dark:text-amber-400;
-}
+
 
 /* Paragraph and body text */
 p, li, .body-text {
@@ -314,7 +344,7 @@ p, li, .body-text {
   @apply bg-transparent border border-amber-400 transition-all duration-500 transform hover:scale-105 hover:text-black hover:bg-amber-400 shadow-lg font-medium;
 }
 .button {
-  @apply px-3 py-1 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded
+  @apply bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded
   hover:bg-gray-300 dark:hover:bg-gray-600 font-inter transition-all duration-300;
 }
 

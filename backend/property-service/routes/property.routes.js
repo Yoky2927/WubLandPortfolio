@@ -17,6 +17,7 @@ import {
   canFeatureProperty,
   canPostPremium
 } from "../middlewares/privilege.middleware.js";
+import buyerRoutes from './buyer.routes.js';
 
 const router = express.Router();
 
@@ -681,6 +682,216 @@ router.get(
     }
   }
 );
+// ================= PROPERTY REQUESTS FOR BROKERS =================
+router.get(
+  "/property-requests/broker",
+  authenticate,
+  checkRole(["internal_broker", "external_broker", "admin", "super_admin"]),
+  async (req, res) => {
+    try {
+      const brokerId = req.user.id;
+      
+      console.log(`🔍 Getting property requests for broker ${brokerId}`);
+      
+      const [requests] = await pool.execute(
+        `SELECT pr.*,
+                u.first_name as requester_first_name,
+                u.last_name as requester_last_name,
+                u.email as requester_email,
+                u.phone_number as requester_phone
+         FROM property_requests pr
+         JOIN users u ON pr.user_id = u.id
+         WHERE (pr.assigned_broker_id = ? OR pr.assigned_broker_id IS NULL)
+         AND pr.status = 'pending'
+         ORDER BY pr.created_at DESC`,
+        [brokerId]
+      );
+      
+      console.log(`✅ Found ${requests.length} property requests for broker ${brokerId}`);
+      
+      res.json({
+        success: true,
+        data: requests
+      });
+    } catch (error) {
+      console.error('❌ Error fetching property requests:', error);
+      res.status(500).json({
+        success: false,
+        message: error.message
+      });
+    }
+  }
+);
+
+router.get(
+  "/analytics/broker/:brokerId/stats",
+  authenticate,
+  checkRole(["internal_broker", "external_broker", "admin", "super_admin"]),
+  async (req, res) => {
+    try {
+      const { brokerId } = req.params;
+      const requestingUserId = req.user.id;
+      
+      // Users can only view their own stats
+      if (parseInt(brokerId) !== requestingUserId) {
+        return res.status(403).json({
+          success: false,
+          message: "Not authorized"
+        });
+      }
+      
+      // Get broker stats
+      const [properties] = await pool.execute(
+        `SELECT COUNT(*) as total_properties,
+                SUM(CASE WHEN property_status = 'active' THEN 1 ELSE 0 END) as active_properties,
+                SUM(CASE WHEN property_status IN ('sold', 'rented') THEN 1 ELSE 0 END) as completed_properties,
+                AVG(price) as average_price,
+                SUM(price) as total_value
+         FROM properties 
+         WHERE assigned_broker_id = ? 
+         AND deleted_at IS NULL`,
+        [brokerId]
+      );
+      
+      // Get requests stats
+      const [requests] = await pool.execute(
+        `SELECT COUNT(*) as total_requests,
+                SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) as pending_requests,
+                SUM(CASE WHEN status = 'accepted' THEN 1 ELSE 0 END) as accepted_requests
+         FROM property_requests 
+         WHERE assigned_broker_id = ?`,
+        [brokerId]
+      );
+      
+      const stats = {
+        broker_id: parseInt(brokerId),
+        properties: properties[0] || {
+          total_properties: 0,
+          active_properties: 0,
+          completed_properties: 0,
+          average_price: 0,
+          total_value: 0
+        },
+        requests: requests[0] || {
+          total_requests: 0,
+          pending_requests: 0,
+          accepted_requests: 0
+        },
+        performance: {
+          conversion_rate: properties[0]?.total_properties > 0 ? 
+            (properties[0]?.completed_properties / properties[0]?.total_properties * 100).toFixed(2) + '%' : '0%',
+          response_rate: requests[0]?.total_requests > 0 ?
+            (requests[0]?.accepted_requests / requests[0]?.total_requests * 100).toFixed(2) + '%' : '0%'
+        },
+        timestamp: new Date().toISOString()
+      };
+      
+      res.json({
+        success: true,
+        data: stats
+      });
+    } catch (error) {
+      console.error('❌ Error fetching broker stats:', error);
+      res.status(500).json({
+        success: false,
+        message: error.message
+      });
+    }
+  }
+);
+
+// ================= TEST ROUTE - CREATE TEST PROPERTY =================
+router.post(
+  "/test/create",
+  authenticate,
+  checkRole(["internal_broker", "external_broker", "admin", "super_admin"]),
+  async (req, res) => {
+    try {
+      const brokerId = req.user.id;
+      
+      console.log(`🧪 Creating test property for broker ${brokerId}`);
+      
+      const testProperty = {
+        title: "Beautiful 3-Bedroom House in Bole",
+        description: "A stunning modern house with 3 bedrooms, 2 bathrooms, large living area, and beautiful garden. Perfect for families.",
+        price: 8500000,
+        property_type: "house",
+        property_status: "active",
+        address: "Bole, Addis Ababa",
+        city: "Addis Ababa",
+        bedrooms: 3,
+        bathrooms: 2,
+        area_sqm: 250,
+        year_built: 2020,
+        features: JSON.stringify(["garden", "garage", "security_system", "swimming_pool", "furnished"]),
+        amenities: JSON.stringify(["wifi", "parking", "garden", "security", "pool"]),
+        latitude: 8.9806,
+        longitude: 38.7578,
+        is_featured: true,
+        is_premium: true,
+        assigned_broker_id: brokerId,
+        created_by_user_id: brokerId,
+        last_modified_by_user_id: brokerId
+      };
+      
+      // Insert the property
+      const [result] = await pool.execute(
+        `INSERT INTO properties (
+          title, description, price, property_type, property_status,
+          address, city, bedrooms, bathrooms, area_sqm, year_built,
+          features, amenities, latitude, longitude, is_featured, is_premium,
+          assigned_broker_id, created_by_user_id, last_modified_by_user_id,
+          created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
+        [
+          testProperty.title,
+          testProperty.description,
+          testProperty.price,
+          testProperty.property_type,
+          testProperty.property_status,
+          testProperty.address,
+          testProperty.city,
+          testProperty.bedrooms,
+          testProperty.bathrooms,
+          testProperty.area_sqm,
+          testProperty.year_built,
+          testProperty.features,
+          testProperty.amenities,
+          testProperty.latitude,
+          testProperty.longitude,
+          testProperty.is_featured,
+          testProperty.is_premium,
+          testProperty.assigned_broker_id,
+          testProperty.created_by_user_id,
+          testProperty.last_modified_by_user_id
+        ]
+      );
+      
+      const propertyId = result.insertId;
+      
+      console.log(`✅ Test property created with ID: ${propertyId}`);
+      
+      res.status(201).json({
+        success: true,
+        message: "Test property created successfully",
+        data: {
+          property_id: propertyId,
+          ...testProperty,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        }
+      });
+    } catch (error) {
+      console.error('❌ Error creating test property:', error);
+      res.status(500).json({
+        success: false,
+        message: error.message
+      });
+    }
+  }
+);
+
+router.use('/buyer', buyerRoutes);
 
 // 404 handler
 router.use((req, res) => {
@@ -690,5 +901,7 @@ router.use((req, res) => {
     path: req.originalUrl,
   });
 });
+
+
 
 export default router;

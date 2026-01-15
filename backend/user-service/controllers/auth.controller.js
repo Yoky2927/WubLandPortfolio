@@ -8,6 +8,8 @@ import path from "path";
 import fs from "fs";
 import crypto from "crypto";
 import axios from "axios"; // Added for inter-service communication
+import jwt from 'jsonwebtoken';
+import { verificationStyles, svgIcons } from '../utils/email-verification-styles.js';
 
 // Email Service interface - will call Communication-Service API instead of direct import
 class EmailServiceClient {
@@ -21,7 +23,7 @@ class EmailServiceClient {
     try {
       console.log(`📧 Attempting to send verification email to: ${emailData.email}`);
       console.log(`📧 Calling: ${this.baseURL}/api/email/send-verification`);
-      
+
       const response = await axios.post(
         `${this.baseURL}/api/email/send-verification`,
         {
@@ -37,7 +39,7 @@ class EmailServiceClient {
           }
         }
       );
-      
+
       console.log(`✅ Email API response:`, response.data);
       return response.data;
     } catch (error) {
@@ -54,7 +56,7 @@ class EmailServiceClient {
   async sendPasswordChangeRequired(emailData) {
     try {
       console.log(`📧 Attempting to send password change email to: ${emailData.email}`);
-      
+
       const response = await axios.post(
         `${this.baseURL}/api/email/send-password-change`,
         {
@@ -69,7 +71,7 @@ class EmailServiceClient {
           }
         }
       );
-      
+
       console.log(`✅ Password change email sent:`, response.data);
       return response.data;
     } catch (error) {
@@ -81,7 +83,7 @@ class EmailServiceClient {
   async sendSecurityAlert(alertData) {
     try {
       console.log(`📧 Attempting to send security alert to: ${alertData.email}`);
-      
+
       const response = await axios.post(
         `${this.baseURL}/api/email/send-security-alert`,
         alertData,
@@ -93,7 +95,7 @@ class EmailServiceClient {
           }
         }
       );
-      
+
       console.log(`✅ Security alert sent:`, response.data);
       return response.data;
     } catch (error) {
@@ -138,7 +140,7 @@ async function isInternalEmployee(userId, role) {
 
 // Helper function to get resource usage via API calls instead of direct DB queries
 async function getCurrentResourceUsage(userId, resourceType) {
-  switch(resourceType) {
+  switch (resourceType) {
     case 'listings':
       // Call Property-Service API
       try {
@@ -150,7 +152,7 @@ async function getCurrentResourceUsage(userId, resourceType) {
         console.warn("Failed to get listing count via API:", error.message);
         return 0;
       }
-    
+
     case 'messages':
       // Call Communication-Service API
       try {
@@ -162,7 +164,7 @@ async function getCurrentResourceUsage(userId, resourceType) {
         console.warn("Failed to get message count via API:", error.message);
         return 0;
       }
-    
+
     default:
       return 0;
   }
@@ -414,7 +416,9 @@ export const login = async (req, res) => {
       username: user.username,
       role: user.role,
       is_email_verified: user.is_email_verified,
-      verified: user.verified
+      verified: user.verified,
+      password_change_required: user.password_change_required,
+      status: user.status
     } : "NOT FOUND");
 
     if (!user) {
@@ -428,27 +432,136 @@ export const login = async (req, res) => {
       return res.status(400).json({ message: "Invalid credentials" });
     }
 
-    console.log("🔍 Checking account lock status...");
-    const isLocked = await User.isAccountLocked(user.id);
-    if (isLocked) {
-      console.log("🔍 Account is locked for user:", user.id);
-      return res.status(423).json({
-        message:
-          "Account temporarily locked due to too many failed attempts. Try again in 30 minutes.",
-      });
-    }
+    // ========== ACCOUNT STATUS CHECKS ==========
+    console.log("🔍 Checking account status...");
 
-    console.log("🔍 Checking email verification...");
-    if (!user.is_email_verified && !user.verified) {
-      console.log("🔍 User email not verified");
+    // 1. Check if account is suspended
+    if (user.status === 'suspended') {
+      console.log("🔴 Account suspended for user:", user.id);
       return res.status(403).json({
-        message:
-          "Please verify your email before logging in. Check your inbox for the verification link.",
-        requiresVerification: true,
-        email: user.email,
+        success: false,
+        message: "Account suspended. Please contact support.",
+        account_status: 'suspended',
+        status_details: {
+          status: 'suspended',
+          reason: 'Account suspended by administrator',
+          contact_support: true,
+          support_email: 'support@wubland.com'
+        },
+        user_info: {
+          id: user.id,
+          email: user.email,
+          first_name: user.first_name,
+          last_name: user.last_name,
+          role: user.role
+        }
       });
     }
 
+    // 2. Check if account is inactive
+    if (user.status === 'inactive') {
+      console.log("🔴 Account inactive for user:", user.id);
+      return res.status(403).json({
+        success: false,
+        message: "Account inactive. Please contact support to reactivate.",
+        account_status: 'inactive',
+        status_details: {
+          status: 'inactive',
+          reason: 'Account has been deactivated',
+          contact_support: true,
+          reactivation_required: true,
+          support_email: 'support@wubland.com'
+        },
+        user_info: {
+          id: user.id,
+          email: user.email,
+          first_name: user.first_name,
+          last_name: user.last_name,
+          role: user.role
+        }
+      });
+    }
+
+    // 3. Check email verification for CLIENT roles only
+    // 3. Check email verification for CLIENT roles only
+    const clientRoles = ['user', 'buyer', 'seller', 'renter', 'landlord'];
+    if (clientRoles.includes(user.role)) {
+      // For clients, check if they're verified
+      const isVerified = user.is_email_verified === 1;
+
+      if (!isVerified) {
+        console.log("🔴 Client account not verified:", user.id);
+        return res.status(403).json({
+          success: false,
+          message: "Please verify your email before logging in. Check your inbox for the verification link.",
+          account_status: 'unverified',
+          status_details: {
+            status: 'unverified',
+            reason: 'Email verification required',
+            requires_verification: true,
+            verification_type: 'email',
+            can_resend: true
+          },
+          user_info: {
+            id: user.id,
+            email: user.email,
+            first_name: user.first_name,
+            last_name: user.last_name,
+            role: user.role
+          },
+          requiresVerification: true,
+          email: user.email,
+          role: user.role
+        });
+      }
+    }
+
+    // ========== PASSWORD CHANGE CHECK ==========
+    console.log("🔍 Checking password change requirement:", user.password_change_required);
+
+    // Check ALL admin-created users (not just certain roles)
+    // Since we're setting password_change_required for all admin-created users
+    if (user.password_change_required === 1) {
+      console.log("🔴 Password change required for user (admin-created)");
+
+      // Create special token for password change
+      const changePasswordToken = jwt.sign(
+        {
+          userId: user.id,
+          requiresPasswordChange: true,
+          email: user.email,
+          initialLogin: true,
+          type: 'password_change'
+        },
+        process.env.JWT_SECRET || 'your-secret-key',
+        { expiresIn: '1h' }
+      );
+
+      return res.status(200).json({
+        success: true,
+        requiresPasswordChange: true,
+        changePasswordToken: changePasswordToken,
+        message: "Password change required before accessing dashboard",
+        status_details: {
+          status: 'password_change_required',
+          reason: 'Admin-created account requires password change',
+          requires_password_change: true,
+          token_expires_in: '1 hour'
+        },
+        user: {
+          id: user.id,
+          email: user.email,
+          first_name: user.first_name,
+          last_name: user.last_name,
+          role: user.role,
+          // Add verification status for frontend
+          is_verified: user.is_email_verified,
+          requires_email_verification: user.role === 'buyer' || user.role === 'seller' || user.role === 'renter' || user.role === 'landlord' || user.role === 'user'
+        }
+      });
+    }
+
+    // ========== NORMAL LOGIN ==========
     console.log("🔍 Comparing passwords...");
     const isValid = await bcrypt.compare(password, user.password);
     console.log("🔍 Password valid?", isValid);
@@ -484,53 +597,19 @@ export const login = async (req, res) => {
       return res.status(400).json({ message: "Invalid credentials" });
     }
 
+    // Reset login attempts
     await User.resetLoginAttempts(user.id);
     console.log("🔍 Login attempts reset");
 
-    // Check if password change is required - get broker_type from broker_profiles
-    console.log("🔍 Checking if internal employee...");
-    console.log("🔍 User role:", user.role);
-    console.log("🔍 User ID:", user.id);
-
-    const internal = await isInternalEmployee(user.id, user.role);
-    console.log("🔍 Is internal employee?", internal);
-    console.log("🔍 Password change required?", user.password_change_required);
-
-    if (internal && user.password_change_required) {
-      console.log("🔍 Password change required for internal employee");
-      const tempToken = generateToken(
-        {
-          userId: user.id,
-          requiresPasswordChange: true,
-        },
-        res,
-        "1h"
-      );
-
-      try {
-        await emailService.sendPasswordChangeRequired({
-          email: user.email,
-          fullName: `${user.first_name} ${user.last_name}`,
-        });
-      } catch (emailError) {
-        console.error("Failed to send password change email:", emailError);
-      }
-
-      return res.status(200).json({
-        success: true,
-        requiresPasswordChange: true,
-        tempToken,
-        message: "Password change required before accessing dashboard",
-      });
-    }
-
-    console.log("🔍 Generating token...");
-    // Generate token WITHOUT broker_type
+    // Generate normal token
     const token = generateToken({
       id: user.id,
       username: user.username,
       role: user.role,
-      privilege_tier: user.privilege_tier
+      privilege_tier: user.privilege_tier,
+      verified: user.verified,
+      status: user.status,
+      password_change_required: user.password_change_required
     }, res);
 
     // Get broker_type separately if needed
@@ -553,10 +632,14 @@ export const login = async (req, res) => {
         username: user.username,
         email: user.email,
         role: user.role,
-        broker_type: brokerType, // From broker_profiles
+        broker_type: brokerType,
         profile_picture: user.profile_picture,
         is_email_verified: user.is_email_verified || user.verified,
+        verified: user.verified,
         privilege_tier: user.privilege_tier,
+        status: user.status,
+        password_change_required: user.password_change_required,
+        created_by_user_id: user.created_by_user_id,
         privileges: await getPrivilegeInfo(user)
       },
     });
@@ -566,6 +649,7 @@ export const login = async (req, res) => {
     res.status(500).json({ message: "Internal Server Error" });
   }
 };
+
 // Helper function to get privilege info
 async function getPrivilegeInfo(user) {
   try {
@@ -657,55 +741,445 @@ export const verifyEmail = async (req, res) => {
   }
 };
 
+// Main verification function with new design
 export const verifyEmailWeb = async (req, res) => {
   try {
     const { token } = req.query;
+    console.log('🔍 verifyEmailWeb - Token received:', token);
 
     if (!token) {
-      return res.redirect(
-        `${process.env.CLIENT_URL}/verification-failed?reason=missing_token`
-      );
+      return res.status(400).send(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>Verification Failed - WUBLAND</title>
+          <style>
+            ${verificationStyles.common}
+            ${verificationStyles.error}
+          </style>
+        </head>
+        <body>
+          <!-- Floating decorative elements -->
+          <div class="floating-element" style="width: 180px; height: 180px; top: 10%; left: 5%; background: linear-gradient(135deg, rgba(245, 158, 11, 0.03), rgba(251, 191, 36, 0.01)); border-radius: 50%;"></div>
+          <div class="floating-element" style="width: 120px; height: 120px; top: 20%; right: 8%; background: linear-gradient(135deg, rgba(245, 158, 11, 0.02), rgba(251, 191, 36, 0.005)); border-radius: 30px;"></div>
+          <div class="floating-element" style="width: 100px; height: 100px; bottom: 15%; left: 10%; background: linear-gradient(135deg, rgba(245, 158, 11, 0.03), rgba(251, 191, 36, 0.01)); border-radius: 40px;"></div>
+          
+          <div class="main-container">
+            <div class="content-card">
+              <div class="icon-wrapper">
+                <div class="icon-circle"></div>
+                ${svgIcons.error}
+              </div>
+              
+              <h1>Missing Verification Link</h1>
+              
+              <p class="subtitle">
+                No verification token was found. Please use the link from the verification email we sent you.
+              </p>
+              
+              <div class="spacer-md"></div>
+              
+              <a href="http://localhost:5173/login-register" class="action-button">
+                <span>Go to Login</span>
+                ${svgIcons.arrowRight}
+              </a>
+              
+              <div class="footer-info">
+                <div class="brand">WUBLAND</div>
+                <p>Need help? Contact us at support@wubland.com</p>
+              </div>
+            </div>
+          </div>
+        </body>
+        </html>
+      `);
     }
 
-    const pendingRegistration = await getPendingRegistrationByToken(token);
-    if (!pendingRegistration) {
-      return res.redirect(
-        `${process.env.CLIENT_URL}/verification-failed?reason=invalid_or_expired`
-      );
-    }
-
-    const newUserResult = await User.create(
-      pendingRegistration.first_name,
-      pendingRegistration.last_name,
-      pendingRegistration.username,
-      pendingRegistration.email,
-      pendingRegistration.password,
-      pendingRegistration.role,
-      null,
-      1,
-      null,
-      null
+    const [users] = await db.query(
+      "SELECT id, email, first_name, last_name, email_verification_expires, is_email_verified FROM users WHERE email_verification_token = ?",
+      [token]
     );
 
-    if (pendingRegistration.role === "broker" && pendingRegistration.broker_type) {
-      await db.query(
-        `INSERT INTO broker_profiles (user_id, broker_type, created_at) 
-         VALUES (?, ?, NOW())`,
-        [newUserResult.insertId, pendingRegistration.broker_type]
-      );
+    console.log('🔍 verifyEmailWeb - Users found:', users.length);
+
+    if (users.length === 0) {
+      return res.status(400).send(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>Invalid Token - WUBLAND</title>
+          <style>
+            ${verificationStyles.common}
+            ${verificationStyles.error}
+          </style>
+        </head>
+        <body>
+          <!-- Floating decorative elements -->
+          <div class="floating-element" style="width: 160px; height: 160px; top: 12%; left: 7%; background: linear-gradient(135deg, rgba(245, 158, 11, 0.03), rgba(251, 191, 36, 0.01)); border-radius: 50%;"></div>
+          <div class="floating-element" style="width: 140px; height: 140px; bottom: 18%; right: 6%; background: linear-gradient(135deg, rgba(245, 158, 11, 0.02), rgba(251, 191, 36, 0.005)); border-radius: 35px;"></div>
+          
+          <div class="main-container">
+            <div class="content-card">
+              <div class="icon-wrapper">
+                <div class="icon-circle"></div>
+                ${svgIcons.search}
+              </div>
+              
+              <h1>Invalid Verification Link</h1>
+              
+              <p class="subtitle">
+                This verification link is invalid or has already been used. Please request a new verification email from your account settings.
+              </p>
+              
+              <div class="spacer-md"></div>
+              
+              <a href="http://localhost:5173/login-register" class="action-button">
+                <span>Request New Link</span>
+                ${svgIcons.arrowRight}
+              </a>
+              
+              <div class="footer-info">
+                <div class="brand">WUBLAND</div>
+                <p>Verification links are valid for 24 hours only</p>
+              </div>
+            </div>
+          </div>
+        </body>
+        </html>
+      `);
     }
 
-    await deletePendingRegistration(pendingRegistration.email);
+    const user = users[0];
+    console.log('🔍 verifyEmailWeb - User found:', {
+      id: user.id,
+      email: user.email,
+      is_email_verified: user.is_email_verified,
+      expires: user.email_verification_expires
+    });
 
-    const newUser = await User.findById(newUserResult.insertId);
-    generateToken(newUser, res);
+    // Check if already verified
+    if (user.is_email_verified === 1) {
+      console.log('🔍 verifyEmailWeb - User already verified');
+      return res.send(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>Already Verified - WUBLAND</title>
+          <style>
+            ${verificationStyles.common}
+          </style>
+        </head>
+        <body>
+          <!-- Floating decorative elements -->
+          <div class="floating-element" style="width: 200px; height: 200px; top: 8%; left: 6%; background: linear-gradient(135deg, rgba(34, 197, 94, 0.03), rgba(21, 128, 61, 0.01)); border-radius: 50%;"></div>
+          <div class="floating-element" style="width: 120px; height: 120px; bottom: 20%; right: 8%; background: linear-gradient(135deg, rgba(34, 197, 94, 0.02), rgba(21, 128, 61, 0.005)); border-radius: 30px;"></div>
+          
+          <div class="main-container">
+            <div class="content-card">
+              <div class="icon-wrapper">
+                <div class="icon-circle"></div>
+                ${svgIcons.success}
+              </div>
+              
+              <h1>Already Verified</h1>
+              
+              <p class="subtitle">
+                Your email has already been verified. You can now access all features of your WUBLAND account.
+              </p>
+              
+              <div class="spacer-md"></div>
+              
+              <a href="http://localhost:5173/login-register" class="action-button">
+                <span>Login to Continue</span>
+                ${svgIcons.arrowRight}
+              </a>
+              
+              <div class="footer-info">
+                <div class="brand">WUBLAND</div>
+                <p>Ready to manage your real estate portfolio?</p>
+              </div>
+            </div>
+          </div>
+        </body>
+        </html>
+      `);
+    }
 
-    return res.redirect(`${process.env.CLIENT_URL}/dashboard?verified=true`);
+    // Check if token is expired
+    if (user.email_verification_expires && new Date(user.email_verification_expires) < new Date()) {
+      console.log('🔍 verifyEmailWeb - Token expired');
+      return res.status(400).send(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>Token Expired - WUBLAND</title>
+          <style>
+            ${verificationStyles.common}
+          </style>
+        </head>
+        <body>
+          <!-- Floating decorative elements -->
+          <div class="floating-element" style="width: 180px; height: 180px; top: 12%; right: 5%; background: linear-gradient(135deg, rgba(245, 158, 11, 0.03), rgba(251, 191, 36, 0.01)); border-radius: 50%;"></div>
+          <div class="floating-element" style="width: 140px; height: 140px; bottom: 15%; left: 8%; background: linear-gradient(135deg, rgba(245, 158, 11, 0.02), rgba(251, 191, 36, 0.005)); border-radius: 40px;"></div>
+          
+          <div class="main-container">
+            <div class="content-card">
+              <div class="icon-wrapper">
+                <div class="icon-circle"></div>
+                ${svgIcons.clock}
+              </div>
+              
+              <h1>Verification Link Expired</h1>
+              
+              <p class="subtitle">
+                This verification link has expired. Please request a new verification email from the login page.
+              </p>
+              
+              <div class="spacer-md"></div>
+              
+              <a href="http://localhost:5173/login-register" class="action-button">
+                <span>Request New Link</span>
+                ${svgIcons.arrowRight}
+              </a>
+              
+              <div class="footer-info">
+                <div class="brand">WUBLAND</div>
+                <p>For security, verification links expire after 24 hours</p>
+              </div>
+            </div>
+          </div>
+        </body>
+        </html>
+      `);
+    }
+
+    // Update user as verified
+    const [updateResult] = await db.query(
+      "UPDATE users SET is_email_verified = 1, verified = 1, email_verification_token = NULL, email_verification_expires = NULL WHERE id = ?",
+      [user.id]
+    );
+
+    console.log(`✅ verifyEmailWeb - Email verified for user ID: ${user.id}, Rows updated: ${updateResult.affectedRows}`);
+
+    // SUCCESS PAGE
+    return res.send(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Email Verified - WUBLAND</title>
+        <meta http-equiv="refresh" content="8;url=http://localhost:5173/login-register" />
+        <style>
+          ${verificationStyles.common}
+          ${verificationStyles.success}
+          
+          /* Success page specific animations */
+          @keyframes gentlePulse {
+            0%, 100% { 
+              transform: scale(1);
+              opacity: 1;
+            }
+            50% { 
+              transform: scale(1.02);
+              opacity: 0.95;
+            }
+          }
+          
+          .content-card {
+            animation: gentlePulse 3s ease-in-out infinite;
+          }
+          
+          .confetti {
+            position: absolute;
+            width: 12px;
+            height: 12px;
+            background: linear-gradient(135deg, #f59e0b, #fbbf24);
+            border-radius: 50%;
+            opacity: 0;
+            z-index: 1;
+          }
+          
+          @keyframes confettiFall {
+            0% {
+              transform: translateY(-100px) rotate(0deg);
+              opacity: 1;
+            }
+            100% {
+              transform: translateY(100vh) rotate(360deg);
+              opacity: 0;
+            }
+          }
+        </style>
+      </head>
+      <body>
+        <!-- Floating decorative elements -->
+        <div class="floating-element" style="width: 220px; height: 220px; top: 5%; left: 4%; background: linear-gradient(135deg, rgba(245, 158, 11, 0.04), rgba(251, 191, 36, 0.02)); border-radius: 50%;"></div>
+        <div class="floating-element" style="width: 160px; height: 160px; top: 15%; right: 6%; background: linear-gradient(135deg, rgba(245, 158, 11, 0.03), rgba(251, 191, 36, 0.01)); border-radius: 40px;"></div>
+        <div class="floating-element" style="width: 140px; height: 140px; bottom: 10%; left: 7%; background: linear-gradient(135deg, rgba(245, 158, 11, 0.02), rgba(251, 191, 36, 0.005)); border-radius: 35px;"></div>
+        
+        <!-- Confetti elements -->
+        <div class="confetti" style="left: 10%; animation: confettiFall 3s linear infinite;"></div>
+        <div class="confetti" style="left: 20%; animation: confettiFall 4s linear infinite 0.5s;"></div>
+        <div class="confetti" style="left: 30%; animation: confettiFall 3.5s linear infinite 1s;"></div>
+        <div class="confetti" style="left: 40%; animation: confettiFall 4.5s linear infinite 1.5s;"></div>
+        <div class="confetti" style="left: 60%; animation: confettiFall 3s linear infinite 2s;"></div>
+        <div class="confetti" style="left: 70%; animation: confettiFall 4s linear infinite 2.5s;"></div>
+        <div class="confetti" style="left: 80%; animation: confettiFall 3.5s linear infinite 3s;"></div>
+        <div class="confetti" style="left: 90%; animation: confettiFall 4.2s linear infinite 3.5s;"></div>
+        
+        <div class="main-container">
+          <div class="content-card">
+            <div class="icon-wrapper">
+              <div class="icon-circle"></div>
+              ${svgIcons.success}
+            </div>
+            
+            <h1>Email Verified Successfully!</h1>
+            
+            <div class="user-details">
+              <div class="detail-item">
+                ${svgIcons.user}
+                <span>Welcome, <span class="detail-value">${user.first_name || 'there'}</span>!</span>
+              </div>
+              
+              <div class="detail-item">
+                ${svgIcons.email}
+                <span><span class="detail-value">${user.email}</span> is now verified</span>
+              </div>
+            </div>
+            
+            <p class="subtitle">
+              Your WUBLAND account is now fully activated. You can start managing your real estate portfolio immediately.
+            </p>
+            
+            <div class="redirect-message">
+              <span>You'll be redirected in <span id="countdown" class="countdown">8</span> seconds...</span>
+            </div>
+            
+            <div class="button-group">
+              <a href="http://localhost:5173/login-register" class="action-button">
+                <span>Start Exploring</span>
+                ${svgIcons.arrowRight}
+              </a>
+              
+              <a href="http://localhost:5173" class="action-button button-outline">
+                <span>Visit Homepage</span>
+              </a>
+            </div>
+            
+            <div class="footer-info">
+              <div class="brand">WUBLAND</div>
+              <p>Real Estate Portfolio Management Platform</p>
+              <p style="margin-top: 8px; font-size: 13px; color: #d1d5db;">
+                You will be automatically redirected to continue
+              </p>
+            </div>
+          </div>
+        </div>
+        
+        <script>
+          let countdown = 8;
+          const countdownElement = document.getElementById('countdown');
+          
+          const timer = setInterval(() => {
+            countdown--;
+            countdownElement.textContent = countdown;
+            
+            if (countdown <= 0) {
+              clearInterval(timer);
+              window.location.href = 'http://localhost:5173/login-register';
+            }
+          }, 1000);
+          
+          // Add more confetti on click - FIXED VERSION
+          document.querySelector('.content-card').addEventListener('click', (e) => {
+            if (e.target.tagName === 'A') return;
+            
+            const confetti = document.createElement('div');
+            confetti.className = 'confetti';
+            confetti.style.left = Math.random() * 100 + '%';
+            
+            // Fixed the template literal issue
+            const hue = Math.random() * 60 + 30;
+            confetti.style.background = 'linear-gradient(135deg, ' + 
+              'hsl(' + hue + ', 100%, 60%), ' +
+              'hsl(' + (hue + 10) + ', 100%, 70%)' +
+              ')';
+            
+            const duration = 2 + Math.random() * 3;
+            confetti.style.animation = 'confettiFall ' + duration + 's linear forwards';
+            
+            document.body.appendChild(confetti);
+            
+            setTimeout(() => {
+              confetti.remove();
+            }, 5000);
+          });
+        </script>
+      </body>
+      </html>
+    `);
+
   } catch (error) {
-    console.error("Email verification error:", error);
-    return res.redirect(
-      `${process.env.CLIENT_URL}/verification-failed?reason=server_error`
-    );
+    console.error('❌ verifyEmailWeb - Email verification error:', error);
+    return res.status(500).send(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Server Error - WUBLAND</title>
+        <style>
+          ${verificationStyles.common}
+          ${verificationStyles.error}
+        </style>
+      </head>
+      <body>
+        <!-- Floating decorative elements -->
+        <div class="floating-element" style="width: 180px; height: 180px; top: 15%; left: 8%; background: linear-gradient(135deg, rgba(239, 68, 68, 0.03), rgba(220, 38, 38, 0.01)); border-radius: 50%;"></div>
+        <div class="floating-element" style="width: 120px; height: 120px; bottom: 20%; right: 10%; background: linear-gradient(135deg, rgba(239, 68, 68, 0.02), rgba(220, 38, 38, 0.005)); border-radius: 30px;"></div>
+        
+        <div class="main-container">
+          <div class="content-card">
+            <div class="icon-wrapper">
+              <div class="icon-circle"></div>
+              ${svgIcons.warning}
+            </div>
+            
+            <h1>Server Error</h1>
+            
+            <p class="subtitle">
+              An unexpected error occurred during email verification. Our team has been notified and is working to resolve the issue.
+            </p>
+            
+            <div class="spacer-md"></div>
+            
+            <a href="http://localhost:5173/login-register" class="action-button">
+              <span>Return to Login</span>
+              ${svgIcons.arrowRight}
+            </a>
+            
+            <div class="footer-info">
+              <div class="brand">WUBLAND</div>
+              <p>Please try again in a few minutes</p>
+              <p style="margin-top: 4px; font-size: 13px; color: #d1d5db;">
+                For immediate assistance, contact support@wubland.com
+              </p>
+            </div>
+          </div>
+        </div>
+      </body>
+      </html>
+    `);
   }
 };
 
@@ -869,24 +1343,300 @@ export const logout = (req, res) => {
 };
 
 export const updateProfile = async (req, res) => {
-  const { firstName, lastName, username } = req.body;
   try {
-    if (!firstName || !lastName || !username)
-      return res.status(400).json({ message: "All fields required" });
+    console.log('📝 Update profile request for user:', req.user.id);
+    console.log('📦 Received data keys:', Object.keys(req.body));
 
-    const success = await User.updateProfile(
-      req.user.id,
-      firstName,
-      lastName,
-      username
-    );
-    if (!success) return res.status(400).json({ message: "Update failed" });
+    // Extract ALL possible fields from your frontend form
+    const {
+      // Personal Info (from frontend)
+      full_name,
+      firstName, first_name,
+      lastName, last_name,
+      username,
+      email,
+      phone, phone_number,
+      phone_country_code,
+      date_of_birth,
+      gender,
 
-    const updatedUser = await User.findById(req.user.id);
-    res.status(200).json({ ...updatedUser, password: undefined });
+      // Ethiopian-specific fields
+      kebele_id,
+      passport_number,
+      nationality,
+      living_abroad,
+
+      // Contact Info
+      emergency_contact_name,
+      emergency_contact_phone,
+      emergency_contact_relationship,
+      alternative_phone,
+
+      // Address
+      region,
+      city,
+      sub_city,
+      woreda,
+      kebele_address,
+      current_address,
+      address, // For backward compatibility
+      postal_code,
+
+      // Property Preferences
+      preferred_regions,
+      preferred_cities,
+      budget_min,
+      budget_max,
+      currency,
+      property_type,
+      bedrooms,
+      bathrooms,
+      preferred_locations,
+
+      // Investment preferences
+      investment_purpose,
+      timeline,
+      financing_method,
+
+      // Renter preferences
+      rental_duration,
+      family_size,
+      pet_friendly,
+      furnished,
+
+      // Broker-specific fields
+      broker_license_number,
+      broker_license_expiry,
+      tin_number,
+      brokerage_firm,
+      experience_years,
+      commission_rate,
+
+      // Verification Documents
+      id_document,
+      id_document_status,
+      proof_of_income,
+      proof_of_income_status,
+      reference_letter,
+      kebele_id_status,
+      passport_document,
+      broker_license_doc,
+      tax_certificate,
+
+      // Profile completion
+      profile_complete,
+      profile_completion_percentage,
+      verification_status,
+      setup_completed_at
+    } = req.body;
+
+    // Handle name variations
+    let finalFirstName = first_name || firstName;
+    let finalLastName = last_name || lastName;
+
+    // If full_name is provided, split it
+    if (full_name && (!finalFirstName || !finalLastName)) {
+      const nameParts = full_name.trim().split(' ');
+      finalFirstName = nameParts[0] || '';
+      finalLastName = nameParts.slice(1).join(' ') || '';
+    }
+
+    // Basic validation
+    if (!finalFirstName || !finalLastName || !username) {
+      return res.status(400).json({
+        success: false,
+        message: "First name, last name, and username are required"
+      });
+    }
+
+    // Build update object
+    const updates = {
+      first_name: finalFirstName,
+      last_name: finalLastName,
+      username: username,
+
+      // Personal info
+      phone_number: phone || phone_number,
+      phone_country_code: phone_country_code || '+251',
+      date_of_birth: date_of_birth,
+      gender: gender,
+
+      // Ethiopian info
+      kebele_id: kebele_id,
+      passport_number: passport_number,
+      nationality: nationality || 'Ethiopian',
+      living_abroad: living_abroad ? 1 : 0,
+
+      // Address info
+      region: region,
+      city: city,
+      sub_city: sub_city,
+      woreda: woreda,
+      kebele_address: kebele_address,
+      current_address: current_address || address,
+      postal_code: postal_code,
+
+      // Contact info
+      emergency_contact_name: emergency_contact_name,
+      emergency_contact_phone: emergency_contact_phone,
+      emergency_contact_relationship: emergency_contact_relationship,
+      alternative_phone: alternative_phone,
+
+      // Preferences - store as JSON
+      preferred_regions: preferred_regions ? JSON.stringify(preferred_regions) : null,
+      preferred_cities: preferred_cities ? JSON.stringify(preferred_cities) : null,
+      preferred_locations: preferred_locations ? JSON.stringify(preferred_locations) : null,
+      budget_min: budget_min ? parseFloat(budget_min) : null,
+      budget_max: budget_max ? parseFloat(budget_max) : null,
+      currency: currency || 'ETB',
+      property_type: property_type,
+      bedrooms: bedrooms,
+      bathrooms: bathrooms,
+      investment_purpose: investment_purpose,
+      timeline: timeline,
+      financing_method: financing_method,
+      rental_duration: rental_duration,
+      family_size: family_size ? parseInt(family_size) : null,
+      pet_friendly: pet_friendly ? 1 : 0,
+      furnished: furnished ? 1 : 0,
+
+      // Broker info
+      broker_license_number: broker_license_number,
+      broker_license_expiry: broker_license_expiry,
+      tin_number: tin_number,
+      brokerage_firm: brokerage_firm,
+      experience_years: experience_years ? parseInt(experience_years) : null,
+      commission_rate: commission_rate,
+
+      // Document status
+      id_document_status: id_document_status || 'pending',
+      proof_of_income_status: proof_of_income_status || 'pending',
+      kebele_id_status: kebele_id_status || 'pending',
+
+      // Profile completion
+      profile_complete: profile_complete ? 1 : 0,
+      profile_completion_percentage: profile_completion_percentage ? parseInt(profile_completion_percentage) : 0,
+      verification_status: verification_status || 'pending',
+      setup_completed_at: setup_completed_at || new Date().toISOString().slice(0, 19).replace('T', ' '),
+
+      // Always update timestamp
+      updated_at: new Date().toISOString().slice(0, 19).replace('T', ' ')
+    };
+
+    // Clean up undefined/null values
+    Object.keys(updates).forEach(key => {
+      if (updates[key] === undefined || updates[key] === null || updates[key] === '') {
+        delete updates[key];
+      }
+    });
+
+    console.log('🔄 Updates to apply:', updates);
+
+    // Update database
+    const db = await import("../../shared/db.js").then(mod => mod.default);
+
+    // Start transaction
+    await db.query('START TRANSACTION');
+
+    try {
+      // Update user
+      const [result] = await db.query(
+        `UPDATE users SET ? WHERE id = ?`,
+        [updates, req.user.id]
+      );
+
+      if (result.affectedRows === 0) {
+        await db.query('ROLLBACK');
+        return res.status(404).json({
+          success: false,
+          message: "User not found"
+        });
+      }
+
+      // Commit transaction
+      await db.query('COMMIT');
+
+      // Get updated user
+      const [updatedUsers] = await db.query(
+        `SELECT 
+          id, first_name, last_name, username, email, phone_number, phone_country_code,
+          date_of_birth, gender, nationality, living_abroad, kebele_id, passport_number,
+          region, city, sub_city, woreda, kebele_address, current_address, postal_code,
+          emergency_contact_name, emergency_contact_phone, emergency_contact_relationship, alternative_phone,
+          preferred_regions, preferred_cities, preferred_locations,
+          budget_min, budget_max, currency, property_type, bedrooms, bathrooms,
+          investment_purpose, timeline, financing_method,
+          rental_duration, family_size, pet_friendly, furnished,
+          broker_license_number, broker_license_expiry, tin_number, brokerage_firm, experience_years, commission_rate,
+          profile_complete, profile_completion_percentage, verification_status, setup_completed_at,
+          profile_picture, role, status, verified, created_at, updated_at
+         FROM users WHERE id = ?`,
+        [req.user.id]
+      );
+
+      if (updatedUsers.length === 0) {
+        return res.status(404).json({
+          success: false,
+          message: "User not found after update"
+        });
+      }
+
+      let user = updatedUsers[0];
+
+      // Parse JSON fields
+      if (user.preferred_regions) {
+        try {
+          user.preferred_regions = JSON.parse(user.preferred_regions);
+        } catch (e) {
+          user.preferred_regions = [];
+        }
+      }
+
+      if (user.preferred_cities) {
+        try {
+          user.preferred_cities = JSON.parse(user.preferred_cities);
+        } catch (e) {
+          user.preferred_cities = [];
+        }
+      }
+
+      if (user.preferred_locations) {
+        try {
+          user.preferred_locations = JSON.parse(user.preferred_locations);
+        } catch (e) {
+          user.preferred_locations = [];
+        }
+      }
+
+      // Add full_name for frontend compatibility
+      user.full_name = `${user.first_name || ''} ${user.last_name || ''}`.trim();
+      user.phone = user.phone_number;
+      user.living_abroad = user.living_abroad === 1;
+      user.pet_friendly = user.pet_friendly === 1;
+      user.furnished = user.furnished === 1;
+      user.profile_complete = user.profile_complete === 1;
+
+      console.log('✅ Profile updated successfully for user:', req.user.id);
+
+      res.status(200).json({
+        success: true,
+        message: "Profile updated successfully",
+        user: user
+      });
+
+    } catch (dbError) {
+      await db.query('ROLLBACK');
+      throw dbError;
+    }
+
   } catch (err) {
-    console.error("updateProfile error:", err.message);
-    res.status(500).json({ message: "Internal Server Error" });
+    console.error("❌ updateProfile error:", err.message);
+    console.error("❌ Error stack:", err.stack);
+    res.status(500).json({
+      success: false,
+      message: "Internal Server Error",
+      error: process.env.NODE_ENV === 'development' ? err.message : undefined
+    });
   }
 };
 
@@ -940,13 +1690,46 @@ export const updateUsername = async (req, res) => {
 
 export const checkAuth = async (req, res) => {
   try {
+    console.log('🔍 checkAuth called for user:', req.user.id);
+
+    // Fetch COMPLETE user data from database including profile_picture
+    const db = await import("../../shared/db.js").then(mod => mod.default);
+
+    const [users] = await db.query(`
+      SELECT 
+        id, first_name, last_name, username, email, role, status,
+        profile_picture, created_at, verified, is_email_verified,
+        password_change_required, last_login, privilege_tier,
+        phone_number, verification_status, setup_completed_at,
+        profile_completion_percentage
+      FROM users 
+      WHERE id = ?
+    `, [req.user.id]);
+
+    if (users.length === 0) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    const user = users[0];
+
     // Get broker_type separately
     const brokerType = await getBrokerType(req.user.id);
+
     const userWithBrokerType = {
-      ...req.user,
+      ...user,
       broker_type: brokerType,
-      password: undefined
+      password: undefined,
+      // Add account status information
+      account_status: {
+        status: user.status || 'active',
+        is_email_verified: user.is_email_verified || user.verified,
+        password_change_required: user.password_change_required || false,
+        last_login: user.last_login,
+        account_age: Math.floor((new Date() - new Date(user.created_at)) / (1000 * 60 * 60 * 24)) + ' days'
+      }
     };
+
+    console.log('✅ checkAuth returning user with profile_picture:', userWithBrokerType.profile_picture);
     res.status(200).json(userWithBrokerType);
   } catch (err) {
     console.error("checkAuth error:", err.message);
@@ -1253,120 +2036,483 @@ export const uploadProfilePicture = async (req, res) => {
 };
 
 export const adminCreateUser = async (req, res) => {
-  const { firstName, lastName, username, email, password, role, broker_type } =
-    req.body;
+  console.log("🟢 CREATE USER: Starting user creation...");
 
-  console.log("Admin creating user:", {
-    firstName,
-    lastName,
+  // Get ALL possible field names
+  const {
+    // From frontend
+    first_name, last_name, username, email, password, role,
+    privilege_tier = 'basic', status = 'active', phone = '', broker_type = '',
+
+    // Backward compatibility
+    firstName, lastName
+  } = req.body;
+
+  // Use the right field names
+  const finalFirstName = first_name || firstName;
+  const finalLastName = last_name || lastName;
+  const finalPhone = phone || '';
+
+  console.log("🟢 CREATE USER: Data received:", {
+    firstName: finalFirstName,
+    lastName: finalLastName,
     username,
     email,
     role,
+    privilege_tier,
+    status,
+    phone: finalPhone,
     broker_type,
+    passwordLength: password ? password.length : 0
   });
 
   try {
-    if (!firstName || !lastName || !username || !email || !password || !role) {
-      return res.status(400).json({ error: "All fields are required" });
+    // ========== BASIC VALIDATION ==========
+    if (!finalFirstName || !finalLastName || !username || !email || !password || !role) {
+      console.log("🔴 CREATE USER: Missing required fields");
+      return res.status(400).json({
+        success: false,
+        message: "Missing required fields: first_name, last_name, username, email, password, role"
+      });
     }
 
-    if (password.length < 8)
-      return res.status(400).json({ message: "Password must be 8+ chars" });
+    if (password.length < 8) {
+      return res.status(400).json({
+        success: false,
+        message: "Password must be at least 8 characters"
+      });
+    }
 
-    const existingUser = await User.findByEmail(email);
-    if (existingUser)
-      return res.status(400).json({ message: "Email already exists" });
+    // ========== CHECK FOR EXISTING USER ==========
+    console.log("🟢 CREATE USER: Checking for existing user...");
 
-    const clientRoles = ["user", "buyer", "seller", "renter", "broker"];
-    const employeeRoles = [
-      "admin",
-      "support_agent",
-      "support_lead",
-      "support_admin",
-    ];
+    // Check email
+    const [existingEmail] = await db.query(
+      "SELECT id FROM users WHERE email = ?",
+      [email]
+    );
 
-    let finalBrokerType = null;
+    if (existingEmail.length > 0) {
+      console.log("🔴 CREATE USER: Email already exists");
+      return res.status(400).json({
+        success: false,
+        message: "Email already exists"
+      });
+    }
 
-    if (role === "broker") {
-      if (!broker_type || !["internal", "external"].includes(broker_type)) {
-        return res
-          .status(400)
-          .json({
-            message: "Invalid broker type. Must be 'internal' or 'external'",
-          });
+    // Check username
+    const [existingUsername] = await db.query(
+      "SELECT id FROM users WHERE username = ?",
+      [username]
+    );
+
+    if (existingUsername.length > 0) {
+      console.log("🔴 CREATE USER: Username already exists");
+      return res.status(400).json({
+        success: false,
+        message: "Username already exists"
+      });
+    }
+
+    console.log("🟢 CREATE USER: No existing user found");
+
+    // ========== HANDLE CONFIRMATION FOR CLIENT ROLES ==========
+    const clientRoles = ['user', 'buyer', 'seller', 'renter', 'landlord'];
+
+    // If it's a client role and no confirmation header, return warning
+    if (req.headers['x-confirm'] !== 'true' && clientRoles.includes(role)) {
+      console.log("🟡 CREATE USER: Sending warning for client role");
+      return res.status(200).json({
+        warning: true,
+        message: `You are creating a ${role}. Clients should register themselves. Proceed?`,
+        role: role
+      });
+    }
+
+    // ========== CREATE THE USER ==========
+    console.log("🟢 CREATE USER: Creating user in database...");
+
+    // Hash password
+    const hashedPassword = await bcrypt.hash(password, 10);
+    console.log("🟢 CREATE USER: Password hashed");
+
+    // Start transaction
+    console.log("🟢 CREATE USER: Starting database transaction...");
+    const connection = await db.getConnection();
+
+    try {
+      await connection.beginTransaction();
+      console.log("🟢 CREATE USER: Transaction started");
+
+      // Define which users require password change
+      const passwordChangeRoles = [
+        'admin', 'support_admin', 'support_lead', 'support_agent',
+        'super_admin', 'internal_broker', 'external_broker',
+        'buyer', 'renter', 'seller', 'landlord', 'user'
+      ];
+
+      const shouldRequirePasswordChange = passwordChangeRoles.includes(role);
+
+      // For email verification:
+      // 1. Staff/admin roles should be marked as verified (since admin created them)
+      // 2. Client roles should be unverified (need to verify their email)
+      const staffRoles = [
+        'super_admin', 'admin', 'support_admin', 'support_lead',
+        'support_agent', 'internal_broker', 'external_broker'
+      ];
+
+      const isStaffRole = staffRoles.includes(role);
+      const isClientRole = clientRoles.includes(role);
+
+      console.log("🟢 CREATE USER: Role classification:", {
+        role,
+        isStaffRole,
+        isClientRole,
+        shouldRequirePasswordChange
+      });
+
+      // Generate email verification token for client roles
+      let emailVerificationToken = null;
+      let emailVerificationExpires = null;
+
+      if (isClientRole) {
+        // Generate verification token for client users
+        emailVerificationToken = crypto.randomBytes(32).toString('hex');
+        emailVerificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+
+        console.log("🟢 CREATE USER: Generated verification token for client");
       }
-      finalBrokerType = broker_type;
 
-      if (broker_type === "internal") {
-        // No warning for internal brokers
-      } else {
-        return res.status(200).json({
-          warning: true,
-          message:
-            "You are creating a client role (External Broker). Are you sure you want to proceed?",
-          role: role,
-          userType: "client",
+      // INSERT USER DIRECTLY
+      const [userResult] = await connection.query(
+        `INSERT INTO users 
+         (first_name, last_name, username, email, password, role, 
+          privilege_tier, status, phone_number, 
+          is_email_verified, verified, password_change_required,
+          email_verification_token, email_verification_expires,
+          created_by_user_id, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
+        [
+          finalFirstName,
+          finalLastName,
+          username,
+          email,
+          hashedPassword,
+          role,
+          privilege_tier,
+          status,
+          finalPhone,
+          isStaffRole ? 1 : 0, // is_email_verified: staff=1, client=0
+          isStaffRole ? 1 : 0, // verified: staff=1, client=0
+          shouldRequirePasswordChange ? 1 : 0, // password_change_required
+          emailVerificationToken, // email_verification_token
+          emailVerificationExpires, // email_verification_expires
+          req.user.id // created_by_user_id
+        ]
+      );
+
+      const userId = userResult.insertId;
+      console.log("✅ CREATE USER: User inserted with ID:", userId);
+      console.log("✅ Email verification:", isStaffRole ? "Verified (staff)" : "Pending (client)");
+      console.log("✅ Password change required:", shouldRequirePasswordChange);
+
+      // If broker role, create broker profile
+      if (role.includes('broker') && broker_type) {
+        console.log("🟢 CREATE USER: Creating broker profile...");
+        await connection.query(
+          `INSERT INTO broker_profiles (user_id, broker_type, created_at, updated_at) 
+           VALUES (?, ?, NOW(), NOW())`,
+          [userId, broker_type]
+        );
+        console.log("✅ CREATE USER: Broker profile created");
+      }
+
+      // Commit transaction
+      await connection.commit();
+      console.log("✅ CREATE USER: Transaction committed");
+      connection.release();
+
+      // ========== GET THE CREATED USER ==========
+      console.log("🟢 CREATE USER: Fetching created user...");
+      const [createdUser] = await db.query(`
+        SELECT 
+          u.id, 
+          u.first_name, 
+          u.last_name, 
+          u.username, 
+          u.email, 
+          u.role, 
+          u.status, 
+          u.profile_picture, 
+          u.created_at, 
+          u.verified,
+          u.is_email_verified,
+          u.password_change_required,
+          u.email_verification_token,
+          u.email_verification_expires,
+          u.created_by_user_id,
+          u.privilege_tier,
+          u.phone_number,
+          bp.broker_type
+        FROM users u
+        LEFT JOIN broker_profiles bp ON u.id = bp.user_id
+        WHERE u.id = ?
+      `, [userId]);
+
+      if (!createdUser || createdUser.length === 0) {
+        console.log("🔴 CREATE USER: Failed to fetch created user");
+        throw new Error("Failed to retrieve created user");
+      }
+
+      const user = createdUser[0];
+      console.log("✅ CREATE USER: User created successfully:", user);
+
+      // ========== SEND EMAIL FOR CLIENT USERS ==========
+      if (isClientRole && emailVerificationToken) {
+        try {
+          // Send email via communication service
+          const response = await fetch('http://localhost:5001/api/email/send-verification', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'internal-service-token': 'communication-service-secret-12345'
+            },
+            body: JSON.stringify({
+              email: user.email,
+              fullName: `${user.first_name || ''} ${user.last_name || ''}`.trim() || user.email,
+              verificationToken: emailVerificationToken
+            })
+          });
+
+          if (response.ok) {
+            console.log("✅ CREATE USER: Verification email sent to client");
+          } else {
+            const errorData = await response.json().catch(() => ({}));
+            console.warn("⚠️ CREATE USER: Failed to send verification email:", errorData);
+          }
+        } catch (emailError) {
+          console.error("⚠️ CREATE USER: Email service error:", emailError.message);
+          // Don't fail the whole process if email fails
+        }
+      }
+
+      // ========== SEND SUCCESS RESPONSE ==========
+      res.status(201).json({
+        success: true,
+        message: "User created successfully",
+        user: user,
+        warning: false,
+        password_change_required: shouldRequirePasswordChange,
+        email_verification_sent: isClientRole,
+        is_verified: isStaffRole
+      });
+
+    } catch (dbError) {
+      // Rollback on error
+      console.error("🔴 CREATE USER: Database error:", dbError);
+      if (connection) {
+        await connection.rollback();
+        connection.release();
+      }
+      throw dbError;
+    }
+
+  } catch (error) {
+    console.error("🔴 CREATE USER: Critical error:", error);
+
+    // Handle specific errors
+    if (error.code === 'ER_DUP_ENTRY') {
+      return res.status(400).json({
+        success: false,
+        message: "Username or email already exists",
+        error: error.message
+      });
+    }
+
+    if (error.code === 'ER_NO_REFERENCED_ROW_2') {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid data reference",
+        error: error.message
+      });
+    }
+
+    // Generic error
+    res.status(500).json({
+      success: false,
+      message: "Failed to create user",
+      error: error.message,
+      code: error.code
+    });
+  }
+};
+
+export const changePassword = async (req, res) => {
+  try {
+    const { currentPassword, newPassword, confirmPassword, isRequiredChange = false } = req.body;
+    const userId = req.user?.id;
+
+    console.log("🔐 CHANGE PASSWORD:", {
+      userId,
+      isRequiredChange,
+      hasCurrentPassword: !!currentPassword
+    });
+
+    if (!newPassword || !confirmPassword) {
+      return res.status(400).json({
+        success: false,
+        message: "New password and confirmation are required"
+      });
+    }
+
+    if (newPassword !== confirmPassword) {
+      return res.status(400).json({
+        success: false,
+        message: "Passwords do not match"
+      });
+    }
+
+    if (newPassword.length < 8) {
+      return res.status(400).json({
+        success: false,
+        message: "Password must be at least 8 characters long"
+      });
+    }
+
+    // Password validation
+    const passwordErrors = [];
+    if (!/\d/.test(newPassword)) passwordErrors.push("at least one number");
+    if (!/[A-Z]/.test(newPassword)) passwordErrors.push("at least one uppercase letter");
+    if (!/[a-z]/.test(newPassword)) passwordErrors.push("at least one lowercase letter");
+    if (!/[!@#$%^&*]/.test(newPassword)) passwordErrors.push("at least one special character");
+
+    if (passwordErrors.length > 0) {
+      return res.status(400).json({
+        success: false,
+        message: `Password must contain: ${passwordErrors.join(', ')}`
+      });
+    }
+
+    // Get user from database
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found"
+      });
+    }
+
+    // If this is NOT a required password change (normal password change), verify current password
+    if (!isRequiredChange) {
+      if (!currentPassword) {
+        return res.status(400).json({
+          success: false,
+          message: "Current password is required"
+        });
+      }
+
+      const isCurrentPasswordValid = await bcrypt.compare(currentPassword, user.password);
+      if (!isCurrentPasswordValid) {
+        return res.status(401).json({
+          success: false,
+          message: "Current password is incorrect"
         });
       }
     }
 
-    if (clientRoles.includes(role) && role !== "broker") {
-      return res.status(200).json({
-        warning: true,
-        message: `You are creating a client role (${role}). Clients should typically register themselves. Are you sure you want to proceed?`,
-        role: role,
-        userType: "client",
+    // Hash new password
+    const hashedPassword = await bcrypt.hash(newPassword, 12);
+
+    // Update password in database
+    const db = await import("../../shared/db.js").then(mod => mod.default);
+    await db.query(
+      `UPDATE users 
+             SET password = ?, 
+                 password_change_required = FALSE,
+                 last_password_change = NOW(),
+                 login_attempts = 0,
+                 lock_until = NULL,
+                 updated_at = NOW()
+             WHERE id = ?`,
+      [hashedPassword, userId]
+    );
+
+    console.log("✅ Password changed successfully for user:", userId);
+
+    // If this was a required password change, generate a proper login token
+    if (isRequiredChange) {
+      // Generate new login token
+      const newUserData = await User.findById(userId);
+      const newToken = generateToken({
+        id: newUserData.id,
+        username: newUserData.username,
+        role: newUserData.role,
+        privilege_tier: newUserData.privilege_tier || 'basic',
+        verified: newUserData.verified || false,
+        status: newUserData.status || 'active',
+        password_change_required: false,
+        created_by_user_id: newUserData.created_by_user_id
+      }, res);
+
+      // Get broker type
+      const brokerType = await getBrokerType(userId);
+
+      return res.json({
+        success: true,
+        message: "Password changed successfully. You are now logged in.",
+        token: newToken,
+        user: {
+          id: newUserData.id,
+          first_name: newUserData.first_name,
+          last_name: newUserData.last_name,
+          username: newUserData.username,
+          email: newUserData.email,
+          role: newUserData.role,
+          broker_type: brokerType,
+          verified: newUserData.verified,
+          status: newUserData.status,
+          password_change_required: false
+        },
+        redirect: true
       });
     }
 
-    const hashedPassword = await bcrypt.hash(password, 10);
-
-    // Create user WITHOUT broker_type
-    const newUserResult = await User.create(
-      firstName,
-      lastName,
-      username,
-      email,
-      hashedPassword,
-      role,
-      null, // Don't pass broker_type
-      1,
-      null,
-      null
-    );
-    const newUserId = newUserResult.insertId;
-
-    await User.verifyEmail(newUserId);
-
-    // If user is a broker, create broker profile
-    if (role === "broker" && finalBrokerType) {
-      await db.query(
-        `INSERT INTO broker_profiles (user_id, broker_type, created_at) 
-         VALUES (?, ?, NOW())`,
-        [newUserId, finalBrokerType]
-      );
-    }
-
-    if (
-      employeeRoles.includes(role) ||
-      (role === "broker" && finalBrokerType === "internal")
-    ) {
-      await User.requirePasswordChange(newUserId);
-    }
-
-    const createdUser = await User.findById(newUserId);
-
-    res.status(201).json({
+    // For normal password changes, just return success
+    res.json({
       success: true,
-      message: "User created successfully",
-      user: { ...createdUser, password: undefined },
-      warning: false,
+      message: "Password changed successfully"
     });
+
   } catch (error) {
-    console.error("adminCreateUser error:", error);
-    res
-      .status(500)
-      .json({ message: "Internal Server Error", details: error.message });
+    console.error("❌ Change password error:", error.message);
+    console.error("❌ Error stack:", error.stack);
+    res.status(500).json({
+      success: false,
+      message: "Internal server error during password change"
+    });
+  }
+};
+
+export const verifyPasswordChangeToken = async (token) => {
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key');
+
+    // Check if this is a password change token
+    if (!decoded.requiresPasswordChange) {
+      throw new Error("Not a password change token");
+    }
+
+    return {
+      valid: true,
+      userId: decoded.userId,
+      email: decoded.email
+    };
+  } catch (error) {
+    console.error("❌ Password change token verification error:", error.message);
+    return {
+      valid: false,
+      error: error.message
+    };
   }
 };
 

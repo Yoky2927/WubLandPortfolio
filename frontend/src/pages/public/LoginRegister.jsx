@@ -8,6 +8,8 @@ import PasswordStrengthIndicator from "../../components/PasswordStrengthIndicato
 import ProfilePictureModal from "../../components/ProfilePictureModal.jsx";
 import { useTheme } from "../../contexts/ThemeContext.jsx";
 import PasswordMismatchIndicator from "../../components/PasswordMismatchIndicator.jsx";
+import AccountStatusBanner from "../../components/AccountStatusBanner.jsx";
+import PasswordChangePopup from "../../components/PasswordChangePopup.jsx";
 
 const LoginRegister = () => {
   // State for theme management (light/dark)
@@ -36,6 +38,11 @@ const LoginRegister = () => {
   const [showProfileModal, setShowProfileModal] = useState(false);
   const [userProfilePicture, setUserProfilePicture] = useState(null);
   const fileInputRef = useRef(null);
+  const [accountStatus, setAccountStatus] = useState(null);
+  const [accountStatusData, setAccountStatusData] = useState(null);
+  const [showPasswordChangeModal, setShowPasswordChangeModal] = useState(false);
+  const [passwordChangeToken, setPasswordChangeToken] = useState(null);
+  const [passwordChangeUserData, setPasswordChangeUserData] = useState(null);
   const [error, setError] = useState("");
   // State for tracking invalid (empty) fields during validation
   const [invalidFields, setInvalidFields] = useState([]);
@@ -53,12 +60,6 @@ const LoginRegister = () => {
   const [emailVerificationSent, setEmailVerificationSent] = useState(false);
   const [pendingVerificationEmail, setPendingVerificationEmail] = useState("");
 
-  // Add these states for name validation
-  const [firstNameError, setFirstNameError] = useState("");
-  const [lastNameError, setLastNameError] = useState("");
-  const [isFirstNameValid, setIsFirstNameValid] = useState(true);
-  const [isLastNameValid, setIsLastNameValid] = useState(true);
-
   // Check if user is already logged in (has token) and redirect based on role
   useEffect(() => {
     const token = localStorage.getItem("token");
@@ -70,11 +71,14 @@ const LoginRegister = () => {
 
         // Check if this is a password change token
         if (payload.requiresPasswordChange) {
+          console.log("🔴 LoginRegister - Password change token found");
+          // Don't redirect, show password change form
           setRequiresPasswordChange(true);
           setTempToken(token);
-          return; // Don't redirect, show password change form
+          return;
         }
 
+        // Only redirect if it's a normal token without password change requirement
         setIsLoading(true);
         setTimeout(() => {
           if (payload.role === "super_admin") {
@@ -114,71 +118,43 @@ const LoginRegister = () => {
     setFormData((prev) => ({ ...prev, acceptedTerms: false }));
   };
 
-  // Generic input change handler
+  // Real-time name validation - prevents numbers and special characters
+  const validateNameInput = (value, fieldName) => {
+    // Allow only letters, spaces, hyphens, and apostrophes
+    return value === '' || /^[A-Za-z\s\-']+$/.test(value);
+  };
+
+  // Handle name input change with real-time validation
+  const handleNameChange = (e) => {
+    const { name, value } = e.target;
+
+    // Validate the input
+    if (validateNameInput(value, name)) {
+      // Only update if valid
+      setFormData((prev) => ({
+        ...prev,
+        [name]: value,
+      }));
+    }
+    // If invalid, don't update - input stays the same (prevents invalid characters)
+  };
+
+  // Generic input change handler for other fields
   const handleInputChange = (e) => {
     const { name, value, type, checked } = e.target;
+
+    // Special handling for name fields
+    if (name === 'firstName' || name === 'lastName') {
+      handleNameChange(e);
+      return;
+    }
+
     setFormData((prev) => ({
       ...prev,
       [name]: type === "checkbox" ? checked : value,
     }));
     // Clear invalid field highlight when user starts typing
     setInvalidFields((prev) => prev.filter((field) => field !== name));
-  };
-  // Name validation function
-  const validateName = (name, type) => {
-    // Check for special characters or numbers
-    const specialChars = /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?0-9]/;
-
-    if (specialChars.test(name)) {
-      if (type === 'firstName') {
-        setFirstNameError("First name cannot contain numbers or special characters");
-        setIsFirstNameValid(false);
-      } else {
-        setLastNameError("Last name cannot contain numbers or special characters");
-        setIsLastNameValid(false);
-      }
-      return false;
-    }
-
-    // Check for empty name
-    if (name.trim() === '') {
-      if (type === 'firstName') {
-        setFirstNameError("First name is required");
-        setIsFirstNameValid(false);
-      } else {
-        setLastNameError("Last name is required");
-        setIsLastNameValid(false);
-      }
-      return false;
-    }
-
-    // Clear errors if valid
-    if (type === 'firstName') {
-      setFirstNameError("");
-      setIsFirstNameValid(true);
-    } else {
-      setLastNameError("");
-      setIsLastNameValid(true);
-    }
-    return true;
-  };
-
-  // Handle name input change with validation
-  const handleNameChange = (e) => {
-    const { name, value } = e.target;
-
-    // Update form data
-    setFormData((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
-
-    // Validate if it's a name field
-    if (name === 'firstName') {
-      validateName(value, 'firstName');
-    } else if (name === 'lastName') {
-      validateName(value, 'lastName');
-    }
   };
 
   // Handle password input to prevent paste
@@ -236,7 +212,7 @@ const LoginRegister = () => {
     }
   };
 
-  // NEW: Handle password change for employees
+  // NEW: Handle password change for employees (old method - keeping for compatibility)
   const handlePasswordChangeSubmit = async (e) => {
     e.preventDefault();
     const { newPassword, confirmPassword } = formData;
@@ -417,11 +393,14 @@ const LoginRegister = () => {
 
     // Validate names before submission - ONLY for signup
     if (isSignUpMode) {
-      const isFirstNameValid = validateName(formData.firstName, 'firstName');
-      const isLastNameValid = validateName(formData.lastName, 'lastName');
-
-      if (!isFirstNameValid || !isLastNameValid) {
-        return; // Stop submission if names are invalid
+      // Check if names are empty
+      if (!formData.firstName.trim()) {
+        setError("First name is required");
+        return;
+      }
+      if (!formData.lastName.trim()) {
+        setError("Last name is required");
+        return;
       }
     }
 
@@ -473,7 +452,7 @@ const LoginRegister = () => {
         setError("Please accept the terms and conditions!");
         return;
       }
-      
+
       try {
         setIsLoading(true);
         setLoaderType("loading");
@@ -602,19 +581,14 @@ const LoginRegister = () => {
         setTimeout(() => setIsLoading(false), 2000);
       }
     } else {
-      // LOGIN SECTION
+      // LOGIN SECTION - UPDATED WITH ACCOUNT STATUS HANDLING
       try {
         setIsLoading(true);
         setLoaderType("loading");
         setLoaderMessage("Signing you in...");
 
         console.log("🔄 Sending login request...");
-        console.log("📤 Login endpoint:", "http://localhost:5000/api/auth/login");
-        console.log("📤 Login credentials:", {
-          username: formData.username,
-          password: "***" // Don't log actual password
-        });
-        
+
         const response = await fetch("http://localhost:5000/api/auth/login", {
           method: "POST",
           headers: {
@@ -627,31 +601,41 @@ const LoginRegister = () => {
         });
 
         console.log("📊 Login response status:", response.status);
-        
-        // Check if we got any response at all
-        if (!response) {
-          console.log("❌ No response from server - network error?");
-          setError("Network error - server not responding");
-          setIsLoading(false);
-          return;
-        }
-        
+
         // Try to get response text first
         const responseText = await response.text();
         console.log("📄 Raw response text:", responseText);
-        
+
         if (response.ok) {
-          // IMPORTANT: Parse the response text to JSON
           const data = JSON.parse(responseText);
           console.log("🔍 Parsed login response data:", data);
-          
-          // Check if password change is required
+
+          // 🔴 NEW: Check for password change requirement
           if (data.requiresPasswordChange) {
-            setRequiresPasswordChange(true);
-            setTempToken(data.tempToken);
+            console.log("🔴 Password change required");
+            setPasswordChangeToken(data.changePasswordToken);
+            setPasswordChangeUserData(data.user || {
+              email: formData.username,
+              role: data.user?.role
+            });
+            setShowPasswordChangeModal(true);
             setLoaderType("info");
             setLoaderMessage("Password change required");
-            setTimeout(() => setIsLoading(false), 2000);
+            setTimeout(() => setIsLoading(false), 1000);
+            return;
+          }
+
+          // 🔴 NEW: Check for account status issues
+          if (data.account_status && data.account_status !== 'active') {
+            console.log("🔴 Account status issue:", data.account_status);
+            setAccountStatus(data.account_status);
+            setAccountStatusData({
+              ...(data.user_info || data.user || {}),
+              status_details: data.status_details
+            });
+            setLoaderType("warning");
+            setLoaderMessage("Account issue detected");
+            setTimeout(() => setIsLoading(false), 1000);
             return;
           }
 
@@ -732,32 +716,37 @@ const LoginRegister = () => {
 
           // Try to get error message
           try {
-            console.log("📝 Login error response text:", responseText);
+            const errorData = JSON.parse(responseText);
+            console.log("📝 Login error details:", errorData);
 
-            try {
-              const errorData = JSON.parse(responseText);
-              console.log("📝 Login error details:", errorData);
-
-              // 🚨 CRITICAL FIX: Handle email verification requirement in login
-              if (errorData.requiresVerification) {
-                setRequiresEmailVerification(true);
-                setPendingVerificationEmail(errorData.email || formData.username);
-                setLoaderType("info");
-                setLoaderMessage("Email verification required");
-                setTimeout(() => setIsLoading(false), 2000);
-                return;
-              }
-
-              setError(
-                `Login failed: ${errorData.message || "Invalid credentials"}`
-              );
-            } catch (e) {
-              console.log("📝 Login error (non-JSON):", responseText);
-              setError(`Login failed: ${responseText || "Invalid credentials"}`);
+            // 🔴 NEW: Handle backend account status responses
+            if (errorData.account_status) {
+              setAccountStatus(errorData.account_status);
+              setAccountStatusData(errorData.user_info || {
+                email: formData.username
+              });
+              setLoaderType("warning");
+              setLoaderMessage("Account issue detected");
+              setTimeout(() => setIsLoading(false), 1000);
+              return;
             }
+
+            // Handle email verification requirement
+            if (errorData.requiresVerification) {
+              setRequiresEmailVerification(true);
+              setPendingVerificationEmail(errorData.email || formData.username);
+              setLoaderType("info");
+              setLoaderMessage("Email verification required");
+              setTimeout(() => setIsLoading(false), 2000);
+              return;
+            }
+
+            setError(
+              `Login failed: ${errorData.message || "Invalid credentials"}`
+            );
           } catch (e) {
-            console.log("📝 No login error details available");
-            setError("Login failed. Please try again.");
+            console.log("📝 Login error (non-JSON):", responseText);
+            setError(`Login failed: ${responseText || "Invalid credentials"}`);
           }
 
           setLoaderType("error");
@@ -815,74 +804,6 @@ const LoginRegister = () => {
       ),
     },
   ];
-
-  // NEW: Password Change Form for Employees
-  const PasswordChangeForm = () => (
-    <div className="fixed inset-0 flex items-center justify-center z-50 bg-black/50 backdrop-filter backdrop-blur-sm">
-      <div
-        className={`p-8 rounded-lg max-w-md w-full mx-4 ${theme === "dark" ? "bg-gray-800" : "bg-white"
-          }`}
-      >
-        <h2
-          className={`text-2xl font-bold mb-4 ${theme === "dark" ? "text-white" : "text-gray-800"
-            }`}
-        >
-          Password Change Required
-        </h2>
-        <p
-          className={`mb-6 ${theme === "dark" ? "text-gray-300" : "text-gray-600"
-            }`}
-        >
-          For security reasons, you are required to change your password before
-          accessing your dashboard.
-        </p>
-        <form onSubmit={handlePasswordChangeSubmit}>
-          <div
-            className={`mb-4 p-3 ${theme === "dark" ? "bg-gray-700" : "bg-gray-100"
-              }`}
-          >
-            <input
-              type="password"
-              name="newPassword"
-              placeholder="New Password"
-              value={formData.newPassword || ""}
-              onChange={handleInputChange}
-              className={`w-full bg-transparent outline-none border-none text-sm font-semibold placeholder-gray-500 ${theme === "dark" ? "text-white" : "text-gray-700"
-                }`}
-            />
-          </div>
-          <div
-            className={`mb-4 p-3 ${theme === "dark" ? "bg-gray-700" : "bg-gray-100"
-              }`}
-          >
-            <input
-              type="password"
-              name="confirmPassword"
-              placeholder="Confirm New Password"
-              value={formData.confirmPassword || ""}
-              onChange={handleInputChange}
-              className={`w-full bg-transparent outline-none border-none text-sm font-semibold placeholder-gray-500 ${theme === "dark" ? "text-white" : "text-gray-700"
-                }`}
-            />
-          </div>
-          {error && (
-            <p
-              className={`text-sm mb-4 ${theme === "dark" ? "text-red-400" : "text-red-600"
-                }`}
-            >
-              {error}
-            </p>
-          )}
-          <button
-            type="submit"
-            className="w-full bg-amber-500 h-12 text-white font-semibold uppercase transition-all duration-300 hover:bg-amber-600"
-          >
-            Change Password
-          </button>
-        </form>
-      </div>
-    </div>
-  );
 
   // NEW: Enhanced Email Verification Notice
   const EmailVerificationNotice = () => (
@@ -1006,9 +927,6 @@ const LoginRegister = () => {
         <Loader theme={theme} message={loaderMessage} type={loaderType} />
       )}
 
-      {/* NEW: Show password change form if required */}
-      {requiresPasswordChange && <PasswordChangeForm />}
-
       {/* NEW: Show email verification notice if required */}
       {requiresEmailVerification && <EmailVerificationNotice />}
 
@@ -1103,6 +1021,21 @@ const LoginRegister = () => {
             >
               Sign in
             </h2>
+
+            {/* Account Status Banner for Login */}
+            {accountStatus && (
+              <AccountStatusBanner
+                status={accountStatus}
+                theme={theme}
+                userInfo={accountStatusData}
+                onClose={() => {
+                  setAccountStatus(null);
+                  setAccountStatusData(null);
+                }}
+                showCloseButton={true}
+              />
+            )}
+
             <div
               className={`w-full my-3 h-12 grid grid-cols-[15%_85%] px-3 transition-all duration-300 ${activeInput === "username"
                 ? theme === "light"
@@ -1263,21 +1196,18 @@ const LoginRegister = () => {
                   : theme === "light"
                     ? "bg-gray-100 hover:bg-gray-200 border border-gray-300"
                     : "bg-gray-800 hover:bg-gray-700 border border-gray-700"
-                  } ${!isFirstNameValid || invalidFields.includes("firstName")
+                  } ${invalidFields.includes("firstName")
                     ? "border-2 border-red-500 ring-0"
                     : ""
                   }`}
                 onFocus={() => setActiveInput("firstName")}
-                onBlur={(e) => {
-                  setActiveInput(null);
-                  validateName(formData.firstName, 'firstName');
-                }}
+                onBlur={() => setActiveInput(null)}
               >
                 <div className="flex items-center justify-center">
                   <svg
                     className={`w-4 h-4 md:w-5 md:h-5 transition-colors duration-300 ${activeInput === "firstName"
                       ? "text-amber-600"
-                      : isFirstNameValid ? "text-gray-400" : "text-red-500"
+                      : "text-gray-400"
                       }`}
                     fill="currentColor"
                     viewBox="0 0 20 20"
@@ -1295,19 +1225,10 @@ const LoginRegister = () => {
                   placeholder="First Name"
                   value={formData.firstName}
                   onChange={handleNameChange}
-                  onBlur={(e) => validateName(e.target.value, 'firstName')}
                   className={`bg-transparent outline-none border-none text-sm md:text-base font-medium placeholder-gray-500 transition-colors duration-300 ${theme === "light" ? "text-gray-800" : "text-white"
                     }`}
                 />
               </div>
-              {firstNameError && (
-                <div className="flex items-center mt-1 ml-1">
-                  <svg className="w-3 h-3 text-red-500 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-                  </svg>
-                  <p className="text-xs text-red-500">{firstNameError}</p>
-                </div>
-              )}
             </div>
 
             {/* Last Name with Validation - REMOVED rounded-lg */}
@@ -1320,21 +1241,18 @@ const LoginRegister = () => {
                   : theme === "light"
                     ? "bg-gray-100 hover:bg-gray-200 border border-gray-300"
                     : "bg-gray-800 hover:bg-gray-700 border border-gray-700"
-                  } ${!isLastNameValid || invalidFields.includes("lastName")
+                  } ${invalidFields.includes("lastName")
                     ? "border-2 border-red-500 ring-0"
                     : ""
                   }`}
                 onFocus={() => setActiveInput("lastName")}
-                onBlur={(e) => {
-                  setActiveInput(null);
-                  validateName(formData.lastName, 'lastName');
-                }}
+                onBlur={() => setActiveInput(null)}
               >
                 <div className="flex items-center justify-center">
                   <svg
                     className={`w-4 h-4 md:w-5 md:h-5 transition-colors duration-300 ${activeInput === "lastName"
                       ? "text-amber-600"
-                      : isLastNameValid ? "text-gray-400" : "text-red-500"
+                      : "text-gray-400"
                       }`}
                     fill="currentColor"
                     viewBox="0 0 20 20"
@@ -1352,19 +1270,10 @@ const LoginRegister = () => {
                   placeholder="Last Name"
                   value={formData.lastName}
                   onChange={handleNameChange}
-                  onBlur={(e) => validateName(e.target.value, 'lastName')}
                   className={`bg-transparent outline-none border-none text-sm md:text-base font-medium placeholder-gray-500 transition-colors duration-300 ${theme === "light" ? "text-gray-800" : "text-white"
                     }`}
                 />
               </div>
-              {lastNameError && (
-                <div className="flex items-center mt-1 ml-1">
-                  <svg className="w-3 h-3 text-red-500 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-                  </svg>
-                  <p className="text-xs text-red-500">{lastNameError}</p>
-                </div>
-              )}
             </div>
 
             {/* Username - REMOVED rounded-lg */}
@@ -1869,6 +1778,41 @@ const LoginRegister = () => {
         theme={theme}
         fileInputRef={fileInputRef}
       />
+
+      {/* Add Password Change Popup */}
+      {showPasswordChangeModal && (
+        <PasswordChangePopup
+          isOpen={showPasswordChangeModal}
+          onClose={() => setShowPasswordChangeModal(false)}
+          theme={theme}
+          token={passwordChangeToken}
+          userData={passwordChangeUserData}
+          onSuccess={(response) => {
+            // Store new token and user data
+            localStorage.setItem('token', response.token);
+            localStorage.setItem('user', JSON.stringify(response.user));
+
+            // Show success message
+            setLoaderType("success");
+            setLoaderMessage("Password changed successfully!");
+
+            // Redirect based on role
+            setTimeout(() => {
+              const payload = JSON.parse(atob(response.token.split('.')[1]));
+              if (payload.role === "super_admin") {
+                window.location.href = "/super-admin-dashboard";
+              } else if (payload.role === "admin") {
+                window.location.href = "/admin-dashboard";
+              } else if (payload.role === "support_agent") {
+                window.location.href = "/support-dashboard";
+              } else {
+                window.location.href = "/";
+              }
+            }, 2000);
+          }}
+          isRequiredChange={true}
+        />
+      )}
     </div>
   );
 };

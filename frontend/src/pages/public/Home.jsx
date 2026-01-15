@@ -19,6 +19,9 @@ function Home() {
   const [user, setUser] = useState(null);
   const [showProfileModal, setShowProfileModal] = useState(false);
 
+  // Add the missing state
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+
   // Add these for typing effect
   const [typingText, setTypingText] = useState("");
   const [typingIndex, setTypingIndex] = useState(0);
@@ -54,7 +57,6 @@ function Home() {
   }, [typingIndex]);
 
   // Redirect logged-in users to their dashboard
-  // In the useEffect for redirecting logged-in users:
   useEffect(() => {
     const token = localStorage.getItem("token");
     const userData = JSON.parse(localStorage.getItem("user") || "{}");
@@ -65,6 +67,28 @@ function Home() {
       userData: userData,
       currentPath: window.location.pathname,
     });
+
+    // Set isLoggedIn state
+    setIsLoggedIn(!!(token || userData.role));
+
+    // Check if this is a password change token
+    if (token) {
+      try {
+        const payload = JSON.parse(atob(token.split(".")[1]));
+
+        // 🚨 IMPORTANT: Check if password change is required
+        if (payload.requiresPasswordChange) {
+          console.log("🔴 Home.jsx - Password change required, redirecting to login");
+          // Clear the token and redirect to login to show password change popup
+          localStorage.removeItem("token");
+          localStorage.removeItem("user");
+          navigate("/login-register", { replace: true });
+          return;
+        }
+      } catch (error) {
+        console.error("❌ Error decoding token for auto-redirect:", error);
+      }
+    }
 
     // If we have EITHER a token OR user data with role, we're logged in
     if (token || userData.role) {
@@ -83,20 +107,21 @@ function Home() {
 
       if (userRole) {
         const roleRedirects = {
-  super_admin: "/super-admin-dashboard",
-  admin: "/admin-dashboard",
-  support_agent: "/support-dashboard",
-  support_lead: "/support-dashboard",
-  support_admin: "/support-dashboard",
-  internal_broker: "/internal-broker-dashboard", // ← ADD THIS
-  external_broker: "/external-broker-dashboard", // ← ADD THIS
-  broker: "/user-dashboard", // Keep as fallback
-  buyer: "/user-dashboard",
-  seller: "/seller-leaser",
-  renter: "/seller-leaser",
-  leaser: "/seller-leaser", // ← Also add this if your system uses "leaser"
-  user: "/user-dashboard",
-};
+          super_admin: "/super-admin-dashboard",
+          admin: "/admin-dashboard",
+          support_agent: "/support-dashboard",
+          support_lead: "/support-dashboard",
+          support_admin: "/support-dashboard",
+          internal_broker: "/internal-broker-dashboard",
+          external_broker: "/external-broker-dashboard",
+          broker: "/internal-broker-dashboard", // Default broker goes to internal
+          buyer: "/buyer-renter",
+          seller: "/seller-leaser",
+          renter: "/buyer-renter",
+          leaser: "/seller-leaser",
+          user: "/buyer-renter",
+          landlord: "/seller-leaser",
+        };
 
         const redirectPath = roleRedirects[userRole];
         console.log("🏠 Home.jsx - Redirect Decision:", {
@@ -253,7 +278,6 @@ function Home() {
             alt="Decor Tilet"
           />
 
-
           <div className="w-full ">
             {/* Navigation Bar */}
             <div className="NavBar flex flex-col sm:flex-row items-center justify-between py-4 sm:py-6">
@@ -299,13 +323,52 @@ function Home() {
                           onUploadImage={() => setShowProfileModal(true)}
                           onUsernameChange={handleUsernameChange}
                         />
-                        <span
-                          className={
-                            theme === "dark" ? "text-white" : "text-black"
-                          }
+                        <div className="hidden md:flex flex-col">
+                          <span
+                            className={
+                              theme === "dark" ? "text-white" : "text-black"
+                            }
+                          >
+                            {user.first_name} {user.last_name}
+                          </span>
+                          <span className="text-xs text-amber-400">
+                            {user.role === "buyer"
+                              ? "Buyer"
+                              : user.role === "renter"
+                                ? "Renter"
+                                : user.role === "seller"
+                                  ? "Seller"
+                                  : user.role === "leaser"
+                                    ? "Leaser"
+                                    : user.role}
+                          </span>
+                        </div>
+                        <button
+                          onClick={() => {
+                            // Redirect to appropriate dashboard
+                            if (
+                              user.role === "buyer" ||
+                              user.role === "renter"
+                            ) {
+                              navigate("/buyer-renter");
+                            } else if (
+                              user.role === "seller" ||
+                              user.role === "leaser"
+                            ) {
+                              navigate("/seller-leaser");
+                            } else if (
+                              user.role === "internal_broker" ||
+                              user.role === "external_broker"
+                            ) {
+                              navigate("/internal-broker-dashboard");
+                            } else {
+                              navigate("/user-dashboard");
+                            }
+                          }}
+                          className="hidden md:block px-3 py-1 bg-amber-400 hover:bg-amber-500 text-black rounded-lg text-sm"
                         >
-                          {user.first_name} {user.last_name}
-                        </span>
+                          My Dashboard
+                        </button>
                       </div>
                     ) : (
                       <Link
@@ -322,13 +385,14 @@ function Home() {
             </div>
 
             {/* Hero Section */}
-            <div className="relative lg:absolute lg:ml-[18%] lg:mb-3 md:-mb-8 sm:md-0">
+            <div className="relative lg:absolute lg:ml-[18%] lg:mb-10 md:-mb-8 sm:md-0">
               <div className="w-full max-w-[100%] sm:max-w-[80%] md:max-w-[70%] lg:w-[400px] mx-auto lg:mx-0 pt-[10vh] sm:pt-[12vh] sm:md-0 lg:pt-32 ">
                 <div className="px-4 sm:px-6 md:px-8 lg:px-0">
                   <h1 className="text-[clamp(1.75rem,5vw,2.5rem)] sm:text-[clamp(2rem,5vw,2.75rem)] md:text-3xl lg:text-4xl text-center lg:text-left font-bold">
                     <span
                       ref={typingRef}
-                      className={`border-r-2 pr-1 typing-cursor text-amber-400 inline-block ${theme === "dark" ? "border-white" : "border-black"}`}
+                      className={`border-r-2 pr-1 typing-cursor text-amber-400 inline-block ${theme === "dark" ? "border-white" : "border-black"
+                        }`}
                     >
                       {typingText}
                     </span>
@@ -377,19 +441,19 @@ function Home() {
 
             {/* Bottom Navigation */}
             <div className="NavBarBottom">
-              <div className="mx-auto px-4 sm:px-6 md:px-10 lg:px-16 xl:px-20 py-4 sm:py-5 md:py-6 lg:py-7">
+              <div className="mx-auto px-4 sm:px-6 md:px-10 lg:px-16 xl:px-16 py-4 sm:py-5 md:py-6 lg:py-7 ">
                 <div className="overflow-x-auto hide-scrollbar">
                   <ul
-                    className={`flex whitespace-nowrap justify-center space-x-4 sm:space-x-6 md:space-x-8 lg:space-x-10 ${theme === "dark" ? "text-white" : "text-black"
+                    className={`flex  whitespace-nowrap justify-center space-x-4 sm:space-x-6 md:space-x-8 lg:space-x-10 ${theme === "dark" ? "text-white" : "text-black"
                       }`}
                   >
                     <li>
-                      <a
-                        href="#"
+                      <button
+                        onClick={() => navigate("/properties")}
                         className="nav-bottom-link text-sm sm:text-base md:text-lg duration-300"
                       >
                         Buy
-                      </a>
+                      </button>
                     </li>
                     <li>
                       <button
@@ -404,28 +468,36 @@ function Home() {
                       </button>
                     </li>
                     <li>
-                      <a
-                        href="#"
+                      <button
+                        onClick={() => navigate("/login-register?type=broker")}
                         className="nav-bottom-link text-sm sm:text-base md:text-lg duration-300"
                       >
                         Register as Broker
-                      </a>
+                      </button>
                     </li>
                     <li>
-                      <a
-                        href="#"
+                      <button
+                        onClick={() => {
+                          if (user) {
+                            navigate("/seller-leaser", {
+                              state: { userType: "seller", action: "post" },
+                            });
+                          } else {
+                            navigate("/login-register?redirect=post-property");
+                          }
+                        }}
                         className="nav-bottom-link text-sm sm:text-base md:text-lg duration-300"
                       >
                         Post your Property
-                      </a>
+                      </button>
                     </li>
                     <li>
-                      <a
-                        href="#"
+                      <button
+                        onClick={() => navigate("/brokers")}
                         className="nav-bottom-link text-sm sm:text-base md:text-lg duration-300"
                       >
                         Find an Agent
-                      </a>
+                      </button>
                     </li>
                   </ul>
                 </div>
@@ -435,7 +507,8 @@ function Home() {
             <div className="w-full flex justify-center mt-6 lg:mt-8">
               <div className="animate-bounce">
                 <ChevronDown
-                  className={`w-8 h-8 ${theme === "dark" ? "text-white" : "text-gray-900"}`}
+                  className={`w-8 h-8 ${theme === "dark" ? "text-white" : "text-gray-900"
+                    }`}
                 />
               </div>
             </div>
@@ -553,8 +626,11 @@ function Home() {
                 </p>
               </div>
               <div className="absolute bottom-6 left-0 right-0 flex justify-center">
-                <button className={`Button2 px-6 py-2 text-sm md:text-base`}>
-                  Browse House
+                <button
+                  onClick={() => navigate("/properties")}
+                  className={`Button2 px-6 py-2 text-sm md:text-base`}
+                >
+                  Browse Houses
                 </button>
               </div>
             </div>
@@ -630,11 +706,7 @@ function Home() {
               </div>
               <div className="absolute bottom-6 left-0 right-0 flex justify-center">
                 <button
-                  onClick={() =>
-                    navigate("/seller-leaser", {
-                      state: { userType: "leaser" },
-                    })
-                  }
+                  onClick={() => navigate("/properties?type=rental")}
                   className={`Button2 px-6 py-2 text-sm md:text-base`}
                 >
                   Find Rentals

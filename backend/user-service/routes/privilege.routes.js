@@ -1,6 +1,6 @@
 // user-service/routes/privilege.routes.js
 import express from 'express';
-import { protectRoute } from '../middleware/auth.middleware.js'; // Use protectRoute instead
+import { verifyToken  } from '../middleware/auth.middleware.js'; // Use protectRoute instead
 import { 
   getUserPrivileges, 
   checkPermission, 
@@ -12,7 +12,7 @@ import {
 const router = express.Router();
 
 // All privilege routes require authentication
-router.use(protectRoute); // Use protectRoute here
+router.use(verifyToken ); // Use protectRoute here
 
 // Get complete privilege profile for current user
 router.get('/profile', getUserPrivileges);

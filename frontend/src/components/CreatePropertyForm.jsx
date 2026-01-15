@@ -43,7 +43,7 @@ import {
   Trash2,
   Grid, // Alternative for floor plans
 } from "lucide-react";
-import { API_CONFIG } from "../config/api.config";
+import API_CONFIG from "../config/api.config";
 import { httpClient } from "../services/http.service";
 import axios from "axios"; // Add this import
 

@@ -93,6 +93,126 @@ CREATE TABLE IF NOT EXISTS users (
     INDEX idx_deleted_at (deleted_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- Extend users table with document and verification fields
+ALTER TABLE users 
+ADD COLUMN kebele_id_document VARCHAR(255) DEFAULT NULL COMMENT 'Path or URL to uploaded Kebele ID document',
+ADD COLUMN proof_of_income_document VARCHAR(255) DEFAULT NULL COMMENT 'Path or URL to uploaded proof of income',
+ADD COLUMN other_documents JSON DEFAULT NULL COMMENT 'JSON array of additional document paths (for flexibility)',
+ADD COLUMN verification_status ENUM('pending', 'approved', 'rejected') DEFAULT 'pending' COMMENT 'Verification status',
+ADD COLUMN verification_reason TEXT DEFAULT NULL COMMENT 'Reason for rejection or notes',
+ADD COLUMN verified_at TIMESTAMP NULL DEFAULT NULL COMMENT 'Timestamp when verified';
+-- Change from longtext to JSON type
+ALTER TABLE users MODIFY COLUMN other_documents JSON NULL;
+ALTER TABLE users 
+-- Broker fields
+ADD COLUMN IF NOT EXISTS broker_license_number VARCHAR(100),
+ADD COLUMN IF NOT EXISTS broker_license_expiry DATE,
+ADD COLUMN IF NOT EXISTS tin_number VARCHAR(100),
+ADD COLUMN IF NOT EXISTS brokerage_firm VARCHAR(255),
+ADD COLUMN IF NOT EXISTS experience_years INT,
+ADD COLUMN IF NOT EXISTS commission_rate VARCHAR(20),
+
+-- Seller/Landlord fields  
+ADD COLUMN IF NOT EXISTS property_type_owned VARCHAR(50),
+ADD COLUMN IF NOT EXISTS property_location TEXT,
+ADD COLUMN IF NOT EXISTS property_value_estimate DECIMAL(15,2),
+ADD COLUMN IF NOT EXISTS ownership_duration INT,
+ADD COLUMN IF NOT EXISTS property_ownership_proof VARCHAR(255),
+
+-- Buyer fields
+ADD COLUMN IF NOT EXISTS investment_purpose VARCHAR(100),
+ADD COLUMN IF NOT EXISTS timeline VARCHAR(100),
+ADD COLUMN IF NOT EXISTS financing_method VARCHAR(100),
+
+-- Renter fields
+ADD COLUMN IF NOT EXISTS rental_duration VARCHAR(100),
+ADD COLUMN IF NOT EXISTS family_size INT,
+ADD COLUMN IF NOT EXISTS pet_friendly BOOLEAN DEFAULT FALSE,
+ADD COLUMN IF NOT EXISTS furnished BOOLEAN DEFAULT FALSE,
+ADD COLUMN IF NOT EXISTS employment_status VARCHAR(50),
+ADD COLUMN IF NOT EXISTS monthly_income DECIMAL(15,2),
+
+-- Common fields
+ADD COLUMN IF NOT EXISTS profile_complete BOOLEAN DEFAULT FALSE,
+ADD COLUMN IF NOT EXISTS profile_completion_percentage INT DEFAULT 0,
+ADD COLUMN IF NOT EXISTS verification_status VARCHAR(50) DEFAULT 'unverified',
+ADD COLUMN IF NOT EXISTS setup_completed_at TIMESTAMP NULL;
+
+
+-- Add to your existing users table ALTER statements
+ALTER TABLE users 
+ADD COLUMN IF NOT EXISTS verification_feedback TEXT DEFAULT NULL,
+ADD COLUMN IF NOT EXISTS verification_notes TEXT DEFAULT NULL,
+ADD COLUMN IF NOT EXISTS last_verification_review_by INT DEFAULT NULL,
+ADD COLUMN IF NOT EXISTS last_verification_review_at TIMESTAMP NULL,
+ADD COLUMN IF NOT EXISTS document_rejection_reason TEXT DEFAULT NULL,
+ADD COLUMN IF NOT EXISTS documents_need_resubmission BOOLEAN DEFAULT FALSE,
+ADD COLUMN IF NOT EXISTS resubmission_requested_at TIMESTAMP NULL,
+ADD COLUMN IF NOT EXISTS verification_step_status ENUM('pending', 'submitted', 'reviewing', 'needs_resubmission', 'verified', 'rejected') DEFAULT 'pending',
+ADD COLUMN IF NOT EXISTS verification_history JSON DEFAULT '[]',
+ADD FOREIGN KEY (last_verification_review_by) REFERENCES users(id) ON DELETE SET NULL;
+ALTER TABLE users 
+ADD COLUMN has_submitted_documents BOOLEAN DEFAULT FALSE,
+ADD COLUMN documents_submitted_at TIMESTAMP NULL DEFAULT NULL;
+
+CREATE TABLE IF NOT EXISTS document_verification_records (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    
+    -- Document identification
+    user_id INT NOT NULL,
+    document_type VARCHAR(100) NOT NULL, -- 'kebele_id', 'proof_of_income', etc.
+    document_url VARCHAR(500) NOT NULL,
+    document_filename VARCHAR(255),
+    
+    -- Verification status
+    status ENUM('pending', 'approved', 'rejected', 'needs_resubmission') DEFAULT 'pending',
+    
+    -- Review details
+    reviewed_by INT,
+    reviewed_at TIMESTAMP NULL,
+    review_notes TEXT,
+    
+    -- Rejection/resubmission details
+    rejection_reason TEXT,
+    admin_comments TEXT,
+    resubmission_requested BOOLEAN DEFAULT FALSE,
+    resubmission_deadline DATE,
+    
+    -- Document metadata
+    uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    resubmitted_at TIMESTAMP NULL,
+    
+    -- Version tracking
+    version INT DEFAULT 1,
+    previous_version_id INT NULL,
+    
+    -- Timestamps
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    
+    -- Foreign keys
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (reviewed_by) REFERENCES users(id) ON DELETE SET NULL,
+    FOREIGN KEY (previous_version_id) REFERENCES document_verification_records(id) ON DELETE SET NULL,
+    
+    -- Indexes
+    INDEX idx_user_status (user_id, status),
+    INDEX idx_document_type (document_type),
+    INDEX idx_reviewed_by (reviewed_by),
+    INDEX idx_resubmission (resubmission_requested, resubmission_deadline)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+ALTER TABLE users 
+ADD COLUMN IF NOT EXISTS current_verification_step INT DEFAULT 1,
+ADD COLUMN IF NOT EXISTS verification_started_at DATETIME,
+ADD COLUMN IF NOT EXISTS verification_completed_at DATETIME,
+ADD COLUMN IF NOT EXISTS step1_status ENUM('not_started', 'uploaded', 'approved', 'rejected') DEFAULT 'not_started',
+ADD COLUMN IF NOT EXISTS step2_status ENUM('not_started', 'uploaded', 'approved', 'rejected') DEFAULT 'not_started',
+ADD COLUMN IF NOT EXISTS step3_status ENUM('not_started', 'uploaded', 'approved', 'rejected') DEFAULT 'not_started',
+ADD COLUMN IF NOT EXISTS step1_uploaded_at DATETIME,
+ADD COLUMN IF NOT EXISTS step2_uploaded_at DATETIME,
+ADD COLUMN IF NOT EXISTS step3_uploaded_at DATETIME;
+
 -- User preferences table for personalized settings
 CREATE TABLE IF NOT EXISTS user_preferences (
     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -364,6 +484,31 @@ CREATE TABLE IF NOT EXISTS properties (
     INDEX idx_lat_lng (latitude, longitude)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- Add JSON columns for simple user tracking
+ALTER TABLE properties 
+ADD COLUMN saved_by_users JSON DEFAULT '[]' COMMENT 'Array of user IDs who saved this property',
+ADD COLUMN viewed_by_users JSON DEFAULT '[]' COMMENT 'Array of user IDs who viewed this property',
+ADD COLUMN recent_applications JSON DEFAULT '[]' COMMENT 'Array of recent application IDs for quick access',
+ADD COLUMN application_stats JSON DEFAULT '{"total": 0, "pending": 0, "approved": 0, "rejected": 0}' COMMENT 'Application statistics';
+
+-- Update existing counts to work with new columns
+UPDATE properties 
+SET 
+    saved_by_users = CASE WHEN saves_count > 0 THEN '[]' ELSE '[]' END,
+    viewed_by_users = CASE WHEN views_count > 0 THEN '[]' ELSE '[]' END;
+
+-- Add property source/origin tracking
+ALTER TABLE properties 
+ADD COLUMN property_source ENUM('company_owned', 'client_listed', 'joint_venture') DEFAULT 'client_listed',
+ADD COLUMN company_project_name VARCHAR(255) NULL,
+ADD COLUMN development_stage ENUM('planning', 'construction', 'completed', 'launched') NULL,
+ADD COLUMN company_ownership_percentage DECIMAL(5,2) DEFAULT 100.00;
+
+-- Add index for quick filtering
+CREATE INDEX idx_property_source ON properties(property_source);
+CREATE INDEX idx_development_stage ON properties(development_stage);
+
+
 -- Property images table
 CREATE TABLE IF NOT EXISTS property_images (
     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -434,6 +579,42 @@ CREATE TABLE IF NOT EXISTS property_documents (
     -- Indexes
     INDEX idx_property_id (property_id),
     INDEX idx_document_type (document_type)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS property_applications (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    application_uuid VARCHAR(36) NOT NULL UNIQUE,
+    
+    -- Property and applicant
+    property_id INT NOT NULL,
+    user_id INT NOT NULL,
+    application_type ENUM('sale', 'rent', 'lease') NOT NULL DEFAULT 'rent',
+    status ENUM('draft', 'submitted', 'reviewing', 'approved', 'rejected', 'withdrawn') DEFAULT 'submitted',
+    
+    -- Simple application data
+    message TEXT,
+    offered_amount DECIMAL(15,2),
+    cover_letter TEXT,
+    
+    -- Timeline
+    submitted_at TIMESTAMP NULL,
+    reviewed_at TIMESTAMP NULL,
+    decision_at TIMESTAMP NULL,
+    
+    -- Timestamps
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    deleted_at TIMESTAMP NULL,
+    
+    -- Foreign keys
+    FOREIGN KEY (property_id) REFERENCES properties(id) ON DELETE CASCADE,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    
+    -- Indexes
+    INDEX idx_application_uuid (application_uuid),
+    INDEX idx_user_property (user_id, property_id),
+    INDEX idx_status (status),
+    INDEX idx_created_at (created_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS property_requests (

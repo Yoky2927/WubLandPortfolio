@@ -1,16 +1,38 @@
 import { io } from 'socket.io-client';
-import { API_CONFIG } from '../config/api.config';
 
 class SocketService {
   constructor() {
     this.socket = null;
     this.listeners = new Map();
     this.isConnected = false;
+    this.reconnectionAttempts = 0;
+    this.maxReconnectionAttempts = 3;
   }
 
-  connect(userId) {
+  // Add this method to check if server is reachable
+  async checkSocketServer() {
+    try {
+      const response = await fetch('http://localhost:5001/health', {
+        method: 'GET',
+        mode: 'cors'
+      });
+      return response.ok;
+    } catch (error) {
+      console.log('Socket server not reachable, skipping WebSocket connection');
+      return false;
+    }
+  }
+
+  async connect(userId) {
     if (!userId) {
       console.warn('SocketService: No userId provided');
+      return;
+    }
+
+    // Check if server is available before attempting connection
+    const isServerAvailable = await this.checkSocketServer();
+    if (!isServerAvailable) {
+      console.log('SocketService: Server not available, skipping connection');
       return;
     }
 
@@ -25,18 +47,22 @@ class SocketService {
         this.disconnect();
       }
 
-      // Create new connection with authentication
       const token = localStorage.getItem('token');
-      this.socket = io(API_CONFIG.NOTIFICATIONS_URL, {
+
+      // IMPORTANT: Use WebSocket transport only, disable polling
+      this.socket = io('http://localhost:5001', {
         query: { userId, token },
-        transports: ['websocket', 'polling'],
+        transports: ['websocket'], // Remove 'polling' to avoid timeouts
         reconnection: true,
-        reconnectionAttempts: 5,
-        reconnectionDelay: 1000,
+        reconnectionAttempts: 3,
+        reconnectionDelay: 2000,
+        timeout: 10000, // 10 second timeout
+        forceNew: true,
+        autoConnect: true
       });
 
       this.setupEventHandlers();
-      
+
     } catch (error) {
       console.error('SocketService: Connection error', error);
     }
@@ -48,6 +74,7 @@ class SocketService {
     this.socket.on('connect', () => {
       console.log('SocketService: Connected to server');
       this.isConnected = true;
+      this.reconnectionAttempts = 0;
       this.notifyListeners('connect', { connected: true });
     });
 
@@ -59,6 +86,13 @@ class SocketService {
 
     this.socket.on('connect_error', (error) => {
       console.error('SocketService: Connection error', error);
+      this.reconnectionAttempts++;
+
+      if (this.reconnectionAttempts >= this.maxReconnectionAttempts) {
+        console.log('SocketService: Max reconnection attempts reached, disabling');
+        this.disconnect();
+      }
+
       this.notifyListeners('connect_error', { error });
     });
 

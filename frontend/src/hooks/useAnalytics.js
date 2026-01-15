@@ -1,7 +1,7 @@
 // hooks/useAnalytics.js
 import { useState, useCallback } from "react";
 import { analyticsClient } from "../services/http.service";
-import { API_CONFIG } from "../config/api.config";
+import API_CONFIG from "../config/api.config";
 
 export const useAnalytics = () => {
   const [analyticsData, setAnalyticsData] = useState(null);

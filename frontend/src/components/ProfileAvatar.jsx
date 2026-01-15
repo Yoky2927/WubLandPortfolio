@@ -28,7 +28,13 @@ import {
   X,
   HelpCircle,
   ExternalLink,
-  ChevronRight
+  ChevronRight,
+  Building,
+  Clock,
+  Target,
+  CheckCircle,
+  DollarSign,
+  MapPin
 } from 'lucide-react';
 
 const ProfileAvatar = ({
@@ -43,9 +49,13 @@ const ProfileAvatar = ({
   status,
   created_at,
   verified,
+  userType = 'buyer',
+  progress = {},
+  stats = {},
   size = 'md',
   onLogout,
   onUploadImage,
+  onEditProfile,
   onNavigateToSection,
   onClose
 }) => {
@@ -53,6 +63,8 @@ const ProfileAvatar = ({
   const [showPopup, setShowPopup] = useState(false);
   const [imageError, setImageError] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [editingUsername, setEditingUsername] = useState(false);
+  const [newUsername, setNewUsername] = useState(username);
 
   const handleClosePopup = () => {
     setShowPopup(false);
@@ -67,12 +79,16 @@ const ProfileAvatar = ({
     }
   };
 
-  // Role normalization with broker types
-  const normalizeRole = (role, brokerType) => {
-    if (!role) return { normalized: 'default', display: 'User' };
+  // Enhanced role handling with userType support
+  const normalizeRole = (role, brokerType, userTypeParam) => {
+    if (!role && !userTypeParam) return { normalized: 'default', display: 'User' };
 
-    const roleLower = role.toLowerCase().trim();
+    const roleLower = role ? role.toLowerCase().trim() : '';
+    const userTypeLower = userTypeParam ? userTypeParam.toLowerCase().trim() : '';
     const brokerTypeLower = brokerType ? brokerType.toLowerCase().trim() : '';
+
+    // Priority: userType > role > broker_type
+    const effectiveRole = userTypeLower || roleLower || brokerTypeLower;
 
     const roleMap = {
       'admin': { normalized: 'admin', display: 'Administrator' },
@@ -86,17 +102,16 @@ const ProfileAvatar = ({
         display: brokerTypeLower === 'internal' ? 'Internal Broker' : 'External Broker'
       },
       'seller': { normalized: 'seller', display: 'Property Seller' },
+      'leaser': { normalized: 'leaser', display: 'Property Leaser' },
       'buyer': { normalized: 'buyer', display: 'Property Buyer' },
       'renter': { normalized: 'renter', display: 'Renter' },
-      'leaser': { normalized: 'leaser', display: 'Property Leaser' },
-      'lease': { normalized: 'leaser', display: 'Property Leaser' },
       'default': { normalized: 'default', display: 'User' }
     };
 
-    return roleMap[roleLower] || roleMap.default;
+    return roleMap[effectiveRole] || roleMap.default;
   };
 
-  const { normalized: normalizedRole, display: roleDisplay } = normalizeRole(role, broker_type);
+  const { normalized: normalizedRole, display: roleDisplay } = normalizeRole(role, broker_type, userType);
 
   const getInitials = () => {
     return `${firstName?.charAt(0) || ''}${lastName?.charAt(0) || ''}`.toUpperCase();
@@ -108,15 +123,14 @@ const ProfileAvatar = ({
       support_agent: "bg-gradient-to-br from-teal-500 to-teal-600",
       broker: "bg-gradient-to-br from-blue-500 to-blue-600",
       seller: "bg-gradient-to-br from-green-500 to-green-600",
+      leaser: "bg-gradient-to-br from-green-500 to-green-600",
       buyer: "bg-gradient-to-br from-purple-500 to-purple-600",
       renter: "bg-gradient-to-br from-orange-500 to-orange-600",
-      leaser: "bg-gradient-to-br from-indigo-500 to-indigo-600",
       default: "bg-gradient-to-br from-amber-500 to-amber-600"
     };
     return colors[normalizedRole] || colors.default;
   };
 
-  // Updated background colors to match your app's theme
   const getPopupBackground = () => {
     return theme === 'dark' 
       ? "bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900"
@@ -137,15 +151,15 @@ const ProfileAvatar = ({
       seller: theme === 'dark' 
         ? "bg-gradient-to-b from-green-900/80 to-green-800/90" 
         : "bg-gradient-to-b from-green-600 to-green-700",
+      leaser: theme === 'dark' 
+        ? "bg-gradient-to-b from-green-900/80 to-green-800/90" 
+        : "bg-gradient-to-b from-green-600 to-green-700",
       buyer: theme === 'dark' 
         ? "bg-gradient-to-b from-purple-900/80 to-purple-800/90" 
         : "bg-gradient-to-b from-purple-600 to-purple-700",
       renter: theme === 'dark' 
         ? "bg-gradient-to-b from-orange-900/80 to-orange-800/90" 
         : "bg-gradient-to-b from-orange-600 to-orange-700",
-      leaser: theme === 'dark' 
-        ? "bg-gradient-to-b from-indigo-900/80 to-indigo-800/90" 
-        : "bg-gradient-to-b from-indigo-600 to-indigo-700",
       default: theme === 'dark' 
         ? "bg-gradient-to-b from-amber-900/80 to-amber-800/90" 
         : "bg-gradient-to-b from-amber-600 to-amber-700"
@@ -203,20 +217,56 @@ const ProfileAvatar = ({
     }
   };
 
-  // Role-specific quick actions
+  const handleUsernameSave = () => {
+    if (newUsername.trim() && onEditProfile) {
+      onEditProfile({ username: newUsername.trim() });
+      setEditingUsername(false);
+    }
+  };
+
+  // Progress steps for Buyer/Renter
+  const getProgressSteps = () => {
+    const baseSteps = [
+      { id: 1, name: 'Profile Setup', icon: User, description: 'Complete your profile', status: progress?.step1 || 'pending' },
+      { id: 2, name: 'Document Upload', icon: FileText, description: 'Upload required documents', status: progress?.step2 || 'pending' },
+      { id: 3, name: 'Property Search', icon: Home, description: 'Find properties', status: progress?.step3 || 'pending' },
+      { id: 4, name: 'Application', icon: ClipboardList, description: 'Submit application', status: progress?.step4 || 'pending' },
+      { id: 5, name: 'Payment', icon: CreditCard, description: 'Make payment', status: progress?.step5 || 'pending' },
+      { id: 6, name: 'Agreement', icon: Award, description: 'Sign agreement', status: progress?.step6 || 'pending' },
+      { id: 7, name: 'Completion', icon: CheckCircle, description: userType === 'buyer' ? 'Move in' : 'Rent starts', status: progress?.step7 || 'pending' }
+    ];
+
+    return baseSteps;
+  };
+
+  const progressSteps = getProgressSteps();
+  const currentStep = progress?.currentStep || 1;
+  const completedSteps = progress?.completedSteps || 0;
+  const totalSteps = progressSteps.length;
+
+  // Enhanced stats with defaults
+  const userStats = {
+    savedProperties: stats?.savedProperties || 0,
+    activeApplications: stats?.activeApplications || 0,
+    completedTours: stats?.completedTours || 0,
+    pendingDocuments: stats?.pendingDocuments || 0,
+    ...stats
+  };
+
+  // Enhanced quick actions based on user type
   const getQuickActions = () => {
     const baseActions = [
+      { 
+        icon: Edit3, 
+        label: 'Edit Profile', 
+        action: () => onEditProfile && onEditProfile(),
+        description: 'Update your personal information'
+      },
       { 
         icon: Settings, 
         label: 'Settings', 
         action: () => onNavigateToSection('settings'),
         description: 'Manage your account preferences'
-      },
-      { 
-        icon: Edit3, 
-        label: 'Edit Profile', 
-        action: () => onNavigateToSection('profile'),
-        description: 'Update your personal information'
       },
       { 
         icon: HelpCircle, 
@@ -226,141 +276,62 @@ const ProfileAvatar = ({
       }
     ];
 
-    const roleActions = {
-      admin: [
-        { 
-          icon: UsersIcon, 
-          label: 'Manage Users', 
-          action: () => onNavigateToSection('users'),
-          description: 'User management dashboard'
-        },
-        { 
-          icon: Shield, 
-          label: 'Admin Panel', 
-          action: () => onNavigateToSection('admin'),
-          description: 'System administration'
-        },
-        { 
-          icon: BarChart3, 
-          label: 'Analytics', 
-          action: () => onNavigateToSection('analytics'),
-          description: 'View platform statistics'
-        }
-      ],
-      support_agent: [
-        { 
-          icon: MessageSquare, 
-          label: 'Support Tickets', 
-          action: () => onNavigateToSection('support'),
-          description: 'Handle customer inquiries'
-        },
-        { 
-          icon: UsersIcon, 
-          label: 'Client Management', 
-          action: () => onNavigateToSection('clients'),
-          description: 'Manage client relationships'
-        },
-        { 
-          icon: FileText, 
-          label: 'Knowledge Base', 
-          action: () => onNavigateToSection('knowledge'),
-          description: 'Access support resources'
-        }
-      ],
-      broker: [
-        { 
-          icon: Home, 
-          label: 'My Listings', 
-          action: () => onNavigateToSection('listings'),
-          description: 'Manage property listings'
-        },
-        { 
-          icon: UsersIcon, 
-          label: 'Clients', 
-          action: () => onNavigateToSection('clients'),
-          description: 'View and manage clients'
-        },
-        { 
-          icon: Calendar, 
-          label: 'Schedule', 
-          action: () => onNavigateToSection('schedule'),
-          description: 'Appointments and viewings'
-        }
-      ],
-      seller: [
-        { 
-          icon: Home, 
-          label: 'My Properties', 
-          action: () => onNavigateToSection('properties'),
-          description: 'Track your listings'
-        },
-        { 
-          icon: Eye, 
-          label: 'Viewings', 
-          action: () => onNavigateToSection('viewings'),
-          description: 'Property viewing schedule'
-        },
-        { 
-          icon: TrendingUp, 
-          label: 'Performance', 
-          action: () => onNavigateToSection('performance'),
-          description: 'Sales analytics'
-        }
-      ],
+    const userTypeActions = {
       buyer: [
         { 
           icon: Heart, 
-          label: 'Favorites', 
-          action: () => onNavigateToSection('favorites'),
-          description: 'Saved properties'
+          label: 'Saved Homes', 
+          action: () => onNavigateToSection('saved'),
+          description: `${userStats.savedProperties} saved properties`
         },
         { 
-          icon: Home, 
-          label: 'Saved Searches', 
-          action: () => onNavigateToSection('searches'),
-          description: 'Your search criteria'
+          icon: Calendar, 
+          label: 'Scheduled Tours', 
+          action: () => onNavigateToSection('tours'),
+          description: `${userStats.completedTours} completed tours`
         },
         { 
-          icon: Bell, 
-          label: 'Alerts', 
-          action: () => onNavigateToSection('alerts'),
-          description: 'Property notifications'
+          icon: FileText, 
+          label: 'Applications', 
+          action: () => onNavigateToSection('applications'),
+          description: `${userStats.activeApplications} active applications`
+        },
+        { 
+          icon: Building, 
+          label: 'Browse Properties', 
+          action: () => onNavigateToSection('properties'),
+          description: 'Find your dream home'
+        }
+      ],
+      renter: [
+        { 
+          icon: Heart, 
+          label: 'Saved Rentals', 
+          action: () => onNavigateToSection('saved'),
+          description: `${userStats.savedProperties} saved rentals`
+        },
+        { 
+          icon: Calendar, 
+          label: 'Viewings', 
+          action: () => onNavigateToSection('tours'),
+          description: `${userStats.completedTours} completed viewings`
+        },
+        { 
+          icon: FileText, 
+          label: 'Rental Applications', 
+          action: () => onNavigateToSection('applications'),
+          description: `${userStats.activeApplications} active applications`
+        },
+        { 
+          icon: CreditCard, 
+          label: 'Rent Payments', 
+          action: () => onNavigateToSection('payments'),
+          description: 'View payment history'
         }
       ]
     };
 
-    return [...baseActions, ...(roleActions[normalizedRole] || [])];
-  };
-
-  // Role-specific statistics
-  const getRoleStats = () => {
-    const stats = {
-      admin: [
-        { label: 'Total Users', value: '1,542', icon: UsersIcon, trend: '+12%' },
-        { label: 'System Health', value: '98%', icon: Shield, trend: 'Stable' }
-      ],
-      support_agent: [
-        { label: 'Open Tickets', value: '24', icon: MessageSquare, trend: '-5' },
-        { label: 'Satisfaction', value: '94%', icon: Star, trend: '+2%' }
-      ],
-      broker: [
-        { label: 'Active Listings', value: '12', icon: Home, trend: '+3' },
-        { label: 'Commission', value: '$45K', icon: TrendingUp, trend: '+18%' }
-      ],
-      seller: [
-        { label: 'Properties', value: '4', icon: Home, trend: '+1' },
-        { label: 'Views', value: '156', icon: Eye, trend: '+24%' }
-      ],
-      buyer: [
-        { label: 'Saved Homes', value: '23', icon: Heart, trend: '+5' },
-        { label: 'Tours', value: '8', icon: Calendar, trend: '+2' }
-      ]
-    };
-
-    return stats[normalizedRole] || [
-      { label: 'Activity', value: '98%', icon: BarChart3, trend: '+5%' },
-      { label: 'Status', value: 'Active', icon: BadgeCheck, trend: 'Online' }
-    ];
+    return [...baseActions, ...(userTypeActions[userType] || [])];
   };
 
   const quickActions = getQuickActions();
@@ -382,8 +353,10 @@ const ProfileAvatar = ({
               } shadow-lg group-hover:shadow-xl transition-all duration-300`}
               onError={() => setImageError(true)}
             />
-            {/* Online indicator */}
-            <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-white shadow-sm"></div>
+            {/* Progress indicator */}
+            <div className="absolute -bottom-1 -right-1 w-6 h-6 bg-amber-500 text-white rounded-full flex items-center justify-center text-xs font-bold border-2 border-white shadow-md">
+              {currentStep}
+            </div>
           </div>
         ) : (
           <div className="relative">
@@ -394,8 +367,10 @@ const ProfileAvatar = ({
             >
               {getInitials()}
             </div>
-            {/* Online indicator */}
-            <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-white shadow-sm"></div>
+            {/* Progress indicator */}
+            <div className="absolute -bottom-1 -right-1 w-6 h-6 bg-amber-500 text-white rounded-full flex items-center justify-center text-xs font-bold border-2 border-white shadow-md">
+              {currentStep}
+            </div>
           </div>
         )}
         
@@ -431,15 +406,9 @@ const ProfileAvatar = ({
                     <X className="w-6 h-6" />
                   </button>
 
-                  <div className="flex flex-col md:flex-row min-h-[500px]">
+                  <div className="flex flex-col md:flex-row min-h-[600px]">
                     {/* Left Panel - Profile Info */}
-                    <div className={`md:w-2/5 p-8 flex flex-col items-center justify-center text-center relative overflow-hidden ${getLeftPanelBackground()}`}>
-                      {/* Background pattern */}
-                      <div className="absolute inset-0 opacity-10">
-                        <div className="absolute top-0 right-0 w-32 h-32 bg-white rounded-full -mr-16 -mt-16"></div>
-                        <div className="absolute bottom-0 left-0 w-24 h-24 bg-white rounded-full -ml-12 -mb-12"></div>
-                      </div>
-                      
+                    <div className={`md:w-2/5 p-8 flex flex-col text-center relative overflow-hidden ${getLeftPanelBackground()}`}>
                       <div className="relative z-10">
                         <div className="flex justify-center mb-6">
                           {userProfilePicture && !imageError ? (
@@ -465,18 +434,58 @@ const ProfileAvatar = ({
                         </div>
 
                         <h3 className="text-2xl font-bold text-white mb-2 drop-shadow-sm">{firstName} {lastName}</h3>
-                        <p className="text-white/80 text-sm mb-3 drop-shadow-sm">@{username}</p>
-                        <div className="flex items-center justify-center gap-2 mb-4">
+                        
+                        {/* Username editing */}
+                        <div className="mb-4">
+                          {editingUsername ? (
+                            <div className="flex items-center justify-center gap-2">
+                              <input
+                                type="text"
+                                value={newUsername}
+                                onChange={(e) => setNewUsername(e.target.value)}
+                                className="px-3 py-1 rounded-lg bg-white/20 text-white border border-white/30 focus:outline-none focus:ring-2 focus:ring-white/50 text-center"
+                                autoFocus
+                              />
+                              <button
+                                onClick={handleUsernameSave}
+                                className="p-1 rounded-full bg-white/20 hover:bg-white/30 text-white"
+                              >
+                                <CheckCircle className="w-4 h-4" />
+                              </button>
+                              <button
+                                onClick={() => {
+                                  setEditingUsername(false);
+                                  setNewUsername(username);
+                                }}
+                                className="p-1 rounded-full bg-white/20 hover:bg-white/30 text-white"
+                              >
+                                <X className="w-4 h-4" />
+                              </button>
+                            </div>
+                          ) : (
+                            <div className="flex items-center justify-center gap-2">
+                              <p className="text-white/80 text-sm drop-shadow-sm">@{username}</p>
+                              <button
+                                onClick={() => setEditingUsername(true)}
+                                className="p-1 rounded-full hover:bg-white/20 text-white/60 hover:text-white"
+                              >
+                                <Edit3 className="w-3 h-3" />
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                        
+                        <div className="flex items-center justify-center gap-2 mb-6">
                           <span className="inline-block px-4 py-2 rounded-full text-sm font-medium bg-white/20 text-white backdrop-blur-sm border border-white/30">
                             {roleDisplay}
                           </span>
-                          {verified && (
-                            <BadgeCheck className="w-5 h-5 text-blue-300" />
-                          )}
+                          <span className="inline-block px-3 py-1 rounded-full text-xs font-medium bg-white/20 text-white backdrop-blur-sm border border-white/30">
+                            {userType === 'buyer' ? 'Buyer' : 'Renter'}
+                          </span>
                         </div>
 
-                        {/* User Info in Left Panel */}
-                        <div className="space-y-3 mt-6">
+                        {/* User Info */}
+                        <div className="space-y-3 mt-4">
                           <div className="flex items-center justify-center gap-3 text-white/90">
                             <Mail className="w-4 h-4" />
                             <span className="text-sm">{email}</span>
@@ -488,33 +497,112 @@ const ProfileAvatar = ({
                             </div>
                           )}
                           <div className="flex items-center justify-center gap-3 text-white/90">
-                            <User className="w-4 h-4" />
+                            <Clock className="w-4 h-4" />
                             <span className="text-sm">Member since {new Date(created_at).toLocaleDateString()}</span>
                           </div>
+                        </div>
+                      </div>
+
+                      {/* Progress Section in Left Panel */}
+                      <div className="mt-8 pt-6 border-t border-white/20">
+                        <h4 className="text-white font-semibold mb-4 text-left">Your Journey Progress</h4>
+                        <div className="space-y-3">
+                          {progressSteps.slice(0, 4).map((step, index) => (
+                            <div 
+                              key={step.id} 
+                              className={`flex items-center gap-3 p-2 rounded-lg ${
+                                index < currentStep 
+                                  ? 'bg-white/20' 
+                                  : 'bg-white/10'
+                              }`}
+                            >
+                              <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                                index < currentStep 
+                                  ? 'bg-white text-green-600' 
+                                  : index === currentStep - 1
+                                  ? 'bg-amber-500 text-white'
+                                  : 'bg-white/20 text-white/60'
+                              }`}>
+                                {index < currentStep ? (
+                                  <CheckCircle className="w-4 h-4" />
+                                ) : (
+                                  <step.icon className="w-4 h-4" />
+                                )}
+                              </div>
+                              <div className="text-left">
+                                <p className="text-sm font-medium text-white">{step.name}</p>
+                                <p className="text-xs text-white/70">{step.description}</p>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                        <div className="mt-4 text-center">
+                          <div className="w-full bg-white/20 rounded-full h-2 mb-2">
+                            <div 
+                              className="bg-amber-400 h-2 rounded-full transition-all duration-500"
+                              style={{ width: `${(completedSteps / totalSteps) * 100}%` }}
+                            ></div>
+                          </div>
+                          <p className="text-sm text-white">
+                            Step {currentStep} of {totalSteps} • {Math.round((completedSteps / totalSteps) * 100)}% Complete
+                          </p>
                         </div>
                       </div>
                     </div>
 
                     {/* Right Panel - Content */}
                     <div className="md:w-3/5 p-6 flex flex-col">
-                      {/* Quick Stats */}
-                      <div className="grid grid-cols-2 gap-4 mb-6">
-                        {getRoleStats().map((stat, index) => (
-                          <div
-                            key={index}
-                            className={`p-4 rounded-xl text-center border transition-all duration-300 ${getCardBackground()} ${getHoverCardBackground()}`}
-                          >
-                            <stat.icon className={`w-6 h-6 mx-auto mb-2 ${getMutedTextColor()}`} />
-                            <div className="text-xl font-bold text-amber-500 mb-1">{stat.value}</div>
-                            <div className={`text-xs ${getMutedTextColor()} mb-1`}>{stat.label}</div>
-                            <div className={`text-xs font-medium ${
-                              stat.trend?.includes('+') ? 'text-green-500' : 
-                              stat.trend?.includes('-') ? 'text-red-500' : 'text-blue-500'
-                            }`}>
-                              {stat.trend}
+                      {/* Stats Overview */}
+                      <div className="mb-6">
+                        <h4 className={`text-lg font-semibold mb-4 ${getTextColor()}`}>
+                          Quick Stats
+                        </h4>
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className={`p-4 rounded-xl border ${getCardBackground()} ${getHoverCardBackground()} transition-all duration-300`}>
+                            <div className="flex items-center gap-3">
+                              <div className="p-2 rounded-lg bg-red-100 dark:bg-red-900/20">
+                                <Heart className="w-5 h-5 text-red-500" />
+                              </div>
+                              <div>
+                                <div className="text-2xl font-bold text-amber-500">{userStats.savedProperties}</div>
+                                <div className={`text-sm ${getSecondaryTextColor()}`}>Saved Properties</div>
+                              </div>
                             </div>
                           </div>
-                        ))}
+                          <div className={`p-4 rounded-xl border ${getCardBackground()} ${getHoverCardBackground()} transition-all duration-300`}>
+                            <div className="flex items-center gap-3">
+                              <div className="p-2 rounded-lg bg-blue-100 dark:bg-blue-900/20">
+                                <Calendar className="w-5 h-5 text-blue-500" />
+                              </div>
+                              <div>
+                                <div className="text-2xl font-bold text-amber-500">{userStats.completedTours}</div>
+                                <div className={`text-sm ${getSecondaryTextColor()}`}>Completed Tours</div>
+                              </div>
+                            </div>
+                          </div>
+                          <div className={`p-4 rounded-xl border ${getCardBackground()} ${getHoverCardBackground()} transition-all duration-300`}>
+                            <div className="flex items-center gap-3">
+                              <div className="p-2 rounded-lg bg-green-100 dark:bg-green-900/20">
+                                <FileText className="w-5 h-5 text-green-500" />
+                              </div>
+                              <div>
+                                <div className="text-2xl font-bold text-amber-500">{userStats.activeApplications}</div>
+                                <div className={`text-sm ${getSecondaryTextColor()}`}>Active Applications</div>
+                              </div>
+                            </div>
+                          </div>
+                          <div className={`p-4 rounded-xl border ${getCardBackground()} ${getHoverCardBackground()} transition-all duration-300`}>
+                            <div className="flex items-center gap-3">
+                              <div className="p-2 rounded-lg bg-yellow-100 dark:bg-yellow-900/20">
+                                <Shield className="w-5 h-5 text-yellow-500" />
+                              </div>
+                              <div>
+                                <div className="text-2xl font-bold text-amber-500">{userStats.pendingDocuments}</div>
+                                <div className={`text-sm ${getSecondaryTextColor()}`}>Pending Docs</div>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
                       </div>
 
                       {/* Quick Actions */}
@@ -523,7 +611,7 @@ const ProfileAvatar = ({
                           Quick Actions
                         </h4>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                          {quickActions.slice(0, 4).map((action, index) => (
+                          {quickActions.map((action, index) => (
                             <button
                               key={index}
                               onClick={action.action}
@@ -538,7 +626,7 @@ const ProfileAvatar = ({
                                   <action.icon className="w-5 h-5" />
                                 </div>
                                 <div className="flex-1">
-                                  <div className={`font-medium text-sm ${getTextColor()}`}>
+                                  <div className={`font-medium ${getTextColor()}`}>
                                     {action.label}
                                   </div>
                                   <div className={`text-xs ${getSecondaryTextColor()}`}>

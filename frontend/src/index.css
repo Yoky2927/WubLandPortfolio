@@ -252,6 +252,7 @@ h1, h2, h3, h4, h5, h6 {
   display: inline-block;
 }
 
+
 .typing-animation .cursor {
   display: inline-block;
   width: 2px;
@@ -280,6 +281,22 @@ h1, h2, h3, h4, h5, h6 {
   .NavBarBottom a { @apply text-xs; }
 }
 
+
+/* Add to your index.css or main CSS file */
+@keyframes marquee {
+  0% { transform: translateX(100%); }
+  100% { transform: translateX(-100%); }
+}
+
+.animate-marquee {
+  animation: marquee 30s linear infinite;
+  display: inline-block;
+  padding-right: 100%;
+}
+
+.animate-marquee:hover {
+  animation-play-state: paused;
+}
 /* Scrollbar hiding utility */
 .hide-scrollbar {
   scrollbar-width: none; /* Firefox */
@@ -386,6 +403,35 @@ header {
 /* White shadow for dark mode testimonials */
 .hover-white-shadow { transition: all 0.3s ease-in-out; }
 .dark .hover-white-shadow:hover { box-shadow: 0 10px 30px rgba(255, 255, 255, 0.15); }
+
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fadeIn {
+  animation: fadeIn 0.3s ease-out;
+}
+
+.animate-slideUp {
+  animation: slideUp 0.3s ease-out;
+}
 
 /* ========== SOCIAL MEDIA ICONS ========== */
 .social-icon {

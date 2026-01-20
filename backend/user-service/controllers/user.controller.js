@@ -582,7 +582,9 @@ export const getVerificationStats = async (req, res) => {
         // Query for real stats from database
         const [stats] = await db.query(`
       SELECT 
-        COUNT(CASE WHEN verification_status = 'pending' AND role IN ('buyer', 'renter') THEN 1 END) as pending,
+        COUNT(CASE WHEN verification_status = 'pending' 
+           AND role IN ('buyer', 'renter') 
+           AND has_submitted_documents = true THEN 1 END) as pending,
         COUNT(CASE WHEN verification_status = 'approved' AND role IN ('buyer', 'renter') THEN 1 END) as approved,
         COUNT(CASE WHEN verification_status = 'rejected' AND role IN ('buyer', 'renter') THEN 1 END) as rejected,
         COUNT(CASE WHEN DATE(updated_at) = CURDATE() AND verification_status IN ('approved', 'rejected') AND role IN ('buyer', 'renter') THEN 1 END) as today

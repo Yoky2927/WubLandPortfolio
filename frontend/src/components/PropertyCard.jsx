@@ -6,31 +6,65 @@ import {
 } from 'lucide-react';
 
 const PropertyCard = ({
-  property,
-  theme,
-  onViewDetails,
-  onSave,
-  isSaved, // This prop needs to be properly managed
-  user,
+  property = {}, // Default to empty object
+  theme = 'light',
+  onViewDetails = () => console.log('View details handler not provided'),
+  onSave = () => console.log('Save handler not provided'),
+  isSaved = false, // Default to false
+  user = null,
   isVerified = true
 }) => {
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [isAutoSliding, setIsAutoSliding] = useState(true);
   const [loadedImages, setLoadedImages] = useState({});
-  const [localIsSaved, setLocalIsSaved] = useState(isSaved); // Local state for save status
+  const [localIsSaved, setLocalIsSaved] = useState(isSaved);
+  const [hasImageError, setHasImageError] = useState(false);
+
+  // Safely get property fields with defaults
+  const safeProperty = {
+    id: property?.id || 0,
+    title: property?.title || 'Untitled Property',
+    price: property?.price || 0,
+    address: property?.address || property?.location || 'No address provided',
+    city: property?.city || property?.region || '',
+    description: property?.description || '',
+    listing_type: property?.listing_type || 'sale',
+    property_source: property?.property_source || 'client_listed',
+    is_exclusive: property?.is_exclusive || false,
+    is_premium: property?.is_premium || false,
+    is_featured: property?.is_featured || false,
+    beds: property?.beds || property?.bedrooms || 0,
+    baths: property?.baths || property?.bathrooms || 0,
+    sqft: property?.sqft || property?.square_meters || property?.area_sqm || 0,
+    views_count: property?.views_count || property?.views || 0,
+    created_at: property?.created_at || property?.updated_at || new Date().toISOString(),
+    features: Array.isArray(property?.features) ? property.features :
+      typeof property?.features === 'string' ?
+        JSON.parse(property.features || '[]') :
+        ['Parking', 'Security'],
+    amenities: Array.isArray(property?.amenities) ? property.amenities :
+      typeof property?.amenities === 'string' ?
+        JSON.parse(property.amenities || '[]') :
+        [],
+    images: Array.isArray(property?.images) ? property.images :
+      Array.isArray(property?.property_images) ? property.property_images :
+        [],
+    company_project_name: property?.company_project_name || ''
+  };
+
+  // Safely get images
+  const images = safeProperty.images || [];
+  const totalImages = Math.min(images.length, 10); // Limit to prevent excessive loading
 
   // Update localIsSaved when isSaved prop changes
   useEffect(() => {
     console.log('🔄 PropertyCard - isSaved prop changed:', {
-      propertyId: property.id,
+      propertyId: safeProperty.id,
       isSaved,
       localIsSaved
     });
     setLocalIsSaved(isSaved);
-  }, [isSaved, property.id]);
-
-  const images = property.images || property.property_images || [];
-  const totalImages = images.length;
+  }, [isSaved, safeProperty.id]);
 
   // Auto-slide functionality
   useEffect(() => {
@@ -41,45 +75,52 @@ const PropertyCard = ({
     return () => clearInterval(interval);
   }, [isAutoSliding, totalImages]);
 
-  const handleSaveClick = (e) => {
-    e?.stopPropagation();
-    console.log('💾 Save button clicked:', {
-      propertyId: property.id,
+  const handleSaveClick = async (e) => {
+    e?.stopPropagation?.();
+    console.log('💾 PropertyCard Save button clicked:', {
+      propertyId: safeProperty.id,
       isSaved: localIsSaved,
       user: user?.id,
-      isVerified: isVerified // Just for logging, not for check
     });
 
-    if (user) { // REMOVED: && isVerified - Only check if user exists
-      // Immediately update local state for better UX
-      const newSavedState = !localIsSaved;
-      setLocalIsSaved(newSavedState);
+    if (user) {
+      try {
+        // Call parent save handler and wait for response
+        const newSavedStatus = await onSave(safeProperty.id, localIsSaved);
 
-      // Call parent save handler
-      onSave(property.id, localIsSaved);
+        // Update local state with the returned new status
+        if (newSavedStatus !== undefined && newSavedStatus !== null) {
+          console.log('✅ Save handler returned:', newSavedStatus);
+          setLocalIsSaved(newSavedStatus);
+        } else {
+          // If no status returned, assume toggle worked
+          const toggledStatus = !localIsSaved;
+          console.log('✅ Toggling saved status to:', toggledStatus);
+          setLocalIsSaved(toggledStatus);
+        }
+      } catch (error) {
+        console.error('❌ Error in save handler:', error);
+        // Revert local state on error
+        setLocalIsSaved(localIsSaved);
+      }
     } else {
       // Show login message
       const shouldLogin = window.confirm("Please login to save properties. Would you like to login now?");
       if (shouldLogin) {
-        // You'll need to pass the navigate function or handle differently
-        // For now, just show a message
-        alert("Redirecting to login...");
-        // In your actual implementation, you might want to:
-        // navigate("/login-register", { state: { returnUrl: window.location.pathname } });
+        window.location.href = '/login-register';
       }
     }
   };
 
-  // ... rest of your image handlers remain the same
   const handleNextImage = (e) => {
-    e?.stopPropagation();
+    e?.stopPropagation?.();
     setIsAutoSliding(false);
     setCurrentImageIndex((prev) => (prev + 1) % totalImages);
     setTimeout(() => setIsAutoSliding(true), 10000);
   };
 
   const handlePrevImage = (e) => {
-    e?.stopPropagation();
+    e?.stopPropagation?.();
     setIsAutoSliding(false);
     setCurrentImageIndex((prev) => (prev - 1 + totalImages) % totalImages);
     setTimeout(() => setIsAutoSliding(true), 10000);
@@ -90,6 +131,7 @@ const PropertyCard = ({
   };
 
   const handleImageError = (e, index) => {
+    setHasImageError(true);
     const fallbackImages = [
       'https://images.unsplash.com/photo-1518780664697-55e3ad937233?auto=format&fit=crop&w=800&q=80',
       'https://images.unsplash.com/photo-1568605114967-8130f3a36994?auto=format&fit=crop&w=800&q=80',
@@ -100,27 +142,31 @@ const PropertyCard = ({
   };
 
   const getCurrentImage = () => {
-    if (images.length > 0 && images[currentImageIndex]) {
+    if (totalImages > 0 && images[currentImageIndex]) {
       const img = images[currentImageIndex];
-      return typeof img === 'object' ? img.url || img.image_url : img;
+      if (typeof img === 'object') {
+        return img.url || img.image_url || img.thumbnail_url;
+      }
+      return img;
     }
     return 'https://images.unsplash.com/photo-1613490493576-7fde63acd811?auto=format&fit=crop&w=800&q=80';
   };
 
   const formatPrice = (price) => {
     if (!price || isNaN(price)) return 'Price on request';
-    if (price >= 1000000) return `ETB ${(price / 1000000).toFixed(1)}M`;
-    if (price >= 1000) return `ETB ${(price / 1000).toFixed(0)}K`;
-    return `ETB ${price.toLocaleString()}`;
+    const numericPrice = Number(price);
+    if (numericPrice >= 1000000) return `ETB ${(numericPrice / 1000000).toFixed(1)}M`;
+    if (numericPrice >= 1000) return `ETB ${(numericPrice / 1000).toFixed(0)}K`;
+    return `ETB ${numericPrice.toLocaleString()}`;
   };
 
   const getPropertySourceInfo = () => {
-    const source = property.property_source || 'client_listed';
+    const source = safeProperty.property_source;
 
     switch (source) {
       case 'company_owned':
         return {
-          label: property.company_project_name || 'Our Development',
+          label: safeProperty.company_project_name || 'Our Development',
           icon: <Building className="w-4 h-4 text-green-300" />,
           style: 'bg-gradient-to-r from-green-500 to-green-600'
         };
@@ -132,7 +178,7 @@ const PropertyCard = ({
         };
       case 'client_listed':
       default:
-        if (property.is_exclusive) {
+        if (safeProperty.is_exclusive) {
           return {
             label: 'Exclusive',
             icon: <Briefcase className="w-4 h-4 text-blue-300" />,
@@ -148,21 +194,42 @@ const PropertyCard = ({
   };
 
   const sourceInfo = getPropertySourceInfo();
-  const keywords = property.features || property.amenities || ['Parking', 'Security'].slice(0, 3);
+  const keywords = safeProperty.features || safeProperty.amenities || ['Parking', 'Security'].slice(0, 3);
+
+  // If property is invalid, show placeholder
+  if (!property || Object.keys(property).length === 0) {
+    return (
+      <div className={`rounded-lg overflow-hidden relative h-full flex flex-col ${theme === "dark" ? "bg-gray-800" : "bg-gray-100"}`}>
+        <div className="w-full h-48 bg-gradient-to-r from-gray-200 to-gray-300 dark:from-gray-700 dark:to-gray-800 animate-pulse" />
+        <div className="p-4 flex-1 flex flex-col">
+          <div className="h-6 bg-gray-300 dark:bg-gray-700 rounded mb-2 animate-pulse" />
+          <div className="h-4 bg-gray-200 dark:bg-gray-600 rounded mb-4 animate-pulse" />
+          <div className="flex gap-4 justify-center mb-4">
+            <div className="h-4 w-16 bg-gray-300 dark:bg-gray-700 rounded animate-pulse" />
+            <div className="h-4 w-16 bg-gray-300 dark:bg-gray-700 rounded animate-pulse" />
+            <div className="h-4 w-16 bg-gray-300 dark:bg-gray-700 rounded animate-pulse" />
+          </div>
+          <div className="mt-auto">
+            <div className="h-10 bg-gray-300 dark:bg-gray-700 rounded animate-pulse" />
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className={`Cards rounded-lg overflow-hidden relative transition-all duration-500 hover:shadow-2xl hover:-translate-y-1 h-full flex flex-col ${theme === "dark" ? "dark" : "light"}`}>
       {/* Image section */}
       <div className="w-full h-48 overflow-hidden relative">
         {/* Loading overlay */}
-        {!loadedImages[currentImageIndex] && (
+        {!loadedImages[currentImageIndex] && !hasImageError && (
           <div className="absolute inset-0 bg-gradient-to-r from-gray-200 to-gray-300 dark:from-gray-700 dark:to-gray-800 animate-pulse z-10" />
         )}
 
         {/* Main image */}
         <img
           src={getCurrentImage()}
-          alt={property.title}
+          alt={safeProperty.title}
           className={`w-full h-full object-cover transition-transform duration-500 hover:scale-105 ${loadedImages[currentImageIndex] ? 'opacity-100' : 'opacity-0'}`}
           onLoad={() => handleImageLoad(currentImageIndex)}
           onError={(e) => handleImageError(e, currentImageIndex)}
@@ -180,23 +247,23 @@ const PropertyCard = ({
 
         {/* Listing type badge */}
         <div className="absolute top-3 right-3 z-20">
-          <div className={`px-3 py-1.5 text-xs font-bold text-white shadow-lg rounded transition-all duration-300 hover:scale-110 ${property.listing_type === 'rent'
+          <div className={`px-3 py-1.5 text-xs font-bold text-white shadow-lg rounded transition-all duration-300 hover:scale-110 ${safeProperty.listing_type === 'rent'
             ? 'bg-gradient-to-r from-orange-500 to-orange-600'
             : 'bg-gradient-to-r from-green-500 to-green-600'
             }`}>
-            {property.listing_type === 'rent' ? 'FOR RENT' : 'FOR SALE'}
+            {safeProperty.listing_type === 'rent' ? 'FOR RENT' : 'FOR SALE'}
           </div>
         </div>
 
         {/* Premium badge */}
-        {property.is_premium && (
+        {safeProperty.is_premium && (
           <div className="absolute top-12 left-3 px-3 py-1.5 text-xs font-bold text-white shadow-lg rounded transition-all duration-300 hover:scale-110 bg-gradient-to-r from-amber-500 to-yellow-500 z-20 flex items-center gap-2">
             <Crown className="w-4 h-4" />
             PREMIUM
           </div>
         )}
 
-        {/* Save button - USE localIsSaved INSTEAD OF isSaved */}
+        {/* Save button */}
         <button
           onClick={handleSaveClick}
           className={`absolute bottom-3 right-3 p-2.5 rounded-full shadow-lg transition-all hover:scale-110 z-20 ${!user ? 'opacity-50 cursor-not-allowed' : ''
@@ -204,7 +271,7 @@ const PropertyCard = ({
               ? 'bg-red-500 text-white hover:bg-red-600'
               : 'bg-white/90 text-gray-700 hover:bg-white dark:bg-gray-800/90 dark:text-gray-300 dark:hover:bg-gray-800'
             } backdrop-blur-sm`}
-          title={!user ? "Login to save" : localIsSaved ? "Remove from saved" : "Save property"} // REMOVED verification check
+          title={!user ? "Login to save" : localIsSaved ? "Remove from saved" : "Save property"}
         >
           <Heart className={`w-4 h-4 ${localIsSaved ? 'fill-current' : ''}`} />
         </button>
@@ -263,9 +330,9 @@ const PropertyCard = ({
         <div className="text-center mb-3">
           <p className="text-base sm:text-lg font-bold">
             <span className={`font-bold ${theme === "dark" ? "text-amber-400" : "text-amber-600"}`}>
-              {formatPrice(property.price)}
+              {formatPrice(safeProperty.price)}
             </span>
-            {property.listing_type === 'rent' && (
+            {safeProperty.listing_type === 'rent' && (
               <span className={`text-xs ml-1 ${theme === "dark" ? "text-gray-400" : "text-gray-600"}`}>
                 /month
               </span>
@@ -279,18 +346,18 @@ const PropertyCard = ({
             Location:
           </p>
           <p className={`text-xs sm:text-sm line-clamp-1 ${theme === "dark" ? "text-gray-300" : "text-gray-700"}`}>
-            {property.address || property.location}
+            {safeProperty.address}
           </p>
           <p className={`text-xs sm:text-sm font-medium ${theme === "dark" ? "text-gray-300" : "text-gray-700"}`}>
-            {property.city || property.region}
+            {safeProperty.city}
           </p>
         </div>
 
         {/* Property Description */}
-        {property.description && (
+        {safeProperty.description && (
           <div className="mb-4 flex-1">
             <p className={`text-xs line-clamp-2 ${theme === "dark" ? "text-gray-300" : "text-gray-600"}`}>
-              {property.description}
+              {safeProperty.description}
             </p>
           </div>
         )}
@@ -308,11 +375,11 @@ const PropertyCard = ({
                   onError={(e) => {
                     e.target.style.display = 'none';
                     e.target.parentNode.innerHTML = `
-                      <div class="flex items-center gap-1 mb-1">
-                        <div class="w-4 h-4 sm:w-5 sm:h-5 rounded bg-amber-400"></div>
-                        <span class="text-xs font-semibold ${theme === "dark" ? "text-gray-200" : "text-gray-800"}">Bed</span>
-                      </div>
-                    `;
+                                        <div class="flex items-center gap-1 mb-1">
+                                          <div class="w-4 h-4 sm:w-5 sm:h-5 rounded bg-amber-400"></div>
+                                          <span class="text-xs font-semibold ${theme === "dark" ? "text-gray-200" : "text-gray-800"}">Bed</span>
+                                        </div>
+                                      `;
                   }}
                 />
                 <span className={`text-xs font-semibold ${theme === "dark" ? "text-gray-200" : "text-gray-800"}`}>
@@ -320,7 +387,7 @@ const PropertyCard = ({
                 </span>
               </div>
               <span className={`text-xs ${theme === "dark" ? "text-gray-300" : "text-gray-700"}`}>
-                {property.beds || 0} beds
+                {safeProperty.beds} beds
               </span>
             </div>
 
@@ -334,11 +401,11 @@ const PropertyCard = ({
                   onError={(e) => {
                     e.target.style.display = 'none';
                     e.target.parentNode.innerHTML = `
-                      <div class="flex items-center gap-1 mb-1">
-                        <div class="w-4 h-4 sm:w-5 sm:h-5 rounded bg-amber-400"></div>
-                        <span class="text-xs font-semibold ${theme === "dark" ? "text-gray-200" : "text-gray-800"}">Bath</span>
-                      </div>
-                    `;
+                                        <div class="flex items-center gap-1 mb-1">
+                                          <div class="w-4 h-4 sm:w-5 sm:h-5 rounded bg-amber-400"></div>
+                                          <span class="text-xs font-semibold ${theme === "dark" ? "text-gray-200" : "text-gray-800"}">Bath</span>
+                                        </div>
+                                      `;
                   }}
                 />
                 <span className={`text-xs font-semibold ${theme === "dark" ? "text-gray-200" : "text-gray-800"}`}>
@@ -346,7 +413,7 @@ const PropertyCard = ({
                 </span>
               </div>
               <span className={`text-xs ${theme === "dark" ? "text-gray-300" : "text-gray-700"}`}>
-                {property.baths || 0} baths
+                {safeProperty.baths} baths
               </span>
             </div>
 
@@ -358,7 +425,7 @@ const PropertyCard = ({
                 </span>
               </div>
               <span className={`text-xs ${theme === "dark" ? "text-gray-300" : "text-gray-700"}`}>
-                {property.sqft?.toLocaleString() || '0'} sqft
+                {safeProperty.sqft.toLocaleString()} sqft
               </span>
             </div>
           </div>
@@ -397,7 +464,7 @@ const PropertyCard = ({
         {/* Action Button */}
         <div className="mt-auto flex justify-center">
           <button
-            onClick={() => onViewDetails(property)}
+            onClick={() => onViewDetails(safeProperty)}
             className="Button2 px-4 py-2 text-sm hover:scale-105 transition-all duration-300 w-full max-w-[200px]"
           >
             View Details
@@ -407,19 +474,19 @@ const PropertyCard = ({
         {/* Footer info */}
         <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
           <div className="flex items-center justify-between text-xs">
-            {property.created_at && (
+            {safeProperty.created_at && (
               <div className={`flex items-center gap-1 ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>
                 <Calendar className="w-3 h-3" />
-                <span>{new Date(property.created_at).toLocaleDateString()}</span>
+                <span>{new Date(safeProperty.created_at).toLocaleDateString()}</span>
               </div>
             )}
-            {property.views_count > 0 && (
+            {safeProperty.views_count > 0 && (
               <div className={`flex items-center gap-1 ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>
                 <Eye className="w-3 h-3" />
-                <span>{property.views_count?.toLocaleString() || '0'}</span>
+                <span>{safeProperty.views_count.toLocaleString()}</span>
               </div>
             )}
-            {property.is_featured && (
+            {safeProperty.is_featured && (
               <div className={`flex items-center gap-1 ${theme === 'dark' ? 'text-amber-400' : 'text-amber-600'}`}>
                 <Star className="w-3 h-3" />
                 <span>Featured</span>

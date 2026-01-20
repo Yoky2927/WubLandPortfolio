@@ -20,6 +20,7 @@ import InternalBrokerDashboard from "./pages/broker/InternalBrokerDashboard.jsx"
 import ExternalBrokerDashboard from "./pages/broker/ExternalBrokerDashboard.jsx";
 // Add this import at the top of Router.jsx
 import BuyerRenter from "./pages/public/BuyerRenter.jsx";
+import PaymentVerificationPage from "./components/PaymentVerificationPage";
 
 // Import hooks
 import { useEffect } from "react";
@@ -349,6 +350,14 @@ function Router() {
                       <BuyerRenter />
                     </MaintenanceWrapper>
                   </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/verify-payment"
+                element={
+                  <PublicRoute>
+                    <PaymentVerificationPage />
+                  </PublicRoute>
                 }
               />
             </Route>

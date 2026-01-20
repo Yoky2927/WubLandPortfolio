@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { httpClient } from "../../../services/http.service";
 
+
 // Lazy load modals
 const UserInfoModal = lazy(() => import("./modals/UserInfoModal"));
 const CreateUserModal = lazy(() => import("./modals/CreateUserModal"));
@@ -252,25 +253,30 @@ const UserManagement = ({
 
       console.log("📤 Creating user:", newUser);
 
+      // OPTION 1: Use fetch directly (since your code already has URLs)
+      const token = localStorage.getItem('token');
+      let response;
+
       // First API call - check for warnings
-      const response = await httpClient.post(
-        "http://localhost:5000/api/auth/admin/create-user",
-        newUser
-      );
+      response = await fetch("http://localhost:5000/api/auth/admin/create-user", {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(newUser)
+      });
 
-      console.log("✅ First API response:", response);
-
-      // Check if response exists
-      if (!response) {
-        throw new Error("No response from server");
-      }
+      console.log("✅ First API response status:", response.status);
+      const responseData = await response.json();
+      console.log("✅ First API response data:", responseData);
 
       // Check for warning response (for client roles like buyer)
-      if (response.warning === true) {
-        console.log("⚠️ Warning received:", response.message);
+      if (responseData.warning === true) {
+        console.log("⚠️ Warning received:", responseData.message);
 
         const isConfirmed = window.confirm(
-          response.message + "\n\nClick OK to proceed or Cancel to go back."
+          responseData.message + "\n\nClick OK to proceed or Cancel to go back."
         );
 
         if (!isConfirmed) {
@@ -284,50 +290,40 @@ const UserManagement = ({
 
         console.log("✅ User confirmed, making second API call with X-Confirm header...");
 
-        try {
-          // Make the CONFIRMED API call with X-Confirm header
-          const confirmResponse = await httpClient.post(
-            "http://localhost:5000/api/auth/admin/create-user",
-            newUser,
-            {
-              headers: {
-                "X-Confirm": "true",
-              },
-            }
-          );
+        // Make the CONFIRMED API call with X-Confirm header
+        const confirmResponse = await fetch("http://localhost:5000/api/auth/admin/create-user", {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+            'X-Confirm': 'true'
+          },
+          body: JSON.stringify(newUser)
+        });
 
-          console.log("✅ Confirmed API response:", confirmResponse);
+        console.log("✅ Confirmed API response status:", confirmResponse.status);
+        const confirmResponseData = await confirmResponse.json();
+        console.log("✅ Confirmed API response data:", confirmResponseData);
 
-          // Handle the confirmed response
-          if (confirmResponse && confirmResponse.success === true) {
-            setShowCreateUserModal(false);
-            resetNewUserForm();
-            setToast({
-              show: true,
-              message: "User created successfully!",
-              type: "success",
-            });
-
-            // Refresh user list
-            console.log("🔄 Refreshing user list...");
-            await fetchUsers();
-          } else {
-            // If no success field, check for error message
-            throw new Error(confirmResponse?.message || "User creation failed after confirmation");
-          }
-        } catch (confirmError) {
-          console.error("❌ Confirmed API call failed:", confirmError);
-
+        // Handle the confirmed response
+        if (confirmResponse.ok && confirmResponseData.success === true) {
+          setShowCreateUserModal(false);
+          resetNewUserForm();
           setToast({
             show: true,
-            message: confirmError.response?.data?.message || confirmError.message || "Failed to create user after confirmation",
-            type: "error",
+            message: "User created successfully!",
+            type: "success",
           });
-          return;
+
+          // Refresh user list
+          console.log("🔄 Refreshing user list...");
+          await fetchUsers();
+        } else {
+          throw new Error(confirmResponseData?.message || "User creation failed after confirmation");
         }
       }
       // Check for direct success (non-client roles like admin)
-      else if (response.success === true) {
+      else if (response.ok && responseData.success === true) {
         console.log("✅ User created directly (no warning needed)");
 
         setShowCreateUserModal(false);
@@ -344,29 +340,29 @@ const UserManagement = ({
       }
       // Handle other responses
       else {
-        console.warn("⚠️ Unexpected response structure:", response);
+        console.warn("⚠️ Unexpected response structure:", responseData);
 
         setToast({
           show: true,
-          message: response.message || "Unexpected response from server",
+          message: responseData.message || "Unexpected response from server",
           type: "error",
         });
       }
 
     } catch (error) {
       console.error("❌ Error in createUser:", error);
-      console.error("Error response:", error.response);
+      console.error("Error stack:", error.stack);
 
       setToast({
         show: true,
-        message: error.response?.data?.message || error.message || "Failed to create user",
+        message: error.message || "Failed to create user",
         type: "error",
       });
     } finally {
       setLoadingAction(false);
     }
   };
-  
+
   const resetNewUserForm = () => {
     setNewUser({
       first_name: "",
@@ -397,7 +393,8 @@ const UserManagement = ({
       if (originalEditUser && userToUpdate.role !== originalEditUser.role) {
         updates.push(
           httpClient.put(
-            `http://localhost:5000/api/users/${userToUpdate.id}/role`,
+            "UPDATE_USER_ROLE",
+            { id: userToUpdate.id },
             { newRole: userToUpdate.role }
           )
         );
@@ -407,7 +404,8 @@ const UserManagement = ({
       if (originalEditUser && userToUpdate.privilege_tier !== originalEditUser.privilege_tier) {
         updates.push(
           httpClient.put(
-            `http://localhost:5000/api/users/${userToUpdate.id}/privileges`,
+            "UPDATE_USER",
+            { id: userToUpdate.id },
             { privilege_tier: userToUpdate.privilege_tier }
           )
         );
@@ -417,7 +415,8 @@ const UserManagement = ({
       if (originalEditUser && userToUpdate.status !== originalEditUser.status) {
         updates.push(
           httpClient.put(
-            `http://localhost:5000/api/users/${userToUpdate.id}/status`,
+            "UPDATE_USER_STATUS",
+            { id: userToUpdate.id },
             { status: userToUpdate.status }
           )
         );
@@ -451,10 +450,12 @@ const UserManagement = ({
       });
 
       // Log activity
-      console.log("Activity logged:", {
-        type: "user_updated",
-        admin: currentUser?.username,
-        target: `User: ${userToUpdate.first_name} ${userToUpdate.last_name}`
+      await httpClient.post("ACTIVITY_LOG", {}, {
+        data: {
+          type: "user_updated",
+          admin: currentUser?.username,
+          target: `User: ${userToUpdate.first_name} ${userToUpdate.last_name}`
+        }
       });
 
       // Refresh user list
@@ -463,10 +464,10 @@ const UserManagement = ({
 
     } catch (error) {
       console.error("❌ Error updating user:", error);
-      console.error("Error details:", error.response?.data || error.message);
+      console.error("Error details:", error.message);
       setToast({
         show: true,
-        message: error.response?.data?.message || "Failed to update user",
+        message: error.message || "Failed to update user",
         type: "error",
       });
     } finally {
@@ -501,28 +502,29 @@ const UserManagement = ({
       setLoadingAction(true);
       console.log(`🔄 Performing ${actionType} on user:`, selectedUser);
 
-      let endpoint, method, data;
+      let endpointKey, data;
 
       switch (actionType) {
         case "delete":
-          endpoint = `http://localhost:5000/api/users/${selectedUser.id}`;
-          method = "DELETE";
+          endpointKey = "DELETE_USER";
           break;
         case "activate":
         case "deactivate":
-          endpoint = `http://localhost:5000/api/users/${selectedUser.id}/status`;
-          method = "PUT";
+          endpointKey = "UPDATE_USER_STATUS";
           data = { status: actionType === "activate" ? "active" : "inactive" };
           break;
         default:
           return;
       }
 
-      const response = method === "DELETE"
-        ? await httpClient.delete(endpoint)
-        : await httpClient.put(endpoint, data);
+      console.log(`🔍 Using endpoint key: ${endpointKey} with params:`, { id: selectedUser.id });
 
-      console.log(`✅ ${actionType} successful:`, response.data);
+      // Use httpClient with endpoint key
+      const response = actionType === "delete"
+        ? await httpClient.delete(endpointKey, { id: selectedUser.id })
+        : await httpClient.put(endpointKey, { id: selectedUser.id }, data);
+
+      console.log(`✅ ${actionType} successful:`, response);
 
       setShowActionModal(false);
       setToast({
@@ -533,10 +535,12 @@ const UserManagement = ({
 
       // Log activity
       try {
-        await httpClient.post("http://localhost:5000/api/activity/log", {
-          type: `user_${actionType}`,
-          admin: currentUser?.username,
-          target: `User: ${selectedUser.first_name} ${selectedUser.last_name}`
+        await httpClient.post("ACTIVITY_LOG", {}, {
+          data: {
+            type: `user_${actionType}`,
+            admin: currentUser?.username,
+            target: `User: ${selectedUser.first_name} ${selectedUser.last_name}`
+          }
         });
       } catch (activityError) {
         console.warn("Activity logging skipped:", activityError.message);
@@ -548,16 +552,17 @@ const UserManagement = ({
 
     } catch (error) {
       console.error(`❌ Error ${actionType} user:`, error);
-      console.error("Error details:", error.response?.data || error.message);
+      console.error("Error details:", error.message);
       setToast({
         show: true,
-        message: error.response?.data?.message || "Action failed",
+        message: error.message || "Action failed",
         type: "error",
       });
     } finally {
       setLoadingAction(false);
     }
   };
+
 
   // Format profile picture URL
   const formatProfilePictureUrl = (url) => {

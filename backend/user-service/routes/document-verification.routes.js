@@ -57,7 +57,7 @@ const uploadVerificationDoc = multer({
     const allowedTypes = /jpeg|jpg|png|pdf|webp|svg/;
     const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
     const mimetype = allowedTypes.test(file.mimetype);
-    
+
     if (mimetype && extname) {
       return cb(null, true);
     } else {
@@ -66,16 +66,16 @@ const uploadVerificationDoc = multer({
   }
 });
 const handleUpload = (req, res, next) => {
-    // Check if request is JSON (not FormData)
-    const contentType = req.headers['content-type'];
-    if (contentType && contentType.includes('application/json')) {
-        // Skip multer for JSON requests
-        console.log("📝 JSON request detected, skipping multer");
-        return next();
-    }
-    // Use multer for FormData requests
-    console.log("📝 FormData request detected, using multer");
-    uploadVerificationDoc.single('document')(req, res, next);
+  // Check if request is JSON (not FormData)
+  const contentType = req.headers['content-type'];
+  if (contentType && contentType.includes('application/json')) {
+    // Skip multer for JSON requests
+    console.log("📝 JSON request detected, skipping multer");
+    return next();
+  }
+  // Use multer for FormData requests
+  console.log("📝 FormData request detected, using multer");
+  uploadVerificationDoc.single('document')(req, res, next);
 };
 
 // User routes (requires authentication)
@@ -89,6 +89,50 @@ router.get('/documents/user/:userId', verifyToken, getDocumentsForUser);
 
 // Single route that handles both JSON and FormData
 router.post('/documents/upload', verifyToken, handleUpload, uploadVerificationDocument);
+
+
+export const uploadTimeoutMiddleware = (req, res, next) => {
+  // Only apply timeout to upload routes
+  if (req.path.includes('/documents/upload')) {
+    const timeout = 30000; // 30 seconds
+
+    // Set timeout
+    req.setTimeout(timeout, () => {
+      if (!res.headersSent) {
+        console.warn(`⚠️ Upload timeout for ${req.path}`);
+        // Don't send response here to avoid "Can't set headers after they are sent"
+      }
+    });
+
+    // Handle request completion
+    const originalEnd = res.end;
+    res.end = function (...args) {
+      clearTimeout(req.uploadTimeout);
+      originalEnd.apply(this, args);
+    };
+
+    // Set a timer that will send timeout response
+    req.uploadTimeout = setTimeout(() => {
+      if (!res.headersSent) {
+        res.status(408).json({
+          success: false,
+          message: "Upload timeout. Please try again with a smaller file.",
+          code: 'UPLOAD_TIMEOUT'
+        });
+      }
+    }, timeout);
+  }
+
+  next();
+};
+
+// In your routes file, use it like this:
+router.post('/documents/upload',
+  verifyToken,
+  uploadTimeoutMiddleware,
+  handleUpload,
+  uploadVerificationDocument
+);
 
 
 // Admin routes (requires admin role)

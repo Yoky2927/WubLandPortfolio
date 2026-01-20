@@ -1,13 +1,14 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { useTheme } from "../../contexts/ThemeContext";
 import { useNavigate } from "react-router-dom";
 import EthiopiaPropertyMap from "../../components/EthiopiaPropertyMap";
-import PropertyDetailsModel from "../../components/PropertyDetailsModal";
-import PropertyCardWithChat from "../../components/PropertyCard.jsx";
+import PropertyDetailsModal from "../../components/PropertyDetailsModal";
+import PropertyCard from "../../components/PropertyCard.jsx";
 import Loader from "../../components/Loader";
 import ThemeToggle from "../../components/ThemeToggle.jsx";
 import Footer from "../../components/Footer";
 import { apiCall } from "../../utils/api.endpoints";
+import { toast } from "react-hot-toast";
 import {
   Search,
   Grid,
@@ -57,7 +58,9 @@ const Properties = () => {
   const [showRecommended, setShowRecommended] = useState(true);
   const [showExplore, setShowExplore] = useState(true);
   const [brokers, setBrokers] = useState([]);
+  const [loadingSave, setLoadingSave] = useState(false);
   const [hasRecommendedError, setHasRecommendedError] = useState(false);
+  const [completedSteps, setCompletedSteps] = useState({});
 
   // Filter states
   const [filters, setFilters] = useState({
@@ -71,7 +74,7 @@ const Properties = () => {
     maxSqft: "",
   });
 
-  // Initialize user data - DON'T REDIRECT FOR UNREGISTERED USERS
+  // Initialize user data
   useEffect(() => {
     const storedUser = localStorage.getItem("user");
     const token = localStorage.getItem("token");
@@ -88,99 +91,19 @@ const Properties = () => {
         } else if (parsedUser.role === 'renter') {
           setFilters(prev => ({ ...prev, propertyStatus: 'rent' }));
         }
-        console.log("✅ User found:", parsedUser.email);
       } catch (e) {
         console.error("Failed to parse user data:", e);
-        setUser(null); // Set user to null if parsing fails
+        setUser(null);
       }
     } else {
-      console.log("👤 No user found, showing public properties");
-      setUser(null); // Explicitly set user to null
+      setUser(null);
     }
-  }, [navigate]);
-
-  // Fetch saved properties (only for logged-in users)
-  const fetchSavedProperties = async () => {
-    if (!user) return;
-
-    try {
-      const response = await apiCall('GET_SAVED_PROPERTIES');
-      if (response && response.success && response.data) {
-        const savedIds = response.data.map(property => property.id || property.property_id);
-        setSavedProperties(savedIds);
-      }
-    } catch (error) {
-      console.log('Could not fetch saved properties:', error);
-    }
-  };
-
-  // Save property function
-  const handleSaveProperty = async (propertyId, isCurrentlySaved) => {
-    if (!user) {
-      // Show login modal or message instead of redirecting
-      const shouldLogin = window.confirm("Please login to save properties. Would you like to login now?");
-      if (shouldLogin) {
-        navigate("/login-register", {
-          state: { returnUrl: "/properties", message: "Please login to save properties" }
-        });
-      }
-      return;
-    }
-
-    setSavingProperty(propertyId);
-    try {
-      const method = isCurrentlySaved ? 'DELETE' : 'POST';
-      const response = await apiCall('SAVE_PROPERTY', { propertyId }, {
-        method: method,
-        data: isCurrentlySaved ? {} : { save: true } // Only send body for POST
-      });
-
-      console.log('💾 Save response:', response);
-
-      if (response && response.success) {
-        if (isCurrentlySaved) {
-          setSavedProperties(prev => prev.filter(id => id !== propertyId));
-          toast.success("Property removed from saved list");
-        } else {
-          setSavedProperties(prev => [...prev, propertyId]);
-          toast.success("Property saved!");
-        }
-
-        // Update the property card if needed
-        setProperties(prev => prev.map(p => {
-          if (p.id === propertyId) {
-            return {
-              ...p,
-              saves: response.data?.savesCount || p.saves + (isCurrentlySaved ? -1 : 1),
-              isSaved: !isCurrentlySaved
-            };
-          }
-          return p;
-        }));
-      } else {
-        toast.error(response?.message || "Failed to save property");
-      }
-    } catch (error) {
-      console.error('❌ Error saving property:', error);
-      toast.error(error.message || "Failed to save property");
-      if (error.message.includes('401') || error.message.includes('403')) {
-        localStorage.removeItem('token');
-        localStorage.removeItem('user');
-        setUser(null);
-        const shouldLogin = window.confirm("Your session has expired. Would you like to login again?");
-        if (shouldLogin) {
-          navigate("/login-register", {
-            state: { returnUrl: "/properties", message: "Session expired. Please login again." }
-          });
-        }
-      }
-    } finally {
-      setSavingProperty(null);
-    }
-  };
+  }, []);
 
   // Transform property data
-  const transformProperty = (property, index) => {
+  const transformProperty = useCallback((property, index) => {
+    if (!property) return null;
+
     let images = [];
 
     if (property.property_image_url) {
@@ -195,7 +118,6 @@ const Properties = () => {
       images = property.photos;
     }
 
-    // Process image URLs
     const processedImages = images.map(img => {
       if (!img || img.trim() === '') return null;
       if (img.startsWith('http')) return img;
@@ -213,8 +135,59 @@ const Properties = () => {
     const property_type = property.property_type || 'house';
     const city = property.city || 'Addis Ababa';
 
+    // Create a broker data object
+    let brokerData = {
+      id: `default-broker-${index || Math.random().toString(36).substr(2, 9)}`,
+      name: "Property Agent",
+      email: "agent@wubland.com",
+      phone_number: "(xxx) xxx-xxxx",
+      profile_picture: null,
+      brokerage_firm: "WubLand Real Estate",
+      experience_years: "5+",
+      commission_rate: "2.5%",
+      total_completed_deals: 50,
+      average_rating: 4.8,
+      is_verified: false,
+      is_available: true
+    };
+
+    // If broker data exists in property
+    if (property.broker && typeof property.broker === 'object') {
+      brokerData = {
+        ...brokerData,
+        ...property.broker,
+        id: property.broker.id || `broker-${index || Math.random().toString(36).substr(2, 9)}`,
+        name: property.broker.name ||
+          `${property.broker.first_name || ''} ${property.broker.last_name || ''}`.trim() ||
+          property.broker.username ||
+          "Property Agent",
+      };
+    }
+
+    // Get coordinates
+    let latitude = property.latitude;
+    let longitude = property.longitude;
+
+    if (!latitude || !longitude) {
+      const cityCoordinates = {
+        'Addis Ababa': [9.024, 38.749],
+        'Gondar': [12.607, 37.459],
+        'Bahir Dar': [11.589, 37.321],
+        'Hawassa': [7.048, 38.484],
+        'Mekele': [13.496, 39.476],
+        'Dire Dawa': [9.600, 41.850],
+        'Adama': [8.540, 39.268],
+        'Jimma': [7.667, 36.833],
+        'Sebeta': [8.917, 38.617],
+        'Bishoftu': [8.750, 39.000]
+      };
+      const coords = cityCoordinates[city] || [9.024, 38.749];
+      latitude = coords[0];
+      longitude = coords[1];
+    }
+
     return {
-      id: property.id || property._id || `property-${index}`,
+      id: property.id || property._id || `property-${index || Math.random().toString(36).substr(2, 9)}`,
       title: property.title || property.property_title || `${property_type} in ${city}`,
       description: property.description || `${property_type} in ${city}`,
       property_type: property_type,
@@ -235,10 +208,239 @@ const Properties = () => {
       created_at: property.created_at || new Date().toISOString(),
       views: property.views || 0,
       saves: property.saves || 0,
-      broker: property.broker || null,
+      broker: brokerData,
+      broker_id: brokerData.id,
       currency: property.currency || 'ETB',
+      property_status: property.property_status,
+      is_negotiable: property.is_negotiable,
+      is_exclusive: property.is_exclusive,
+      is_premium: property.is_premium,
+      year_built: property.year_built,
+      lot_size: property.lot_size,
+      latitude: latitude,
+      longitude: longitude,
+      coordinates: [latitude, longitude],
+      isSaved: false
     };
+  }, []);
+
+  // Fetch saved properties
+  const fetchSavedProperties = useCallback(async () => {
+    if (!user) {
+      console.log('⚠️ No user, skipping saved properties fetch');
+      return;
+    }
+
+    try {
+      console.log('📥 Fetching saved properties for user:', user.id);
+      const response = await apiCall('GET_SAVED_PROPERTIES');
+
+      console.log('📥 GET_SAVED_PROPERTIES response structure:', response);
+
+      let savedData = [];
+
+      // Handle response structure
+      if (response && response.success) {
+        // Case 1: Response has data array
+        if (Array.isArray(response.data)) {
+          savedData = response.data;
+          console.log('✅ Found saved properties in response.data:', savedData.length);
+        }
+        // Case 2: Response has properties in data object
+        else if (response.data && Array.isArray(response.data.properties)) {
+          savedData = response.data.properties;
+          console.log('✅ Found saved properties in response.data.properties:', savedData.length);
+        }
+        // Case 3: Response is the data itself
+        else if (Array.isArray(response)) {
+          savedData = response;
+          console.log('✅ Found saved properties as array:', savedData.length);
+        }
+      }
+
+      console.log('📊 Processed saved properties count:', savedData.length);
+
+      if (savedData.length > 0) {
+        // Transform and add saved status
+        const savedProps = savedData.map(property => {
+          const transformedProperty = transformProperty(property);
+          return {
+            ...transformedProperty,
+            isSaved: true
+          };
+        });
+
+        const savedIds = savedProps.map(p => p.id);
+
+        setSavedProperties(savedProps);
+        localStorage.setItem(`saved_properties_${user.id}`, JSON.stringify(savedProps));
+
+        // Update property lists with saved status
+        const updateListWithSavedStatus = (list) =>
+          list.map(property => ({
+            ...property,
+            isSaved: savedIds.includes(property.id)
+          }));
+
+        setAllProperties(prev => updateListWithSavedStatus(prev));
+        setRecommendedProperties(prev => updateListWithSavedStatus(prev));
+        setExploreProperties(prev => updateListWithSavedStatus(prev));
+
+        console.log(`✅ Loaded ${savedProps.length} saved properties`);
+      } else {
+        console.log('ℹ️ No saved properties found');
+        setSavedProperties([]);
+        localStorage.removeItem(`saved_properties_${user.id}`);
+      }
+
+    } catch (error) {
+      console.error('❌ Error fetching saved properties:', error);
+      setSavedProperties([]);
+    }
+  }, [user, transformProperty]);
+
+  // Save property function - FIXED VERSION
+  const handleSaveProperty = async (propertyId, isCurrentlySaved) => {
+    console.log('💾 handleSaveProperty called:', {
+      propertyId,
+      isCurrentlySaved,
+      userId: user?.id
+    });
+
+    if (!user) {
+      const shouldLogin = window.confirm("Please login to save properties. Would you like to login now?");
+      if (shouldLogin) {
+        navigate("/login-register");
+      }
+      return isCurrentlySaved;
+    }
+
+    setLoadingSave(true);
+    setSavingProperty(propertyId);
+
+    try {
+      let response;
+
+      if (isCurrentlySaved) {
+        // Unsave the property (DELETE method)
+        console.log(`🗑️  Unsaving property ${propertyId}...`);
+        response = await apiCall('UNSAVE_PROPERTY', { propertyId: propertyId.toString() });
+      } else {
+        // Save the property (POST method)
+        console.log(`💾 Saving property ${propertyId}...`);
+        response = await apiCall('SAVE_PROPERTY', { propertyId: propertyId.toString() });
+      }
+
+      console.log('💾 Save/Unsave response:', response);
+
+      if (response && response.success) {
+        const isNowSaved = response.data?.saved;
+        const savesCount = response.data?.savesCount || 0;
+
+        console.log(`✅ Action successful: ${isNowSaved ? 'Saved' : 'Unsaved'}, savesCount: ${savesCount}`);
+
+        // Update saved properties state
+        setSavedProperties(prev => {
+          if (isNowSaved) {
+            // Add to saved
+            const propertyToSave = allProperties.find(p => p.id === propertyId) ||
+              recommendedProperties.find(p => p.id === propertyId) ||
+              exploreProperties.find(p => p.id === propertyId);
+
+            if (propertyToSave) {
+              const newSaved = [...prev, { ...propertyToSave, isSaved: true }];
+              localStorage.setItem(`saved_properties_${user.id}`, JSON.stringify(newSaved));
+              return newSaved;
+            }
+          } else {
+            // Remove from saved
+            const newSaved = prev.filter(p => p.id !== propertyId);
+            localStorage.setItem(`saved_properties_${user.id}`, JSON.stringify(newSaved));
+            return newSaved;
+          }
+          return prev;
+        });
+
+        // Update all property lists
+        const updatePropertyLists = (list) =>
+          list.map(p =>
+            p.id === propertyId
+              ? {
+                ...p,
+                isSaved: isNowSaved,
+                saves: savesCount || p.saves || 0
+              }
+              : p
+          );
+
+        setAllProperties(prev => updatePropertyLists(prev));
+        setRecommendedProperties(prev => updatePropertyLists(prev));
+        setExploreProperties(prev => updatePropertyLists(prev));
+
+        // Show toast
+        toast.success(isNowSaved ? "Property saved!" : "Property removed from saved!");
+
+        return isNowSaved;
+      } else {
+        toast.error(response?.message || "Failed to save property");
+        return isCurrentlySaved;
+      }
+    } catch (error) {
+      console.error('❌ Error saving property:', error);
+      toast.error(error.message || "Failed to save property");
+      return isCurrentlySaved;
+    } finally {
+      setLoadingSave(false);
+      setSavingProperty(null);
+    }
   };
+
+
+  // Add this debug function
+  const debugSavedPropertiesAPI = async () => {
+    if (!user) return;
+
+    try {
+      console.log('🔍 DEBUG: Checking GET_SAVED_PROPERTIES API response...');
+
+      // Method 1: Check what apiCall returns
+      const apiCallResult = await apiCall('GET_SAVED_PROPERTIES');
+      console.log('🔍 apiCall result:', apiCallResult);
+      console.log('🔍 Type:', typeof apiCallResult);
+      console.log('🔍 Is array?', Array.isArray(apiCallResult));
+      console.log('🔍 Has success?', apiCallResult?.success);
+      console.log('🔍 Has data?', apiCallResult?.data);
+      console.log('🔍 All keys:', Object.keys(apiCallResult || {}));
+
+      // Method 2: Direct fetch to see raw response
+      const token = localStorage.getItem('token');
+      const rawResponse = await fetch('http://localhost:5002/api/buyer/saved-properties', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Accept': 'application/json'
+        }
+      });
+
+      const rawText = await rawResponse.text();
+      console.log('📄 RAW RESPONSE TEXT:', rawText);
+
+      // Method 3: Check localStorage for existing saved properties
+      const cached = localStorage.getItem(`saved_properties_${user.id}`);
+      console.log('📦 Cached saved properties:', cached ? JSON.parse(cached).length : 0);
+
+    } catch (error) {
+      console.error('🔍 Debug error:', error);
+    }
+  };
+
+  // Call it when user logs in or in useEffect
+  useEffect(() => {
+    if (user) {
+      setTimeout(() => {
+        debugSavedPropertiesAPI();
+      }, 1000);
+    }
+  }, [user]);
 
   // Fetch brokers
   const fetchBrokers = async () => {
@@ -254,29 +456,21 @@ const Properties = () => {
     }
   };
 
-  // Fetch all properties - ALLOW FOR UNREGISTERED USERS
+  // Fetch all properties
   const fetchAllProperties = async () => {
     setLoading(true);
     setError(null);
-    setHasRecommendedError(false);
 
     try {
-      // Fetch all properties (available to everyone)
       console.log('🔄 Fetching all properties...');
       const propertiesResponse = await apiCall('GET_PROPERTIES');
 
-      // Try to fetch recommended properties ONLY for logged-in users
       let recommendedResponse = null;
-      let recommendedError = false;
-
       if (user && (user.role === 'buyer' || user.role === 'renter')) {
         try {
-          console.log('🔄 Trying to fetch recommended properties for logged-in user...');
           recommendedResponse = await apiCall('GET_RECOMMENDED_PROPERTIES');
-          console.log('✅ Recommended properties fetched successfully');
-        } catch (recError) {
-          console.log('⚠️ Could not fetch recommended properties:', recError.message);
-          recommendedError = true;
+        } catch (error) {
+          console.log('⚠️ Could not fetch recommended properties:', error.message);
           setHasRecommendedError(true);
         }
       }
@@ -286,13 +480,6 @@ const Properties = () => {
 
       // Process all properties response
       if (propertiesResponse) {
-        console.log('📊 Properties response structure:', {
-          success: propertiesResponse.success,
-          hasData: !!propertiesResponse.data,
-          hasProperties: !!propertiesResponse.data?.properties,
-          isArray: Array.isArray(propertiesResponse)
-        });
-
         if (propertiesResponse.success && propertiesResponse.data && Array.isArray(propertiesResponse.data.properties)) {
           propertiesData = propertiesResponse.data.properties;
         } else if (propertiesResponse.success && Array.isArray(propertiesResponse.data)) {
@@ -304,60 +491,46 @@ const Properties = () => {
         }
       }
 
-      console.log(`✅ Found ${propertiesData.length} total properties`);
-
-      // Process recommended properties (if available and user is logged in)
-      if (user && recommendedResponse && !recommendedError) {
-        console.log('📊 Recommended properties response:', recommendedResponse);
+      // Process recommended properties
+      if (user && recommendedResponse && !hasRecommendedError) {
         if (recommendedResponse.success && recommendedResponse.data && Array.isArray(recommendedResponse.data)) {
           recommendedData = recommendedResponse.data;
         } else if (Array.isArray(recommendedResponse)) {
           recommendedData = recommendedResponse;
-        } else if (recommendedResponse.data && Array.isArray(recommendedResponse.data)) {
-          recommendedData = recommendedResponse.data;
         }
-        console.log(`✅ Found ${recommendedData.length} recommended properties`);
       }
 
       // Transform all properties
       const transformedProperties = propertiesData.map(transformProperty).filter(Boolean);
       const transformedRecommended = recommendedData.map(transformProperty).filter(Boolean);
 
-      // Apply user role filter for unverified users (only if logged in)
+      // Apply user role filter
       let filteredProperties = transformedProperties;
       if (user && !isVerified) {
         if (user.role === 'buyer') {
           filteredProperties = transformedProperties.filter(p => p.listing_type === 'sale');
-          console.log(`👑 Filtered for unverified buyer: ${filteredProperties.length} properties`);
         } else if (user.role === 'renter') {
           filteredProperties = transformedProperties.filter(p => p.listing_type === 'rent');
-          console.log(`🔑 Filtered for unverified renter: ${filteredProperties.length} properties`);
         }
       }
 
       setAllProperties(filteredProperties);
-
-      // Set recommended properties (only for logged-in users)
       setRecommendedProperties(transformedRecommended);
 
       // Set explore properties
       if (user && transformedRecommended.length > 0) {
-        // For logged-in users with recommendations: show non-recommended properties
         const recommendedIds = new Set(transformedRecommended.map(p => p.id));
         const exploreProps = filteredProperties.filter(p => !recommendedIds.has(p.id));
         setExploreProperties(exploreProps);
-        console.log(`🗺️ Explore properties for logged-in user: ${exploreProps.length} (excluding ${transformedRecommended.length} recommended)`);
       } else {
-        // For unregistered users OR users without recommendations: show all properties
         setExploreProperties(filteredProperties);
-        console.log(`🗺️ Showing all ${filteredProperties.length} properties in Explore section`);
       }
 
-      // Fetch saved properties and brokers (only if logged in)
+      // Fetch saved properties and brokers
       if (user) {
-        fetchSavedProperties();
+        await fetchSavedProperties();
       }
-      fetchBrokers();
+      await fetchBrokers();
 
     } catch (error) {
       console.error('❌ Error fetching properties:', error);
@@ -408,7 +581,6 @@ const Properties = () => {
       const filteredExplore = filteredAll.filter(p => !recommendedIds.has(p.id));
       setExploreProperties(filteredExplore);
     } else {
-      // For unregistered users OR users without recommendations: show all filtered properties
       setExploreProperties(filteredAll);
     }
   }, [filters, searchTerm, allProperties, recommendedProperties, user]);
@@ -620,7 +792,7 @@ const Properties = () => {
 
       {/* Main Content */}
       <div className="flex flex-1">
-        {/* Map Sidebar - Reduced width */}
+        {/* Map Sidebar */}
         <div className={`hidden lg:block w-full lg:w-2/5 xl:w-2/5 h-[calc(100vh-140px)] sticky top-0 ${mobileView === "map" ? "block" : "hidden"}`}>
           <div className="h-full bg-gray-200 dark:bg-gray-800">
             <EthiopiaPropertyMap
@@ -633,7 +805,7 @@ const Properties = () => {
           </div>
         </div>
 
-        {/* Properties List - Increased width */}
+        {/* Properties List */}
         <div className={`flex-1 flex flex-col ${mobileView === "map" ? "hidden lg:flex" : "flex"}`}>
           <div className="flex-1 overflow-y-auto pb-20 lg:pb-0">
             <div className="container mx-auto px-4 py-8 max-w-7xl">
@@ -763,9 +935,7 @@ const Properties = () => {
                 )}
               </div>
 
-              {/* SIMPLE HEADERS - H2 SIZE */}
-
-              {/* RECOMMENDED FOR YOU SECTION (Only show for logged-in users with recommendations) */}
+              {/* RECOMMENDED FOR YOU SECTION */}
               {user && recommendedProperties.length > 0 && !hasRecommendedError && (
                 <div className="mb-12">
                   <div className="flex items-center justify-between mb-6">
@@ -780,7 +950,7 @@ const Properties = () => {
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
                     {recommendedProperties.map((property) => (
                       <div key={property.id} className="transform transition-transform duration-300 hover:scale-[1.02]">
-                        <PropertyCardWithChat
+                        <PropertyCard
                           property={property}
                           theme={theme}
                           onViewDetails={(prop) => {
@@ -792,11 +962,11 @@ const Properties = () => {
                             setSelectedProperty(property);
                             setIsPopupOpen(true);
                           }}
-                          isSaved={savedProperties.includes(property.id)}
-                          broker={property.broker || brokers[Math.floor(Math.random() * brokers.length)]}
+                          isSaved={savedProperties.some(p => p.id === property.id)}
+                          broker={property.broker}
                           user={user}
                           isVerified={isVerified}
-                          isSaving={savingProperty === property.id}
+                          isSaving={loadingSave && savingProperty === property.id}
                         />
                       </div>
                     ))}
@@ -804,7 +974,7 @@ const Properties = () => {
                 </div>
               )}
 
-              {/* ALL PROPERTIES SECTION (Simple H2 header) */}
+              {/* ALL PROPERTIES SECTION */}
               <div className="mb-12">
                 <div className="flex items-center justify-between mb-6">
                   <h2 className={`text-2xl font-bold ${theme === "dark" ? "text-white" : "text-gray-900"}`}>
@@ -819,7 +989,7 @@ const Properties = () => {
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
                     {exploreProperties.map((property) => (
                       <div key={property.id} className="transform transition-transform duration-300 hover:scale-[1.02]">
-                        <PropertyCardWithChat
+                        <PropertyCard
                           property={property}
                           theme={theme}
                           onViewDetails={(prop) => {
@@ -831,11 +1001,11 @@ const Properties = () => {
                             setSelectedProperty(property);
                             setIsPopupOpen(true);
                           }}
-                          isSaved={savedProperties.includes(property.id)}
-                          broker={property.broker || brokers[Math.floor(Math.random() * brokers.length)]}
+                          isSaved={savedProperties.some(p => p.id === property.id)}
+                          broker={property.broker}
                           user={user}
                           isVerified={isVerified}
-                          isSaving={savingProperty === property.id}
+                          isSaving={loadingSave && savingProperty === property.id}
                         />
                       </div>
                     ))}
@@ -853,10 +1023,8 @@ const Properties = () => {
                 )}
               </div>
 
-
-
               {/* No Properties Found Fallback */}
-              {exploreProperties.length === 0 && (
+              {exploreProperties.length === 0 && allProperties.length > 0 && (
                 <div className={`text-center py-12 rounded-xl ${theme === "dark" ? "bg-gray-800" : "bg-white"} shadow-lg border border-amber-200 dark:border-amber-800`}>
                   <AlertCircle className="mx-auto text-amber-500 mb-3" size={48} />
                   <h3 className={`text-lg font-semibold mb-2 ${theme === "dark" ? "text-white" : "text-gray-900"}`}>
@@ -888,12 +1056,15 @@ const Properties = () => {
       )}
 
       {/* Property Details Modal */}
-      <PropertyDetailsModel
-        property={selectedProperty}
-        isOpen={isPopupOpen}
-        onClose={() => setIsPopupOpen(false)}
-        brokers={brokers}
-      />
+      {selectedProperty && (
+        <PropertyDetailsModal
+          property={selectedProperty}
+          isOpen={isPopupOpen}
+          onClose={() => setIsPopupOpen(false)}
+          theme={theme}
+          brokers={brokers}
+        />
+      )}
     </div>
   );
 };

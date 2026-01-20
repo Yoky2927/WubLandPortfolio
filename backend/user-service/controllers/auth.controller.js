@@ -29,10 +29,10 @@ class EmailServiceClient {
         {
           email: emailData.email,
           fullName: emailData.fullName,
-          token: token
+          verificationToken: token  // ← CHANGE THIS from 'token' to 'verificationToken'
         },
         {
-          timeout: 10000, // 10 second timeout
+          timeout: 10000,
           headers: {
             'Content-Type': 'application/json',
             'Internal-Service-Token': process.env.INTERNAL_SERVICE_TOKEN || 'communication-service-secret-12345'
@@ -692,10 +692,14 @@ export const verifyEmail = async (req, res) => {
       pendingRegistration.email,
       pendingRegistration.password,
       pendingRegistration.role,
-      null, // Don't pass broker_type
-      1,
-      null,
-      null
+      'basic', // privilege_tier
+      'active', // status
+      null, // phone_number
+      isEmailVerified,
+      verified, // verified flag
+      null, // emailVerificationToken
+      null, // emailVerificationExpires
+      null  // verification_status = NULL (not pending)
     );
 
     // If user is a broker, create broker profile
@@ -742,6 +746,8 @@ export const verifyEmail = async (req, res) => {
 };
 
 // Main verification function with new design
+// In your auth.controller.js - REPLACE the existing verifyEmailWeb function with this:
+
 export const verifyEmailWeb = async (req, res) => {
   try {
     const { token } = req.query;
@@ -797,14 +803,49 @@ export const verifyEmailWeb = async (req, res) => {
       `);
     }
 
+    // Check users table first
     const [users] = await db.query(
       "SELECT id, email, first_name, last_name, email_verification_expires, is_email_verified FROM users WHERE email_verification_token = ?",
       [token]
     );
 
-    console.log('🔍 verifyEmailWeb - Users found:', users.length);
+    // If not found in users, check pending_registrations
+    let user = null;
+    let fromPending = false;
+    let userData = null;
 
-    if (users.length === 0) {
+    if (users.length > 0) {
+      user = users[0];
+      console.log('🔍 verifyEmailWeb - User found in users table:', {
+        id: user.id,
+        email: user.email,
+        is_email_verified: user.is_email_verified,
+        expires: user.email_verification_expires
+      });
+    } else {
+      const [pending] = await db.query(
+        "SELECT * FROM pending_registrations WHERE email_verification_token = ?",
+        [token]
+      );
+      if (pending.length > 0) {
+        userData = pending[0];
+        user = {
+          email: userData.email,
+          first_name: userData.first_name,
+          last_name: userData.last_name,
+          email_verification_expires: userData.email_verification_expires
+        };
+        fromPending = true;
+        console.log('🔍 verifyEmailWeb - User found in pending_registrations:', {
+          email: user.email,
+          first_name: user.first_name,
+          expires: user.email_verification_expires
+        });
+      }
+    }
+
+    if (!user) {
+      console.log('🔍 verifyEmailWeb - No user found with token');
       return res.status(400).send(`
         <!DOCTYPE html>
         <html>
@@ -853,16 +894,8 @@ export const verifyEmailWeb = async (req, res) => {
       `);
     }
 
-    const user = users[0];
-    console.log('🔍 verifyEmailWeb - User found:', {
-      id: user.id,
-      email: user.email,
-      is_email_verified: user.is_email_verified,
-      expires: user.email_verification_expires
-    });
-
-    // Check if already verified
-    if (user.is_email_verified === 1) {
+    // Check if already verified (for users table only)
+    if (!fromPending && user.is_email_verified === 1) {
       console.log('🔍 verifyEmailWeb - User already verified');
       return res.send(`
         <!DOCTYPE html>
@@ -961,173 +994,262 @@ export const verifyEmailWeb = async (req, res) => {
       `);
     }
 
-    // Update user as verified
-    const [updateResult] = await db.query(
-      "UPDATE users SET is_email_verified = 1, verified = 1, email_verification_token = NULL, email_verification_expires = NULL WHERE id = ?",
-      [user.id]
-    );
+    // Process verification based on source
+    if (fromPending) {
+      console.log('🔍 verifyEmailWeb - Processing pending registration...');
 
-    console.log(`✅ verifyEmailWeb - Email verified for user ID: ${user.id}, Rows updated: ${updateResult.affectedRows}`);
+      const newUserResult = await User.create(
+        userData.first_name, // Use userData, not pendingRegistration
+        userData.last_name,
+        userData.username,
+        userData.email,
+        userData.password,
+        userData.role,
+        'basic', // privilege_tier
+        'active', // status
+        null, // phone_number
+        1, // isEmailVerified (set to 1 since we're verifying)
+        0, // verified (set to 0)
+        null, // emailVerificationToken
+        null, // emailVerificationExpires
+        null  // verification_status = NULL (not pending)
+      );
 
-    // SUCCESS PAGE
-    return res.send(`
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Email Verified - WUBLAND</title>
-        <meta http-equiv="refresh" content="8;url=http://localhost:5173/login-register" />
-        <style>
-          ${verificationStyles.common}
-          ${verificationStyles.success}
-          
-          /* Success page specific animations */
-          @keyframes gentlePulse {
-            0%, 100% { 
-              transform: scale(1);
-              opacity: 1;
-            }
-            50% { 
-              transform: scale(1.02);
-              opacity: 0.95;
-            }
-          }
-          
-          .content-card {
-            animation: gentlePulse 3s ease-in-out infinite;
-          }
-          
-          .confetti {
-            position: absolute;
-            width: 12px;
-            height: 12px;
-            background: linear-gradient(135deg, #f59e0b, #fbbf24);
-            border-radius: 50%;
-            opacity: 0;
-            z-index: 1;
-          }
-          
-          @keyframes confettiFall {
-            0% {
-              transform: translateY(-100px) rotate(0deg);
-              opacity: 1;
-            }
-            100% {
-              transform: translateY(100vh) rotate(360deg);
-              opacity: 0;
-            }
-          }
-        </style>
-      </head>
-      <body>
-        <!-- Floating decorative elements -->
-        <div class="floating-element" style="width: 220px; height: 220px; top: 5%; left: 4%; background: linear-gradient(135deg, rgba(245, 158, 11, 0.04), rgba(251, 191, 36, 0.02)); border-radius: 50%;"></div>
-        <div class="floating-element" style="width: 160px; height: 160px; top: 15%; right: 6%; background: linear-gradient(135deg, rgba(245, 158, 11, 0.03), rgba(251, 191, 36, 0.01)); border-radius: 40px;"></div>
-        <div class="floating-element" style="width: 140px; height: 140px; bottom: 10%; left: 7%; background: linear-gradient(135deg, rgba(245, 158, 11, 0.02), rgba(251, 191, 36, 0.005)); border-radius: 35px;"></div>
-        
-        <!-- Confetti elements -->
-        <div class="confetti" style="left: 10%; animation: confettiFall 3s linear infinite;"></div>
-        <div class="confetti" style="left: 20%; animation: confettiFall 4s linear infinite 0.5s;"></div>
-        <div class="confetti" style="left: 30%; animation: confettiFall 3.5s linear infinite 1s;"></div>
-        <div class="confetti" style="left: 40%; animation: confettiFall 4.5s linear infinite 1.5s;"></div>
-        <div class="confetti" style="left: 60%; animation: confettiFall 3s linear infinite 2s;"></div>
-        <div class="confetti" style="left: 70%; animation: confettiFall 4s linear infinite 2.5s;"></div>
-        <div class="confetti" style="left: 80%; animation: confettiFall 3.5s linear infinite 3s;"></div>
-        <div class="confetti" style="left: 90%; animation: confettiFall 4.2s linear infinite 3.5s;"></div>
-        
-        <div class="main-container">
-          <div class="content-card">
-            <div class="icon-wrapper">
-              <div class="icon-circle"></div>
-              ${svgIcons.success}
-            </div>
+      // If user is a broker, create broker profile
+      if ((userData.role === "broker" || userData.role.includes("broker")) && userData.broker_type) {
+        await db.query(
+          `INSERT INTO broker_profiles (user_id, broker_type, created_at) 
+           VALUES (?, ?, NOW())`,
+          [newUserResult.insertId, userData.broker_type]
+        );
+      }
+      // Delete from pending_registrations
+      await deletePendingRegistration(userData.email);
+
+      // Get the newly created user
+      const newUser = await User.findById(newUserResult.insertId);
+      const brokerType = await getBrokerType(newUser.id);
+
+      console.log(`✅ verifyEmailWeb - Pending registration completed for: ${user.email}`);
+
+      // SUCCESS PAGE for pending registration
+      return res.send(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>Registration Complete - WUBLAND</title>
+          <meta http-equiv="refresh" content="8;url=http://localhost:5173/login-register" />
+          <style>
+            ${verificationStyles.common}
+            ${verificationStyles.success}
             
-            <h1>Email Verified Successfully!</h1>
+            @keyframes gentlePulse {
+              0%, 100% { 
+                transform: scale(1);
+                opacity: 1;
+              }
+              50% { 
+                transform: scale(1.02);
+                opacity: 0.95;
+              }
+            }
             
-            <div class="user-details">
-              <div class="detail-item">
-                ${svgIcons.user}
-                <span>Welcome, <span class="detail-value">${user.first_name || 'there'}</span>!</span>
+            .content-card {
+              animation: gentlePulse 3s ease-in-out infinite;
+            }
+          </style>
+        </head>
+        <body>
+          <!-- Floating decorative elements -->
+          <div class="floating-element" style="width: 220px; height: 220px; top: 5%; left: 4%; background: linear-gradient(135deg, rgba(245, 158, 11, 0.04), rgba(251, 191, 36, 0.02)); border-radius: 50%;"></div>
+          <div class="floating-element" style="width: 160px; height: 160px; top: 15%; right: 6%; background: linear-gradient(135deg, rgba(245, 158, 11, 0.03), rgba(251, 191, 36, 0.01)); border-radius: 40px;"></div>
+          <div class="floating-element" style="width: 140px; height: 140px; bottom: 10%; left: 7%; background: linear-gradient(135deg, rgba(245, 158, 11, 0.02), rgba(251, 191, 36, 0.005)); border-radius: 35px;"></div>
+          
+          <div class="main-container">
+            <div class="content-card">
+              <div class="icon-wrapper">
+                <div class="icon-circle"></div>
+                ${svgIcons.success}
               </div>
               
-              <div class="detail-item">
-                ${svgIcons.email}
-                <span><span class="detail-value">${user.email}</span> is now verified</span>
-              </div>
-            </div>
-            
-            <p class="subtitle">
-              Your WUBLAND account is now fully activated. You can start managing your real estate portfolio immediately.
-            </p>
-            
-            <div class="redirect-message">
-              <span>You'll be redirected in <span id="countdown" class="countdown">8</span> seconds...</span>
-            </div>
-            
-            <div class="button-group">
-              <a href="http://localhost:5173/login-register" class="action-button">
-                <span>Start Exploring</span>
-                ${svgIcons.arrowRight}
-              </a>
+              <h1>Registration Complete!</h1>
               
-              <a href="http://localhost:5173" class="action-button button-outline">
-                <span>Visit Homepage</span>
-              </a>
-            </div>
-            
-            <div class="footer-info">
-              <div class="brand">WUBLAND</div>
-              <p>Real Estate Portfolio Management Platform</p>
-              <p style="margin-top: 8px; font-size: 13px; color: #d1d5db;">
-                You will be automatically redirected to continue
+              <div class="user-details">
+                <div class="detail-item">
+                  ${svgIcons.user}
+                  <span>Welcome, <span class="detail-value">${user.first_name || 'there'}</span>!</span>
+                </div>
+                
+                <div class="detail-item">
+                  ${svgIcons.email}
+                  <span><span class="detail-value">${user.email}</span> is now verified</span>
+                </div>
+              </div>
+              
+              <p class="subtitle">
+                Your account has been created successfully! You can now login and start using all features of WUBLAND.
               </p>
+              
+              <div class="redirect-message">
+                <span>You'll be redirected to login in <span id="countdown" class="countdown">8</span> seconds...</span>
+              </div>
+              
+              <div class="button-group">
+                <a href="http://localhost:5173/login-register" class="action-button">
+                  <span>Login Now</span>
+                  ${svgIcons.arrowRight}
+                </a>
+                
+                <a href="http://localhost:5173" class="action-button button-outline">
+                  <span>Visit Homepage</span>
+                </a>
+              </div>
+              
+              <div class="footer-info">
+                <div class="brand">WUBLAND</div>
+                <p>Real Estate Portfolio Management Platform</p>
+                <p style="margin-top: 8px; font-size: 13px; color: #d1d5db;">
+                  You will be automatically redirected to login
+                </p>
+              </div>
             </div>
           </div>
-        </div>
-        
-        <script>
-          let countdown = 8;
-          const countdownElement = document.getElementById('countdown');
           
-          const timer = setInterval(() => {
-            countdown--;
-            countdownElement.textContent = countdown;
+          <script>
+            let countdown = 8;
+            const countdownElement = document.getElementById('countdown');
             
-            if (countdown <= 0) {
-              clearInterval(timer);
-              window.location.href = 'http://localhost:5173/login-register';
+            const timer = setInterval(() => {
+              countdown--;
+              countdownElement.textContent = countdown;
+              
+              if (countdown <= 0) {
+                clearInterval(timer);
+                window.location.href = 'http://localhost:5173/login-register';
+              }
+            }, 1000);
+          </script>
+        </body>
+        </html>
+      `);
+    } else {
+      // Update user as verified (from users table)
+      console.log('🔍 verifyEmailWeb - Updating existing user verification...');
+      const [updateResult] = await db.query(
+        "UPDATE users SET is_email_verified = 1, verified = 1, email_verification_token = NULL, email_verification_expires = NULL WHERE id = ?",
+        [user.id]
+      );
+
+      console.log(`✅ verifyEmailWeb - Email verified for user ID: ${user.id}, Rows updated: ${updateResult.affectedRows}`);
+
+      // Get broker type for display
+      const brokerType = await getBrokerType(user.id);
+
+      // SUCCESS PAGE for existing user verification
+      return res.send(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>Email Verified - WUBLAND</title>
+          <meta http-equiv="refresh" content="8;url=http://localhost:5173/login-register" />
+          <style>
+            ${verificationStyles.common}
+            ${verificationStyles.success}
+            
+            @keyframes gentlePulse {
+              0%, 100% { 
+                transform: scale(1);
+                opacity: 1;
+              }
+              50% { 
+                transform: scale(1.02);
+                opacity: 0.95;
+              }
             }
-          }, 1000);
+            
+            .content-card {
+              animation: gentlePulse 3s ease-in-out infinite;
+            }
+          </style>
+        </head>
+        <body>
+          <!-- Floating decorative elements -->
+          <div class="floating-element" style="width: 220px; height: 220px; top: 5%; left: 4%; background: linear-gradient(135deg, rgba(245, 158, 11, 0.04), rgba(251, 191, 36, 0.02)); border-radius: 50%;"></div>
+          <div class="floating-element" style="width: 160px; height: 160px; top: 15%; right: 6%; background: linear-gradient(135deg, rgba(245, 158, 11, 0.03), rgba(251, 191, 36, 0.01)); border-radius: 40px;"></div>
+          <div class="floating-element" style="width: 140px; height: 140px; bottom: 10%; left: 7%; background: linear-gradient(135deg, rgba(245, 158, 11, 0.02), rgba(251, 191, 36, 0.005)); border-radius: 35px;"></div>
           
-          // Add more confetti on click - FIXED VERSION
-          document.querySelector('.content-card').addEventListener('click', (e) => {
-            if (e.target.tagName === 'A') return;
+          <div class="main-container">
+            <div class="content-card">
+              <div class="icon-wrapper">
+                <div class="icon-circle"></div>
+                ${svgIcons.success}
+              </div>
+              
+              <h1>Email Verified Successfully!</h1>
+              
+              <div class="user-details">
+                <div class="detail-item">
+                  ${svgIcons.user}
+                  <span>Welcome back, <span class="detail-value">${user.first_name || 'there'}</span>!</span>
+                </div>
+                
+                <div class="detail-item">
+                  ${svgIcons.email}
+                  <span><span class="detail-value">${user.email}</span> is now verified</span>
+                </div>
+              </div>
+              
+              <p class="subtitle">
+                Your email verification is complete! You can now access all features of your WUBLAND account.
+              </p>
+              
+              <div class="redirect-message">
+                <span>You'll be redirected to login in <span id="countdown" class="countdown">8</span> seconds...</span>
+              </div>
+              
+              <div class="button-group">
+                <a href="http://localhost:5173/login-register" class="action-button">
+                  <span>Login to Continue</span>
+                  ${svgIcons.arrowRight}
+                </a>
+                
+                <a href="http://localhost:5173" class="action-button button-outline">
+                  <span>Visit Homepage</span>
+                </a>
+              </div>
+              
+              <div class="footer-info">
+                <div class="brand">WUBLAND</div>
+                <p>Real Estate Portfolio Management Platform</p>
+                <p style="margin-top: 8px; font-size: 13px; color: #d1d5db;">
+                  You will be automatically redirected to continue
+                </p>
+              </div>
+            </div>
+          </div>
+          
+          <script>
+            let countdown = 8;
+            const countdownElement = document.getElementById('countdown');
             
-            const confetti = document.createElement('div');
-            confetti.className = 'confetti';
-            confetti.style.left = Math.random() * 100 + '%';
-            
-            // Fixed the template literal issue
-            const hue = Math.random() * 60 + 30;
-            confetti.style.background = 'linear-gradient(135deg, ' + 
-              'hsl(' + hue + ', 100%, 60%), ' +
-              'hsl(' + (hue + 10) + ', 100%, 70%)' +
-              ')';
-            
-            const duration = 2 + Math.random() * 3;
-            confetti.style.animation = 'confettiFall ' + duration + 's linear forwards';
-            
-            document.body.appendChild(confetti);
-            
-            setTimeout(() => {
-              confetti.remove();
-            }, 5000);
-          });
-        </script>
-      </body>
-      </html>
-    `);
+            const timer = setInterval(() => {
+              countdown--;
+              countdownElement.textContent = countdown;
+              
+              if (countdown <= 0) {
+                clearInterval(timer);
+                window.location.href = 'http://localhost:5173/login-register';
+              }
+            }, 1000);
+          </script>
+        </body>
+        </html>
+      `);
+    }
 
   } catch (error) {
     console.error('❌ verifyEmailWeb - Email verification error:', error);
@@ -1181,6 +1303,7 @@ export const verifyEmailWeb = async (req, res) => {
       </html>
     `);
   }
+
 };
 
 export const changeRequiredPassword = async (req, res) => {
@@ -1233,64 +1356,115 @@ export const resendVerificationEmail = async (req, res) => {
     if (!email) {
       return res.status(400).json({
         success: false,
-        message: "Email is required",
+        message: "Email is required"
       });
     }
 
-    const user = await User.findByEmail(email);
-    if (!user) {
-      return res.status(404).json({
-        success: false,
-        message: "User not found with this email",
-      });
-    }
+    const db = await import("../../shared/db.js").then(mod => mod.default);
 
-    if (user.is_email_verified || user.verified) {
-      return res.status(400).json({
-        success: false,
-        message: "Email is already verified",
-      });
-    }
-
-    const emailVerificationToken = crypto.randomBytes(32).toString("hex");
-    const expiryDate = new Date(Date.now() + 24 * 60 * 60 * 1000);
-    const emailVerificationExpires = expiryDate
-      .toISOString()
-      .slice(0, 19)
-      .replace("T", " ");
-
-    await User.setVerificationToken(
-      user.id,
-      emailVerificationToken,
-      emailVerificationExpires
+    // IMPORTANT: Check users table FIRST - this should have priority
+    const [users] = await db.query(
+      "SELECT id, email, first_name, last_name, email_verification_token, email_verification_expires, is_email_verified FROM users WHERE email = ?",
+      [email]
     );
 
-    try {
-      await emailService.sendVerificationEmail(
-        { email: user.email, fullName: `${user.first_name} ${user.last_name}` },
-        emailVerificationToken
-      );
-    } catch (emailError) {
-      console.error("Failed to send verification email:", emailError);
-      return res.status(500).json({
+    const [pending] = await db.query(
+      "SELECT email, first_name, last_name, email_verification_token, email_verification_expires FROM pending_registrations WHERE email = ?",
+      [email]
+    );
+
+    // If user doesn't exist anywhere
+    if (users.length === 0 && pending.length === 0) {
+      return res.status(404).json({
         success: false,
-        message: "Failed to send verification email",
+        message: "User not found"
       });
     }
 
-    res.json({
-      success: true,
-      message: "Verification email sent successfully. Please check your inbox.",
-    });
+    // IMPORTANT: Always prioritize existing user over pending registration
+    let userInfo;
+    let source = 'users'; // Track where user info comes from
+
+    if (users.length > 0) {
+      // User exists in users table (active or pending verification)
+      userInfo = users[0];
+      source = 'users';
+
+      // If already verified
+      if (userInfo.is_email_verified === 1) {
+        return res.status(400).json({
+          success: false,
+          message: "Email already verified"
+        });
+      }
+    } else {
+      // Only use pending registration if no user exists
+      userInfo = pending[0];
+      source = 'pending';
+    }
+
+    // Generate NEW verification token
+    const newVerificationToken = crypto.randomBytes(32).toString('hex');
+    const newExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+
+    console.log("🔄 Generated new verification token:", newVerificationToken);
+    console.log("📧 Using user info from:", source, userInfo.first_name, userInfo.last_name);
+
+    // Update the appropriate table
+    if (source === 'users') {
+      await db.query(
+        "UPDATE users SET email_verification_token = ?, email_verification_expires = ? WHERE email = ?",
+        [newVerificationToken, newExpiry, email]
+      );
+    } else {
+      await db.query(
+        "UPDATE pending_registrations SET email_verification_token = ?, email_verification_expires = ? WHERE email = ?",
+        [newVerificationToken, newExpiry, email]
+      );
+    }
+
+    // Send verification email with NEW token
+    try {
+      const response = await fetch('http://localhost:5001/api/email/send-verification', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'internal-service-token': 'communication-service-secret-12345'
+        },
+        body: JSON.stringify({
+          email: email,
+          fullName: `${userInfo.first_name || 'User'} ${userInfo.last_name || ''}`.trim() || email,
+          verificationToken: newVerificationToken
+        })
+      });
+
+      if (response.ok) {
+        console.log("✅ Resend verification email sent with NEW token");
+        return res.json({
+          success: true,
+          message: "Verification email sent successfully"
+        });
+      } else {
+        const errorData = await response.json().catch(() => ({}));
+        console.error("Email service error:", errorData);
+        throw new Error(errorData.message || "Failed to send email");
+      }
+    } catch (emailError) {
+      console.error("Email service error:", emailError);
+      return res.status(500).json({
+        success: false,
+        message: "Failed to send verification email. Please try again later."
+      });
+    }
+
   } catch (error) {
     console.error("Resend verification error:", error);
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
-      message: "Internal server error",
+      message: "Failed to resend verification email"
     });
   }
 };
-
 async function logFailedLoginAttempt(
   userId,
   identifier,
@@ -2190,8 +2364,9 @@ export const adminCreateUser = async (req, res) => {
           privilege_tier, status, phone_number, 
           is_email_verified, verified, password_change_required,
           email_verification_token, email_verification_expires,
+          verification_status, // Add this field
           created_by_user_id, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
         [
           finalFirstName,
           finalLastName,
@@ -2207,6 +2382,7 @@ export const adminCreateUser = async (req, res) => {
           shouldRequirePasswordChange ? 1 : 0, // password_change_required
           emailVerificationToken, // email_verification_token
           emailVerificationExpires, // email_verification_expires
+          null, // verification_status = NULL (not pending)
           req.user.id // created_by_user_id
         ]
       );
@@ -2576,3 +2752,56 @@ async function getPendingRegistrationByToken(token) {
     return null;
   }
 }
+
+async function cleanupExpiredTokens() {
+  try {
+    console.log('🧹 Starting expired token cleanup...');
+    const db = await import("../../shared/db.js").then(mod => mod.default);
+
+    // Clean expired tokens from users table
+    const [usersResult] = await db.query(
+      "UPDATE users SET email_verification_token = NULL, email_verification_expires = NULL WHERE email_verification_expires < NOW()"
+    );
+
+    console.log(`🧹 Cleared ${usersResult.affectedRows} expired tokens from users table`);
+
+    // Clean expired pending registrations
+    const [pendingResult] = await db.query(
+      "DELETE FROM pending_registrations WHERE email_verification_expires < NOW()"
+    );
+
+    console.log(`🧹 Deleted ${pendingResult.affectedRows} expired pending registrations`);
+
+    // Clean expired password reset tokens
+    const [passwordResult] = await db.query(
+      "DELETE FROM password_reset_tokens WHERE expires_at < NOW()"
+    );
+
+    console.log(`🧹 Deleted ${passwordResult.affectedRows} expired password reset tokens`);
+
+    return {
+      usersCleared: usersResult.affectedRows,
+      pendingCleared: pendingResult.affectedRows,
+      passwordCleared: passwordResult.affectedRows
+    };
+
+  } catch (error) {
+    console.error('❌ Error cleaning up expired tokens:', error);
+    throw error;
+  }
+}
+
+// Run cleanup every hour (60 * 60 * 1000 ms = 1 hour)
+if (process.env.NODE_ENV !== 'test') {
+  // Run immediately on startup
+  setTimeout(() => {
+    cleanupExpiredTokens().catch(console.error);
+  }, 30000); // Wait 30 seconds after server starts
+
+  // Then run every hour
+  setInterval(() => {
+    cleanupExpiredTokens().catch(console.error);
+  }, 60 * 60 * 1000); // Every hour
+}
+
+

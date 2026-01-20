@@ -15,9 +15,11 @@ import PropertyApplicationModal from "../../components/PropertyApplicationModal"
 import BrokerChatInterface from "../../components/BrokerChatInterface";
 import ScheduleViewingModal from "../../components/ScheduleViewingModal";
 import HeroTypingText from "../../components/HeroTypingText";
-import PropertyCardWithChat from "../../components/PropertyCard";
+import PropertyCard from "../../components/PropertyCard";
 import PaymentHistory from "../../components/PaymentHistory";
-import PaymentModal from "../../components/PaymentModal"; // Make sure this component exists
+import PaymentModal from "../../components/PaymentModal";
+import AnnouncementBanner from '../../components/AnnouncementBanner';
+
 import { toast } from "react-hot-toast";
 import {
   ChevronDown, ChevronRight, ArrowRight, ArrowLeft, CheckCircle,
@@ -84,9 +86,9 @@ const BuyerRenter = () => {
   const progressSectionRef = useRef(null);
   const isInitializedRef = useRef(false);
 
-  // Track completed steps
+  // Track completed steps - Initialize as ALL FALSE
   const [completedSteps, setCompletedSteps] = useState({
-    1: true, // Profile creation is always completed once user is logged in
+    1: false,
     2: false,
     3: false,
     4: false,
@@ -157,14 +159,14 @@ const BuyerRenter = () => {
           setShowDocumentUpload(true);
 
           if (needsResubmission[0].feedback) {
-            toast.info(`Please resubmit: ${needsResubmission[0].feedback}`, {
+            toast(`Please resubmit: ${needsResubmission[0].feedback}`, {
               duration: 6000,
               icon: '📄'
             });
           }
         } else {
           setShowDocumentUpload(true);
-          toast.info('Multiple documents need resubmission', {
+          toast('Multiple documents need resubmission', {
             duration: 5000,
             icon: '📄'
           });
@@ -208,6 +210,7 @@ const BuyerRenter = () => {
     }
   };
 
+
   // ========== VERIFICATION FUNCTIONS ==========
 
   const checkVerificationStatus = useCallback(async (forceCheck = false) => {
@@ -228,100 +231,168 @@ const BuyerRenter = () => {
 
       const response = await apiCall('GET_VERIFICATION_STATUS', {}, { method: 'GET' });
 
-      if (response.success) {
-        const { user: userData, documents, verificationStep } = response;
-
-        const updatedUser = {
-          ...user,
-          verification_status: userData.verification_status,
-          verification_step_status: userData.verification_step_status,
-          verification_feedback: userData.verification_feedback,
-          documents_need_resubmission: userData.documents_need_resubmission,
-          has_submitted_documents: userData.has_submitted_documents,
-          documents_submitted_at: userData.documents_submitted_at,
-          last_verification_review_at: userData.last_verification_review_at
-        };
-
-        setUser(updatedUser);
-        localStorage.setItem('user', JSON.stringify(updatedUser));
-
-        if (documents && Array.isArray(documents)) {
-          setUserDocuments(documents);
-          localStorage.setItem(`user_documents_${user.id}`, JSON.stringify(documents));
-        }
-
-        const hasSubmitted =
-          userData.verification_status === 'pending' ||
-          userData.verification_status === 'submitted' ||
-          userData.verification_status === 'reviewing' ||
-          userData.has_submitted_documents === true;
-
-        const isPending =
-          userData.verification_step_status === 'pending' ||
-          userData.verification_step_status === 'submitted' ||
-          userData.verification_step_status === 'reviewing' ||
-          userData.verification_step_status === 'needs_resubmission';
-
-        setHasSubmittedDocuments(hasSubmitted);
-        setIsVerificationInProgress(isPending);
-
-        if (userData.verification_step_status === 'verified') {
-          setCompletedSteps(prev => ({ ...prev, 2: true }));
-        }
-
-        const statusData = {
-          status: userData.verification_step_status,
-          feedback: userData.verification_feedback,
-          needsResubmission: userData.documents_need_resubmission,
-          lastReviewed: userData.last_verification_review_at,
-          stepInfo: verificationStep,
-          hasSubmitted: hasSubmitted,
-          isInProgress: isPending,
-          lastChecked: now
-        };
-
-        setVerificationStatus(statusData);
-        setLastVerificationCheck(now);
-
-        localStorage.setItem(`verification_status_${user.id}`, JSON.stringify(statusData));
-
-        const previousStatus = verificationStatus?.status;
-        if (previousStatus && previousStatus !== userData.verification_step_status) {
-          handleVerificationStatusChange(previousStatus, userData.verification_step_status, userData.verification_feedback);
-        }
-
-        return statusData;
+      // Handle undefined or null response
+      if (!response) {
+        console.log('❌ Verification status check returned no response');
+        return verificationStatus;
       }
+
+      // Handle error responses
+      if (!response.success) {
+        console.log('❌ Verification status check failed:', response.message);
+        return verificationStatus;
+      }
+
+      const { user: userData, documents, verificationStep } = response;
+
+      // Handle case where userData might be undefined
+      if (!userData) {
+        console.log('❌ No user data in verification response');
+        return verificationStatus;
+      }
+
+      const updatedUser = {
+        ...user,
+        verification_status: userData.verification_status || userData.verificationStepStatus || null,
+        verification_step_status: userData.verification_step_status || userData.verificationStepStatus || 'not_started',
+        verification_feedback: userData.verification_feedback || null,
+        documents_need_resubmission: userData.documents_need_resubmission || false,
+        has_submitted_documents: userData.has_submitted_documents || false,
+        documents_submitted_at: userData.documents_submitted_at || null,
+        last_verification_review_at: userData.last_verification_review_at || null
+      };
+
+      setUser(updatedUser);
+      localStorage.setItem('user', JSON.stringify(updatedUser));
+
+      if (documents && Array.isArray(documents)) {
+        setUserDocuments(documents);
+        localStorage.setItem(`user_documents_${user.id}`, JSON.stringify(documents));
+      }
+
+      const hasSubmitted =
+        userData.verification_status === 'pending' ||
+        userData.verification_status === 'submitted' ||
+        userData.verification_status === 'reviewing' ||
+        userData.has_submitted_documents === true;
+
+      const isPending =
+        userData.verification_step_status === 'pending' ||
+        userData.verification_step_status === 'submitted' ||
+        userData.verification_step_status === 'reviewing' ||
+        userData.verification_step_status === 'needs_resubmission';
+
+      setHasSubmittedDocuments(hasSubmitted);
+      setIsVerificationInProgress(isPending);
+
+      // Update step 2 completion based on actual verification status
+      const isStep2Completed = userData.verification_step_status === 'verified';
+      if (isStep2Completed !== completedSteps[2]) {
+        setCompletedSteps(prev => {
+          const updated = { ...prev, 2: isStep2Completed };
+          localStorage.setItem('completed_steps', JSON.stringify(updated));
+          return updated;
+        });
+      }
+
+      const statusData = {
+        status: userData.verification_step_status || 'not_started',
+        feedback: userData.verification_feedback || null,
+        needsResubmission: userData.documents_need_resubmission || false,
+        lastReviewed: userData.last_verification_review_at || null,
+        stepInfo: verificationStep,
+        hasSubmitted: hasSubmitted,
+        isInProgress: isPending,
+        lastChecked: now
+      };
+
+      setVerificationStatus(statusData);
+      setLastVerificationCheck(now);
+
+      localStorage.setItem(`verification_status_${user.id}`, JSON.stringify(statusData));
+
+      const previousStatus = verificationStatus?.status;
+      if (previousStatus && previousStatus !== userData.verification_step_status) {
+        handleVerificationStatusChange(previousStatus, userData.verification_step_status, userData.verification_feedback);
+      }
+
+      return statusData;
     } catch (error) {
       console.error('Error checking verification status:', error);
-      if (forceCheck) {
-        const storedDocs = localStorage.getItem(`user_documents_${user.id}`);
-        if (storedDocs) {
-          const docs = JSON.parse(storedDocs);
-          setUserDocuments(docs);
 
-          const hasSubmitted = docs.length > 0;
-          const isPending = docs.some(doc =>
-            doc.status === 'pending' ||
-            doc.status === 'submitted' ||
-            doc.status === 'reviewing'
-          );
-
-          setHasSubmittedDocuments(hasSubmitted);
-          setIsVerificationInProgress(isPending);
-
-          return {
-            status: isPending ? 'pending' : 'unknown',
-            feedback: null,
-            needsResubmission: false,
-            lastReviewed: null
-          };
-        }
+      // Return existing status if available
+      if (verificationStatus) {
+        return verificationStatus;
       }
-    }
-    return null;
-  }, [user, verificationStatus, lastVerificationCheck]);
 
+      // Return default status if no existing status
+      return {
+        status: 'not_started',
+        feedback: null,
+        needsResubmission: false,
+        lastReviewed: null,
+        hasSubmitted: false,
+        isInProgress: false,
+        lastChecked: Date.now()
+      };
+    }
+  }, [user, verificationStatus, lastVerificationCheck, completedSteps]);
+
+  const validateAndUpdateSteps = useCallback(async () => {
+    if (!user) return;
+
+    console.log('🔍 Validating and updating steps...');
+
+    // Step 1: Check if profile is complete
+    const isProfileComplete = user.first_name &&
+      user.last_name &&
+      user.phone_number;
+
+    if (isProfileComplete !== completedSteps[1]) {
+      console.log(`🔄 Step 1: ${isProfileComplete ? 'Complete' : 'Incomplete'}`);
+      setCompletedSteps(prev => {
+        const updated = { ...prev, 1: isProfileComplete };
+        localStorage.setItem('completed_steps', JSON.stringify(updated));
+        return updated;
+      });
+    }
+
+    // Step 2: Check verification status
+    const isVerified = verificationStatus?.status === 'verified';
+    if (isVerified !== completedSteps[2]) {
+      console.log(`🔄 Step 2: ${isVerified ? 'Complete' : 'Incomplete'}`);
+      setCompletedSteps(prev => {
+        const updated = { ...prev, 2: isVerified };
+        localStorage.setItem('completed_steps', JSON.stringify(updated));
+        return updated;
+      });
+    }
+
+    // Step 3: Check if user has saved properties
+    const hasSavedProperties = savedProperties.length > 0;
+    if (hasSavedProperties !== completedSteps[3]) {
+      console.log(`🔄 Step 3: ${hasSavedProperties ? 'Complete' : 'Incomplete'}`);
+      setCompletedSteps(prev => {
+        const updated = { ...prev, 3: hasSavedProperties };
+        localStorage.setItem('completed_steps', JSON.stringify(updated));
+        return updated;
+      });
+    }
+
+    // Step 4: Check if user has scheduled a viewing
+    // For new users, this should ALWAYS be false initially
+    // Only set to true when user actually schedules a viewing
+    if (completedSteps[4] && !hasSavedProperties) {
+      console.log('🔄 Resetting step 4 (no saved properties to schedule viewings for)');
+      setCompletedSteps(prev => {
+        const updated = { ...prev, 4: false };
+        localStorage.setItem('completed_steps', JSON.stringify(updated));
+        return updated;
+      });
+    }
+
+    console.log('✅ Step validation complete:', completedSteps);
+  }, [user, verificationStatus, savedProperties, completedSteps]);
   const handleVerificationStatusChange = (oldStatus, newStatus, feedback) => {
     switch (newStatus) {
       case 'verified':
@@ -348,7 +419,7 @@ const BuyerRenter = () => {
         break;
 
       case 'reviewing':
-        toast.info('🔍 Your documents are now being reviewed by our team', {
+        toast('🔍 Your documents are now being reviewed by our team', {
           duration: 4000,
           icon: '👀'
         });
@@ -360,6 +431,11 @@ const BuyerRenter = () => {
 
   const getStepConfig = useCallback(() => {
     const getStep4Description = () => {
+      // Force step 4 description to show "Save properties" if no properties are saved
+      if (savedProperties.length === 0) {
+        return "Save properties to schedule viewings";
+      }
+
       return completedSteps[4]
         ? "Viewing scheduled"
         : (savedProperties.length > 0
@@ -374,18 +450,17 @@ const BuyerRenter = () => {
         if (property.broker) {
           setSelectedBroker(property.broker);
         }
+        // OPEN THE MODAL - DO NOT MARK AS COMPLETE YET
         setShowScheduleViewingModal(true);
 
-        setCompletedSteps(prev => {
-          const updated = { ...prev, 4: true };
-          localStorage.setItem('completed_steps', JSON.stringify(updated));
-          return updated;
-        });
+        // DO NOT mark as complete here - that should happen AFTER actual scheduling
+        // The step should only be marked complete when viewing is actually scheduled
+        // The completion should happen in handleScheduleViewing function
       } else if (properties.length > 0) {
-        toast.info("Save a property first to schedule viewing. Click the heart icon on any property to save it.");
+        toast("Save a property first to schedule viewing. Click the heart icon on any property to save it.");
         setActiveStep(3);
       } else {
-        toast.info("No properties available. Please check back later.");
+        toast("No properties available. Please check back later.");
       }
     };
 
@@ -396,13 +471,10 @@ const BuyerRenter = () => {
         if (property.broker) {
           setSelectedBroker(property.broker);
         }
+        // OPEN THE MODAL - DO NOT MARK AS COMPLETE YET
         setShowScheduleViewingModal(true);
 
-        setCompletedSteps(prev => {
-          const updated = { ...prev, 4: true };
-          localStorage.setItem('completed_steps', JSON.stringify(updated));
-          return updated;
-        });
+        // DO NOT mark as complete here - that should happen AFTER actual scheduling
       } else if (properties.length > 0) {
         const property = properties[0];
         setSelectedProperty(property);
@@ -411,7 +483,7 @@ const BuyerRenter = () => {
         }
         setShowScheduleViewingModal(true);
       } else {
-        toast.info("Save a property first to schedule viewing");
+        toast("Save a property first to schedule viewing");
       }
     };
 
@@ -419,7 +491,7 @@ const BuyerRenter = () => {
       {
         number: 1,
         title: "Create Profile",
-        description: "Profile setup completed",
+        description: completedSteps[1] ? "Profile setup completed" : "Complete your personal profile",
         icon: Users,
         action: () => setShowProfileSetup(true),
         completed: completedSteps[1],
@@ -440,7 +512,7 @@ const BuyerRenter = () => {
         number: 3,
         title: userType === 'buyer' ? "Explore Properties" : "Find Homes",
         description: completedSteps[3]
-          ? (userType === 'buyer' ? "Properties explored" : "Homes explored")
+          ? `Saved ${savedProperties.length} ${savedProperties.length === 1 ? 'property' : 'properties'}`
           : (userType === 'buyer' ? "Browse dream properties" : "Search perfect rentals"),
         icon: userType === 'buyer' ? Search : Home,
         action: () => {
@@ -450,19 +522,7 @@ const BuyerRenter = () => {
             return;
           }
 
-          setCompletedSteps(prev => {
-            const updated = { ...prev, 3: true };
-            localStorage.setItem('completed_steps', JSON.stringify(updated));
-            return updated;
-          });
-
-          if (userType === 'buyer') {
-            navigate("/properties?type=sale");
-            toast.success("Step 3 completed! Exploring properties for sale...");
-          } else {
-            navigate("/properties?type=rental");
-            toast.success("Step 3 completed! Exploring rental properties...");
-          }
+          navigate("/properties");
         },
         completed: completedSteps[3],
         color: completedSteps[3] ? "from-green-500 to-green-600" : "from-amber-800 to-amber-500",
@@ -473,10 +533,11 @@ const BuyerRenter = () => {
     const buyerSpecificSteps = [
       {
         number: 4,
-        title: "Schedule Viewing",
+        title: completedSteps[4] ? "Viewing Scheduled" : "Schedule Viewing",
         description: getStep4Description(),
         icon: Calendar,
         action: handleBuyerStep4Action,
+        // Step 4 is only complete when viewing is actually scheduled
         completed: completedSteps[4],
         color: completedSteps[4] ? "from-green-500 to-green-600" : "from-amber-800 to-amber-500",
         iconColor: completedSteps[4] ? "text-green-500" : (savedProperties.length > 0 ? "text-amber-500" : "text-amber-500")
@@ -493,7 +554,7 @@ const BuyerRenter = () => {
             setSelectedProperty(savedProperties[0]);
             setShowApplicationModal(true);
           } else if (completedSteps[5]) {
-            toast.info("Your application has already been submitted and is under review.");
+            toast("Your application has already been submitted and is under review.");
           }
         },
         completed: completedSteps[5] || hasAppliedForProperty,
@@ -518,11 +579,10 @@ const BuyerRenter = () => {
       {
         number: 4,
         title: completedSteps[4] ? "Viewing Scheduled" : "Schedule Viewing",
-        description: completedSteps[4] ? "Viewing scheduled" : (hasSelectedBroker
-          ? "Book rental viewing with broker"
-          : "Schedule rental viewing"),
+        description: getStep4Description(),
         icon: Calendar,
         action: handleRenterStep4Action,
+        // Step 4 is only complete when viewing is actually scheduled
         completed: completedSteps[4],
         color: completedSteps[4] ? "from-green-500 to-green-600" : "from-amber-800 to-amber-500",
         iconColor: completedSteps[4] ? "text-green-500" : "text-amber-500"
@@ -539,7 +599,7 @@ const BuyerRenter = () => {
             setSelectedProperty(savedProperties[0]);
             setShowApplicationModal(true);
           } else if (completedSteps[5]) {
-            toast.info("Your rental application has already been submitted and is under review.");
+            toast("Your rental application has already been submitted and is under review.");
           }
         },
         completed: completedSteps[5] || hasAppliedForProperty,
@@ -600,7 +660,7 @@ const BuyerRenter = () => {
       setActiveStep(2);
       setShowDocumentUpload(true);
 
-      toast.info(`Please resubmit your ${docType}`, {
+      toast(`Please resubmit your ${docType}`, {
         duration: 5000,
         icon: '📄'
       });
@@ -687,10 +747,16 @@ const BuyerRenter = () => {
     const property_type = property.property_type || 'house';
     const city = property.city || 'Addis Ababa';
 
+    const brokerId = property.broker_id ||
+      property.assigned_broker_id ||
+      property.broker?.id ||
+      property.broker?._id;
+
     let brokerData = null;
+
     if (property.broker && typeof property.broker === 'object') {
       brokerData = {
-        id: property.broker.id || property.broker._id || property.broker_id || property.assigned_broker_id,
+        id: brokerId || `broker-${index}`,
         name: property.broker.name ||
           `${property.broker.first_name || ''} ${property.broker.last_name || ''}`.trim() ||
           property.broker.username ||
@@ -705,6 +771,49 @@ const BuyerRenter = () => {
         average_rating: property.broker.rating || property.broker.average_rating || 4.8,
         is_verified: property.broker.is_verified || false,
         is_available: property.broker.is_available !== false
+      };
+    } else if (brokerId) {
+      const foundBroker = brokers.find(b =>
+        b.id === brokerId ||
+        b._id === brokerId ||
+        b.user_id === brokerId
+      );
+
+      if (foundBroker) {
+        brokerData = {
+          id: foundBroker.id || foundBroker._id,
+          name: foundBroker.name ||
+            `${foundBroker.first_name || ''} ${foundBroker.last_name || ''}`.trim() ||
+            foundBroker.username ||
+            "Property Agent",
+          email: foundBroker.email,
+          phone_number: foundBroker.phone_number,
+          profile_picture: foundBroker.profile_picture,
+          brokerage_firm: foundBroker.brokerage_firm || foundBroker.company || "Independent Broker",
+          experience_years: foundBroker.years_experience || foundBroker.experience_years || "5+",
+          commission_rate: foundBroker.commission_rate || "2.5%",
+          total_completed_deals: foundBroker.completed_deals || foundBroker.total_completed_deals || 50,
+          average_rating: foundBroker.rating || foundBroker.average_rating || 4.8,
+          is_verified: foundBroker.is_verified || false,
+          is_available: foundBroker.is_available !== false
+        };
+      }
+    }
+
+    if (!brokerData) {
+      brokerData = {
+        id: `default-broker-${index}`,
+        name: "Property Agent",
+        email: "agent@wubland.com",
+        phone_number: "(xxx) xxx-xxxx",
+        profile_picture: null,
+        brokerage_firm: "WubLand Real Estate",
+        experience_years: "5+",
+        commission_rate: "2.5%",
+        total_completed_deals: 50,
+        average_rating: 4.8,
+        is_verified: false,
+        is_available: true
       };
     }
 
@@ -731,9 +840,9 @@ const BuyerRenter = () => {
       views: property.views || 0,
       saves: property.saves || 0,
       broker: brokerData,
+      broker_id: brokerId || brokerData.id,
+      assigned_broker_id: brokerId,
       currency: property.currency || 'ETB',
-      broker_id: property.broker_id,
-      assigned_broker_id: property.assigned_broker_id,
       property_status: property.property_status,
       is_negotiable: property.is_negotiable,
       is_exclusive: property.is_exclusive,
@@ -742,7 +851,145 @@ const BuyerRenter = () => {
       lot_size: property.lot_size,
       isSaved: false
     };
+  }, [brokers]);
+
+  const fetchSavedProperties = useCallback(async () => {
+    if (!user) {
+      console.log('⚠️ No user, skipping saved properties fetch');
+      return;
+    }
+
+    try {
+      console.log('📚 Fetching saved properties for user:', user.id);
+      const response = await apiCall('GET_SAVED_PROPERTIES');
+
+      if (response && response.success && response.data) {
+        console.log(`✅ Found ${response.data.length || 0} saved properties`);
+
+        const savedProps = response.data.map(property => ({
+          ...transformProperty(property),
+          isSaved: true
+        }));
+
+        const savedIds = savedProps.map(property => property.id);
+        setSavedProperties(savedProps);
+
+        localStorage.setItem(`saved_properties_${user.id}`, JSON.stringify(savedProps));
+
+        // Update step 3 based on actual saved properties
+        const hasSavedProperties = savedProps.length > 0;
+        if (hasSavedProperties !== completedSteps[3]) {
+          console.log(`🔄 Updating step 3: ${hasSavedProperties ? 'Complete' : 'Incomplete'}`);
+          setCompletedSteps(prev => {
+            const updated = { ...prev, 3: hasSavedProperties };
+            localStorage.setItem('completed_steps', JSON.stringify(updated));
+            if (hasSavedProperties && !prev[3]) {
+              toast.success("Step 3 completed! You've saved properties.");
+            }
+            return updated;
+          });
+        }
+
+        // Update properties with saved status
+        setProperties(prev => prev.map(property => ({
+          ...property,
+          isSaved: savedIds.includes(property.id)
+        })));
+
+        setRecommendedProperties(prev => prev.map(property => ({
+          ...property,
+          isSaved: savedIds.includes(property.id)
+        })));
+
+        return savedProps;
+      } else {
+        console.log('📭 No saved properties found for user');
+        // If no saved properties, ensure step 3 is false
+        if (completedSteps[3]) {
+          setCompletedSteps(prev => {
+            const updated = { ...prev, 3: false };
+            localStorage.setItem('completed_steps', JSON.stringify(updated));
+            return updated;
+          });
+        }
+      }
+    } catch (error) {
+      console.log('❌ Could not fetch saved properties:', error.message);
+      // Don't mark step as complete if there's an error
+      if (completedSteps[3]) {
+        setCompletedSteps(prev => ({ ...prev, 3: false }));
+      }
+    }
+  }, [user, transformProperty, completedSteps]);
+
+  const fetchBrokers = useCallback(async () => {
+    try {
+      console.log('Fetching brokers...');
+      const response = await apiCall('GET_BROKERS');
+      console.log('Brokers API response:', response);
+
+      let brokersData = [];
+
+      if (response && Array.isArray(response)) {
+        brokersData = response;
+      } else if (response && response.data && Array.isArray(response.data)) {
+        brokersData = response.data;
+      } else if (response && response.success && Array.isArray(response.brokers)) {
+        brokersData = response.brokers;
+      }
+
+      console.log('Processed brokers:', brokersData);
+      setBrokers(brokersData);
+
+      localStorage.setItem('cached_brokers', JSON.stringify(brokersData));
+
+      return brokersData;
+    } catch (error) {
+      console.error('Could not fetch brokers:', error);
+      const cachedBrokers = localStorage.getItem('cached_brokers');
+      if (cachedBrokers) {
+        try {
+          const parsed = JSON.parse(cachedBrokers);
+          setBrokers(parsed);
+          return parsed;
+        } catch (e) {
+          console.error('Error parsing cached brokers:', e);
+        }
+      }
+      return [];
+    }
   }, []);
+
+  const checkSavedStatusForProperties = useCallback(async () => {
+    if (!user || !properties.length) return;
+
+    try {
+      const updatedProperties = await Promise.all(
+        properties.map(async (property) => {
+          try {
+            const response = await apiCall('CHECK_SAVED_STATUS', {
+              propertyId: property.id.toString()
+            });
+
+            if (response && response.success) {
+              return {
+                ...property,
+                isSaved: response.data?.isSaved || false
+              };
+            }
+            return property;
+          } catch (error) {
+            console.error(`Error checking saved status for property ${property.id}:`, error);
+            return property;
+          }
+        })
+      );
+
+      setProperties(updatedProperties);
+    } catch (error) {
+      console.error('Error checking saved status:', error);
+    }
+  }, [user, properties]);
 
   const loadActualProperties = useCallback(async () => {
     if (!user) return;
@@ -750,8 +997,14 @@ const BuyerRenter = () => {
     try {
       setIsLoading(true);
 
+      if (brokers.length === 0) {
+        console.log('📞 Fetching brokers before loading properties...');
+        await fetchBrokers();
+      }
+
       let propertiesResponse;
       try {
+        console.log('🏠 Fetching properties...');
         propertiesResponse = await apiCall('GET_PROPERTIES');
       } catch (error) {
         if (error.message.includes('429')) {
@@ -768,6 +1021,7 @@ const BuyerRenter = () => {
       }
 
       if (propertiesResponse) {
+        console.log('✅ Properties API response received');
         localStorage.setItem('cached_properties', JSON.stringify(propertiesResponse));
       }
 
@@ -784,8 +1038,24 @@ const BuyerRenter = () => {
           propertiesData = propertiesResponse.data;
         }
       }
+      await checkSavedStatusForProperties();
+      console.log(`📊 Processing ${propertiesData.length} properties with ${brokers.length} available brokers`);
 
-      const transformedProperties = propertiesData.map(transformProperty).filter(Boolean);
+      const transformedProperties = propertiesData.map((property, index) => {
+        try {
+          return transformProperty(property, index);
+        } catch (error) {
+          console.error(`Error transforming property ${property.id || index}:`, error);
+          return null;
+        }
+      }).filter(Boolean);
+
+      console.log('✅ Transformed properties:', transformedProperties.map(p => ({
+        id: p.id,
+        title: p.title,
+        hasBroker: !!p.broker,
+        brokerName: p.broker?.name
+      })));
 
       let filteredProperties = transformedProperties;
 
@@ -864,10 +1134,25 @@ const BuyerRenter = () => {
         otherProperties = filteredProperties.slice(3, 9);
       }
 
+      console.log('🔍 Broker information in properties:');
+      recommendedProperties.forEach((p, i) => {
+        console.log(`Recommended ${i + 1}:`, {
+          id: p.id,
+          title: p.title,
+          broker: p.broker ? {
+            id: p.broker.id,
+            name: p.broker.name,
+            firm: p.broker.brokerage_firm
+          } : 'No broker'
+        });
+      });
+
       setProperties(otherProperties);
       setRecommendedProperties(recommendedProperties);
 
       await fetchSavedProperties();
+
+      console.log('🎉 Properties loaded successfully!');
 
     } catch (error) {
       console.error('Error loading properties:', error);
@@ -877,65 +1162,7 @@ const BuyerRenter = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [user, userType, transformProperty]);
-
-  const fetchSavedProperties = useCallback(async () => {
-    if (!user) {
-      return;
-    }
-
-    try {
-      const response = await apiCall('GET_SAVED_PROPERTIES');
-
-      if (response && response.success && response.data) {
-        const savedProps = response.data.map(property => ({
-          ...transformProperty(property),
-          isSaved: true
-        }));
-
-        const savedIds = savedProps.map(property => property.id);
-        setSavedProperties(savedProps);
-
-        localStorage.setItem(`saved_properties_${user.id}`, JSON.stringify(savedProps));
-
-        if (savedProps.length > 0 && !completedSteps[3]) {
-          setCompletedSteps(prev => {
-            const updated = { ...prev, 3: true };
-            localStorage.setItem('completed_steps', JSON.stringify(updated));
-            toast.success("Step 3 completed! You have saved properties.");
-            return updated;
-          });
-        }
-
-        setProperties(prev => prev.map(property => ({
-          ...property,
-          isSaved: savedIds.includes(property.id)
-        })));
-
-        setRecommendedProperties(prev => prev.map(property => ({
-          ...property,
-          isSaved: savedIds.includes(property.id)
-        })));
-
-        return savedProps;
-      }
-    } catch (error) {
-      console.log('Could not fetch saved properties:', error);
-    }
-  }, [user, transformProperty, completedSteps]);
-
-  const fetchBrokers = useCallback(async () => {
-    try {
-      const response = await apiCall('GET_BROKERS');
-      if (response && Array.isArray(response)) {
-        setBrokers(response);
-      } else if (response && response.data && Array.isArray(response.data)) {
-        setBrokers(response.data);
-      }
-    } catch (error) {
-      console.log('Could not fetch brokers:', error);
-    }
-  }, []);
+  }, [user, userType, transformProperty, brokers.length, fetchBrokers, fetchSavedProperties]);
 
   useEffect(() => {
     const step4Handler = async () => {
@@ -964,28 +1191,81 @@ const BuyerRenter = () => {
         const token = localStorage.getItem('token');
         const userData = JSON.parse(localStorage.getItem('user') || '{}');
 
+        console.log('🚀 Initializing dashboard...', {
+          hasToken: !!token,
+          userId: userData?.id,
+          userName: userData?.first_name || userData?.username
+        });
+
         if (!token || !userData.id) {
-          navigate("/login-register", { state: { returnUrl: "/buyer-renter" } });
+          console.log('❌ No token or user data, redirecting to login');
+          navigate("/login-register", {
+            state: {
+              returnUrl: "/buyer-renter",
+              message: "Please login to access your dashboard"
+            }
+          });
           return;
         }
 
         setUser(userData);
-        setIsVerified(userData.is_verified || false);
 
+        // Set user type based on role
         if (userData.role === 'buyer' || userData.role === 'renter') {
           setUserType(userData.role);
+          console.log(`👤 User type set to: ${userData.role}`);
         }
 
+        // Initialize steps object
+        let initialSteps = {
+          1: false,
+          2: false,
+          3: false,
+          4: false,
+          5: false,
+          6: false
+        };
+
+        // Load saved steps from localStorage
         const savedCompletedSteps = localStorage.getItem('completed_steps');
         if (savedCompletedSteps) {
           try {
             const parsedSteps = JSON.parse(savedCompletedSteps);
-            setCompletedSteps(parsedSteps);
+
+            // Force reset steps for new users or if steps are corrupted
+            const isNewUser = !parsedSteps || Object.keys(parsedSteps).length === 0;
+
+            if (isNewUser) {
+              console.log('👤 New user detected - initializing fresh steps');
+              localStorage.removeItem('completed_steps');
+              setCompletedSteps(initialSteps);
+            } else {
+              // Validate each step
+              const validatedSteps = { ...initialSteps, ...parsedSteps };
+
+              // Force step 4 to false if no saved properties exist
+              const cachedSavedProps = localStorage.getItem(`saved_properties_${userData.id}`);
+              if (!cachedSavedProps || JSON.parse(cachedSavedProps).length === 0) {
+                console.log('🔄 No saved properties - resetting step 4 to false');
+                validatedSteps[4] = false;
+              }
+
+              setCompletedSteps(validatedSteps);
+              console.log('📋 Loaded and validated saved steps:', validatedSteps);
+            }
           } catch (error) {
-            console.error('Error loading completed steps:', error);
+            console.error('❌ Error loading completed steps:', error);
+            console.log('🔄 Starting with fresh steps due to error');
+            localStorage.removeItem('completed_steps');
+            setCompletedSteps(initialSteps);
           }
+        } else {
+          // First time user - all steps are incomplete
+          console.log('📋 No saved steps found - starting fresh');
+          setCompletedSteps(initialSteps);
         }
 
+        // Load cached data
         const cachedDocs = localStorage.getItem(`user_documents_${userData.id}`);
         const cachedProperties = localStorage.getItem('cached_properties');
         const cachedBrokers = localStorage.getItem('cached_brokers');
@@ -993,36 +1273,64 @@ const BuyerRenter = () => {
         const cachedSavedProperties = localStorage.getItem(`saved_properties_${userData.id}`);
 
         if (cachedDocs) {
-          setUserDocuments(JSON.parse(cachedDocs));
+          try {
+            const docs = JSON.parse(cachedDocs);
+            if (Array.isArray(docs)) {
+              setUserDocuments(docs);
+              console.log('📄 Loaded cached documents:', docs.length);
+            }
+          } catch (e) {
+            console.error('❌ Error parsing cached documents:', e);
+          }
         }
 
         if (cachedVerification) {
-          const verificationData = JSON.parse(cachedVerification);
-          setVerificationStatus(verificationData);
-          setHasSubmittedDocuments(verificationData.hasSubmitted || false);
-          setIsVerificationInProgress(verificationData.isInProgress || false);
-          setLastVerificationCheck(verificationData.lastChecked || null);
+          try {
+            const verificationData = JSON.parse(cachedVerification);
+            if (verificationData && typeof verificationData === 'object') {
+              setVerificationStatus(verificationData);
+              setHasSubmittedDocuments(verificationData.hasSubmitted || false);
+              setIsVerificationInProgress(verificationData.isInProgress || false);
+              setLastVerificationCheck(verificationData.lastChecked || null);
 
-          if (verificationData.status === 'verified') {
-            setCompletedSteps(prev => {
-              const updated = { ...prev, 2: true };
-              localStorage.setItem('completed_steps', JSON.stringify(updated));
-              return updated;
-            });
+              console.log('✅ Loaded cached verification status:', verificationData.status);
+
+              // Update step 2 based on cached verification
+              if (verificationData.status === 'verified' && !completedSteps[2]) {
+                setCompletedSteps(prev => {
+                  const updated = { ...prev, 2: true };
+                  localStorage.setItem('completed_steps', JSON.stringify(updated));
+                  console.log('✅ Step 2 marked as complete (cached verification)');
+                  return updated;
+                });
+              }
+            }
+          } catch (e) {
+            console.error('❌ Error parsing cached verification:', e);
           }
         }
 
         if (cachedProperties) {
-          const propertiesData = JSON.parse(cachedProperties);
-          if (Array.isArray(propertiesData)) {
-            setProperties(propertiesData);
+          try {
+            const propertiesData = JSON.parse(cachedProperties);
+            if (Array.isArray(propertiesData)) {
+              setProperties(propertiesData);
+              console.log('🏠 Loaded cached properties:', propertiesData.length);
+            }
+          } catch (e) {
+            console.error('❌ Error parsing cached properties:', e);
           }
         }
 
         if (cachedBrokers) {
-          const brokersData = JSON.parse(cachedBrokers);
-          if (Array.isArray(brokersData)) {
-            setBrokers(brokersData);
+          try {
+            const brokersData = JSON.parse(cachedBrokers);
+            if (Array.isArray(brokersData)) {
+              setBrokers(brokersData);
+              console.log('🤝 Loaded cached brokers:', brokersData.length);
+            }
+          } catch (e) {
+            console.error('❌ Error parsing cached brokers:', e);
           }
         }
 
@@ -1030,53 +1338,106 @@ const BuyerRenter = () => {
           try {
             const savedProps = JSON.parse(cachedSavedProperties);
             if (Array.isArray(savedProps) && savedProps.length > 0) {
+              setSavedProperties(savedProps);
+              console.log('💾 Loaded cached saved properties:', savedProps.length);
+
+              // Update step 3 based on saved properties
               if (!completedSteps[3]) {
                 setCompletedSteps(prev => {
                   const updated = { ...prev, 3: true };
                   localStorage.setItem('completed_steps', JSON.stringify(updated));
+                  console.log('✅ Step 3 marked as complete (cached saved properties)');
                   return updated;
                 });
               }
+            } else {
+              console.log('📭 No cached saved properties found');
             }
           } catch (error) {
-            console.error('Error parsing saved properties cache:', error);
+            console.error('❌ Error parsing saved properties cache:', error);
           }
         }
 
-        setCompletedSteps(prev => {
-          if (!prev[1]) {
-            const updated = { ...prev, 1: true };
-            localStorage.setItem('completed_steps', JSON.stringify(updated));
-            return updated;
-          }
-          return prev;
+        // Check profile completion for step 1
+        const isProfileComplete = userData.first_name &&
+          userData.last_name &&
+          userData.phone_number;
+
+        console.log('👤 Profile completion check:', {
+          first_name: !!userData.first_name,
+          last_name: !!userData.last_name,
+          phone_number: !!userData.phone_number,
+          isComplete: isProfileComplete
         });
 
-        const fetchResults = await Promise.allSettled([
-          fetchBrokers(),
-          loadActualProperties(),
-          checkVerificationStatus()
-        ]);
-
-        const savedPropsResponse = fetchResults[1];
-        if (savedPropsResponse.status === 'fulfilled') {
-          setTimeout(() => {
-            if (savedProperties.length > 0 && !completedSteps[3]) {
-              setCompletedSteps(prev => {
-                const updated = { ...prev, 3: true };
-                localStorage.setItem('completed_steps', JSON.stringify(updated));
-                return updated;
-              });
-            }
-          }, 500);
+        if (isProfileComplete && !completedSteps[1]) {
+          setCompletedSteps(prev => {
+            const updated = { ...prev, 1: true };
+            localStorage.setItem('completed_steps', JSON.stringify(updated));
+            console.log('✅ Step 1 marked as complete (profile complete)');
+            return updated;
+          });
         }
 
+        // Fetch fresh data but don't fail if some endpoints fail
+        console.log('🔄 Fetching fresh data...');
+        const results = await Promise.allSettled([
+          fetchBrokers().catch(err => console.error('❌ Error fetching brokers:', err)),
+          loadActualProperties().catch(err => console.error('❌ Error loading properties:', err)),
+          checkVerificationStatus(true).catch(err => console.error('❌ Error checking verification:', err))
+        ]);
+
+        // After loading all data, do a final validation of steps
+        console.log('🔍 Final step validation...');
+
+        // Step 1: Profile completion
+        if (isProfileComplete && !completedSteps[1]) {
+          setCompletedSteps(prev => ({ ...prev, 1: true }));
+        }
+
+        // Step 2: Verification status
+        const isVerified = verificationStatus?.status === 'verified';
+        if (isVerified !== completedSteps[2]) {
+          setCompletedSteps(prev => ({ ...prev, 2: isVerified }));
+        }
+
+        // Step 3: Saved properties
+        const hasSavedProperties = savedProperties.length > 0;
+        if (hasSavedProperties !== completedSteps[3]) {
+          setCompletedSteps(prev => ({ ...prev, 3: hasSavedProperties }));
+        }
+
+        // Step 4: Force false for new users without saved properties
+        if (savedProperties.length === 0 && completedSteps[4]) {
+          console.log('🔄 Resetting step 4 - no saved properties');
+          setCompletedSteps(prev => ({ ...prev, 4: false }));
+        }
+
+        // Save validated steps
+        localStorage.setItem('completed_steps', JSON.stringify(completedSteps));
+
+        console.log('✅ Dashboard initialization complete');
+        console.log('📊 Final step status:', completedSteps);
+
       } catch (error) {
-        console.error("Initialization error:", error);
-        toast.error("Failed to load dashboard");
+        console.error("❌ Initialization error:", error);
+
+        // Handle specific errors
+        if (error.message?.includes('Authentication') || error.message?.includes('401')) {
+          console.log('🔒 Authentication error, redirecting to login');
+          localStorage.removeItem('token');
+          localStorage.removeItem('user');
+          toast.error('Please log in to access your dashboard');
+          navigate('/login-register');
+        } else if (error.message?.includes('Network')) {
+          toast.error("Network error. Please check your connection and try again.");
+        } else {
+          toast.error("Failed to load dashboard. Please try refreshing the page.");
+        }
       } finally {
         setIsLoading(false);
         isInitializedRef.current = true;
+        console.log('🏁 Dashboard initialization finished');
       }
     };
 
@@ -1085,7 +1446,7 @@ const BuyerRenter = () => {
     }, 100);
 
     return () => clearTimeout(timer);
-  }, [checkVerificationStatus, loadActualProperties, fetchBrokers, navigate, savedProperties.length, completedSteps]);
+  }, [checkVerificationStatus, loadActualProperties, fetchBrokers, navigate]);
 
   // ========== HANDLER FUNCTIONS ==========
 
@@ -1128,12 +1489,22 @@ const BuyerRenter = () => {
   const handleProfileComplete = async (updatedData) => {
     try {
       setIsLoading(true);
-      await handleEditProfile(updatedData);
-      toast.success("Profile setup completed!");
-      setShowProfileSetup(false);
-      setActiveStep(2);
+      const success = await handleEditProfile(updatedData);
 
-      await loadActualProperties();
+      if (success) {
+        // Mark step 1 as completed
+        setCompletedSteps(prev => {
+          const updated = { ...prev, 1: true };
+          localStorage.setItem('completed_steps', JSON.stringify(updated));
+          return updated;
+        });
+
+        toast.success("Profile setup completed!");
+        setShowProfileSetup(false);
+        setActiveStep(2); // Move to verification step
+
+        await loadActualProperties();
+      }
     } catch (error) {
       toast.error("Failed to complete profile setup");
     } finally {
@@ -1215,6 +1586,13 @@ const BuyerRenter = () => {
   };
 
   const handleSaveProperty = async (propertyId, isCurrentlySaved) => {
+    console.log('💾 handleSaveProperty called:', {
+      propertyId,
+      isCurrentlySaved,
+      userId: user?.id,
+      currentSavedCount: savedProperties.length
+    });
+
     if (!user) {
       const shouldLogin = window.confirm("Please login to save properties. Would you like to login now?");
       if (shouldLogin) {
@@ -1222,55 +1600,90 @@ const BuyerRenter = () => {
           state: { returnUrl: "/buyer-renter", message: "Please login to save properties" }
         });
       }
-      return;
+      return isCurrentlySaved;
     }
 
     setSavingProperty(propertyId);
     try {
-      const response = await apiCall('SAVE_PROPERTY', { propertyId }, {
-        method: 'POST',
-        data: {
-          save: !isCurrentlySaved
-        }
-      });
+      let endpointKey;
 
-      if (response) {
-        if (response.success === true) {
-          if (isCurrentlySaved) {
-            setSavedProperties(prev => prev.filter(p => p.id !== propertyId));
-            toast.success("Property removed from saved list");
-          } else {
-            const property = properties.find(p => p.id === propertyId);
-            if (property) {
-              setSavedProperties(prev => [...prev, property]);
-              toast.success("Property saved!");
+      if (isCurrentlySaved) {
+        endpointKey = 'UNSAVE_PROPERTY';
+        console.log(`🗑️  Unsaving property ${propertyId}...`);
+      } else {
+        endpointKey = 'SAVE_PROPERTY';
+        console.log(`💾 Saving property ${propertyId}...`);
+      }
 
-              if (savedProperties.length === 0 && !completedSteps[3]) {
-                setCompletedSteps(prev => {
-                  const updated = { ...prev, 3: true };
-                  localStorage.setItem('completed_steps', JSON.stringify(updated));
-                  toast.success("Step 3 completed! You've saved your first property.");
-                  return updated;
-                });
-              }
+      const response = await apiCall(endpointKey, { propertyId: propertyId.toString() });
+
+      if (response && response.success) {
+        const isNowSaved = !isCurrentlySaved;
+        let newSavedProperties = [];
+
+        if (isNowSaved) {
+          // Add to saved properties
+          const property = properties.find(p => p.id === propertyId) ||
+            recommendedProperties.find(p => p.id === propertyId) ||
+            savedProperties.find(p => p.id === propertyId);
+
+          if (property) {
+            newSavedProperties = [...savedProperties, { ...property, isSaved: true }];
+            setSavedProperties(newSavedProperties);
+            toast.success("Property saved!");
+
+            // Check if this completes step 3 (first property saved)
+            if (savedProperties.length === 0 && !completedSteps[3]) {
+              console.log('🎉 First property saved! Completing step 3');
+              setCompletedSteps(prev => {
+                const updated = { ...prev, 3: true };
+                localStorage.setItem('completed_steps', JSON.stringify(updated));
+                toast.success("Step 3 completed! You've saved your first property.");
+                return updated;
+              });
             }
           }
+        } else {
+          // Remove from saved properties
+          newSavedProperties = savedProperties.filter(p => p.id !== propertyId);
+          setSavedProperties(newSavedProperties);
+          toast.success("Property removed from saved list");
 
-          setProperties(prev => prev.map(p => {
+          // If no more saved properties, reset step 3
+          if (newSavedProperties.length === 0 && completedSteps[3]) {
+            console.log('🔄 No saved properties left, resetting step 3');
+            setCompletedSteps(prev => {
+              const updated = { ...prev, 3: false };
+              localStorage.setItem('completed_steps', JSON.stringify(updated));
+              return updated;
+            });
+          }
+        }
+
+        // Update all property lists
+        const updatePropertyList = (list) =>
+          list.map(p => {
             if (p.id === propertyId) {
               return {
                 ...p,
-                saves: response.data?.savesCount || p.saves + (isCurrentlySaved ? -1 : 1),
-                isSaved: !isCurrentlySaved
+                isSaved: isNowSaved
               };
             }
             return p;
-          }));
-        }
+          });
+
+        setProperties(prev => updatePropertyList(prev));
+        setRecommendedProperties(prev => updatePropertyList(prev));
+
+        // Update localStorage
+        localStorage.setItem(`saved_properties_${user.id}`, JSON.stringify(newSavedProperties));
+
+        return isNowSaved;
       }
     } catch (error) {
       console.error('Error saving property:', error);
       toast.error(error.message || "Failed to save property");
+      return isCurrentlySaved;
     } finally {
       setSavingProperty(null);
     }
@@ -1340,16 +1753,34 @@ const BuyerRenter = () => {
     try {
       setIsLoading(true);
 
-      setCompletedSteps(prev => {
-        const updated = { ...prev, 6: true };
-        localStorage.setItem('completed_steps', JSON.stringify(updated));
-        return updated;
+      const invoiceId = 1; // This should come from your application/offer flow
+
+      const response = await directApi.initializePayment(invoiceId, {
+        amount: paymentData.amount,
+        description: paymentData.description,
+        userType: userType,
+        property_id: selectedProperty?.id,
+        property_title: selectedProperty?.title
       });
 
-      toast.success("Payment processed successfully!");
-      setShowPaymentModal(false);
+      if (response.success && response.data.checkoutUrl) {
+        window.location.href = response.data.checkoutUrl;
+
+        setCompletedSteps(prev => {
+          const updated = { ...prev, 6: true };
+          localStorage.setItem('completed_steps', JSON.stringify(updated));
+          return updated;
+        });
+
+        toast.success("Redirecting to secure payment gateway...");
+        setShowPaymentModal(false);
+      } else {
+        toast.error(response.message || "Failed to initialize payment");
+      }
+
     } catch (error) {
-      toast.error("Payment failed");
+      console.error("Payment error:", error);
+      toast.error(error.message || "Payment failed. Please try again.");
     } finally {
       setIsLoading(false);
     }
@@ -1359,19 +1790,34 @@ const BuyerRenter = () => {
     try {
       setIsLoading(true);
 
-      setCompletedSteps(prev => {
-        const updated = { ...prev, 4: true };
-        localStorage.setItem('completed_steps', JSON.stringify(updated));
-        return updated;
+      // Make the API call to schedule viewing
+      const response = await apiCall('CREATE_APPOINTMENT', {}, {
+        data: viewingData
       });
 
-      toast.success("Viewing scheduled successfully! The broker will contact you shortly.");
-      setShowScheduleViewingModal(false);
+      if (response.success) {
+        // MARK STEP 4 AS COMPLETE HERE - AFTER SUCCESSFUL SCHEDULING
+        setCompletedSteps(prev => {
+          const updated = { ...prev, 4: true };
+          localStorage.setItem('completed_steps', JSON.stringify(updated));
+          return updated;
+        });
+
+        toast.success("Viewing scheduled successfully! The broker will contact you shortly.");
+        setShowScheduleViewingModal(false);
+      } else {
+        toast.error(response.message || "Failed to schedule viewing");
+      }
     } catch (error) {
+      console.error("Error scheduling viewing:", error);
       toast.error("Failed to schedule viewing");
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleScheduleSubmit = async (viewingData) => {
+    await handleScheduleViewing(viewingData);
   };
 
   const handleManualVerificationCheck = async () => {
@@ -1519,6 +1965,8 @@ const BuyerRenter = () => {
     return baseCards[userType];
   };
 
+
+
   const getJourneySteps = () => {
     const baseJourneys = {
       buyer: [
@@ -1642,28 +2090,173 @@ const BuyerRenter = () => {
   const VerificationStatus = () => {
     const isUploadDisabled = hasSubmittedDocuments && isVerificationInProgress && verificationStatus?.status !== 'needs_resubmission';
 
+    // Helper functions moved inside the component
+    const getVerificationGradient = () => {
+      if (verificationStatus?.status === 'needs_resubmission') {
+        return 'bg-gradient-to-r from-amber-500 to-amber-800';
+      } else if (isUploadDisabled) {
+        return 'bg-gradient-to-r from-gray-500 to-gray-700';
+      } else {
+        return 'bg-gradient-to-r from-amber-500 to-amber-800';
+      }
+    };
+
+    const getVerificationIcon = () => {
+      if (verificationStatus?.status === 'needs_resubmission') {
+        return <AlertCircle className={`w-16 h-16 ${theme === "dark" ? "text-amber-200" : "text-amber-500"}`} />;
+      } else if (isUploadDisabled) {
+        return <Lock className={`w-16 h-16 ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`} />;
+      } else {
+        return <ShieldCheck className={`w-16 h-16 ${theme === "dark" ? "text-amber-200" : "text-amber-500"}`} />;
+      }
+    };
+
+    const getVerificationTitle = () => {
+      if (verificationStatus?.status === 'needs_resubmission') {
+        return 'Resubmission Required';
+      } else if (isUploadDisabled) {
+        return 'Verification In Progress';
+      } else {
+        return hasSubmittedDocuments ? 'Complete Your Verification' : 'Verify Your Identity';
+      }
+    };
+
+    const getVerificationDescription = () => {
+      if (verificationStatus?.status === 'needs_resubmission') {
+        return 'Your documents need corrections. Please review the feedback and upload the corrected versions.';
+      } else if (isUploadDisabled) {
+        return 'Your documents are currently being reviewed. Please wait for the verification process to complete before uploading new documents.';
+      } else {
+        return hasSubmittedDocuments
+          ? 'Upload additional documents or check your verification status to complete the process.'
+          : 'Upload required documents to verify your identity and unlock full access to property listings.';
+      }
+    };
+
+    const getVerificationSteps = () => {
+      if (verificationStatus?.status === 'needs_resubmission') {
+        return [
+          {
+            icon: <FileText className="w-8 h-8 mx-auto mb-2 text-amber-500" />,
+            title: 'Review Feedback'
+          },
+          {
+            icon: <Upload className="w-8 h-8 mx-auto mb-2 text-amber-500" />,
+            title: 'Upload Corrections'
+          },
+          {
+            icon: <ShieldCheck className="w-8 h-8 mx-auto mb-2 text-amber-500" />,
+            title: 'Complete Verification'
+          }
+        ];
+      } else if (isUploadDisabled) {
+        return [
+          {
+            icon: <Clock className="w-8 h-8 mx-auto mb-2 text-gray-500" />,
+            title: 'Under Review',
+            bgColorDark: 'bg-gray-800/50 border border-gray-700',
+            bgColorLight: 'bg-gray-100 border border-gray-300'
+          },
+          {
+            icon: <FileCheck className="w-8 h-8 mx-auto mb-2 text-gray-500" />,
+            title: 'Processing',
+            bgColorDark: 'bg-gray-800/50 border border-gray-700',
+            bgColorLight: 'bg-gray-100 border border-gray-300'
+          },
+          {
+            icon: <ShieldCheck className="w-8 h-8 mx-auto mb-2 text-gray-500" />,
+            title: 'Pending Approval',
+            bgColorDark: 'bg-gray-800/50 border border-gray-700',
+            bgColorLight: 'bg-gray-100 border border-gray-300'
+          }
+        ];
+      } else {
+        return [
+          {
+            icon: <FileText className="w-8 h-8 mx-auto mb-2 text-amber-500" />,
+            title: 'Upload Documents'
+          },
+          {
+            icon: <Shield className="w-8 h-8 mx-auto mb-2 text-amber-500" />,
+            title: 'Secure Processing'
+          },
+          {
+            icon: <CheckCircle className="w-8 h-8 mx-auto mb-2 text-amber-500" />,
+            title: 'Get Verified'
+          }
+        ];
+      }
+    };
+
+    const getVerificationButtonStyles = () => {
+      if (verificationStatus?.status === 'needs_resubmission') {
+        return 'bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white hover:text-white';
+      } else if (isUploadDisabled) {
+        return 'bg-gradient-to-r from-gray-500 to-gray-600 text-white';
+      } else {
+        return 'bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white hover:text-white';
+      }
+    };
+
+    const getVerificationMainAction = () => {
+      if (verificationStatus?.status === 'needs_resubmission') {
+        return () => {
+          setShowDocumentUpload(true);
+          toast('Please upload corrected documents as requested', { icon: '📄' });
+        };
+      } else if (isUploadDisabled) {
+        return () => {
+          setShowVerificationRestriction(true);
+          toast.error("Cannot upload new documents during verification");
+        };
+      } else {
+        return () => setShowDocumentUpload(true);
+      }
+    };
+
+    const getVerificationMainButtonContent = () => {
+      if (verificationStatus?.status === 'needs_resubmission') {
+        return (
+          <>
+            <Upload className="inline w-5 h-5 mr-2" />
+            Resubmit Documents
+          </>
+        );
+      } else if (isUploadDisabled) {
+        return (
+          <>
+            <Lock className="inline w-5 h-5 mr-2" />
+            Upload Disabled
+          </>
+        );
+      } else {
+        return (
+          <>
+            <Upload className="inline w-5 h-5 mr-2" />
+            {hasSubmittedDocuments ? 'Upload Additional Documents' : 'Upload Required Documents'}
+          </>
+        );
+      }
+    };
+
     return (
       <div className="text-center py-8">
         <div className="relative mx-auto w-36 h-36 mb-8">
-          <div className="absolute inset-0 bg-gradient-to-r from-amber-500 to-amber-800 rounded-full animate-pulse"></div>
+          <div className={`absolute inset-0 ${getVerificationGradient()} rounded-full ${verificationStatus?.status === 'needs_resubmission' ? 'animate-pulse' : ''}`}></div>
           <div className={`absolute inset-4 ${theme === "dark" ? "bg-gray-800" : "bg-white"} rounded-full flex items-center justify-center`}>
-            {verificationStatus?.status === 'verified' ? (
-              <CheckCircle className="w-16 h-16 text-green-500" />
-            ) : verificationStatus?.status === 'needs_resubmission' ? (
-              <AlertCircle className="w-16 h-16 text-amber-500" />
-            ) : hasSubmittedDocuments ? (
-              <Clock className="w-16 h-16 text-amber-500 animate-pulse" />
-            ) : (
-              <ShieldCheck className="w-16 h-16 text-amber-500" />
-            )}
+            {getVerificationIcon()}
           </div>
         </div>
 
         <h4 className={`text-2xl font-bold mb-6 ${theme === "dark" ? "text-white" : "text-gray-800"}`}>
-          {getVerificationStepTitle()}
+          {getVerificationTitle()}
         </h4>
 
         <div className="max-w-2xl mx-auto mb-10">
+          <p className={`text-lg mb-6 ${theme === "dark" ? "text-gray-300" : "text-gray-600"}`}>
+            {getVerificationDescription()}
+          </p>
+
           <div className={`p-6 rounded-xl mb-6 ${theme === "dark"
             ? "bg-gradient-to-r from-amber-900/30 to-orange-900/30 border border-amber-700/30"
             : "bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200"}`}>
@@ -1698,8 +2291,23 @@ const BuyerRenter = () => {
             </div>
           </div>
 
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+            {getVerificationSteps().map((step, index) => (
+              <div
+                key={index}
+                className={`p-4 rounded-xl text-center ${theme === "dark"
+                  ? step.bgColorDark || "bg-gray-800/50 border border-gray-700"
+                  : step.bgColorLight || "bg-amber-50 border border-amber-200"
+                  }`}
+              >
+                {step.icon}
+                <p className="font-medium">{step.title}</p>
+              </div>
+            ))}
+          </div>
+
           {isVerificationInProgress && (
-            <div className={`p-6 rounded-xl ${theme === "dark"
+            <div className={`p-6 rounded-xl mb-6 ${theme === "dark"
               ? "bg-gradient-to-r from-blue-900/20 to-cyan-900/20 border border-blue-800/30"
               : "bg-gradient-to-r from-blue-50 to-cyan-50/50 border border-blue-200"}`}>
               <div className="flex items-start gap-4">
@@ -1742,7 +2350,7 @@ const BuyerRenter = () => {
           )}
 
           {isUploadDisabled && (
-            <div className={`mt-6 p-4 rounded-lg ${theme === "dark"
+            <div className={`p-4 rounded-lg ${theme === "dark"
               ? "bg-gradient-to-r from-amber-900/20 to-orange-900/20 border border-amber-800/30"
               : "bg-gradient-to-r from-amber-50 to-orange-50/50 border border-amber-200"}`}>
               <div className="flex items-center gap-3">
@@ -1756,43 +2364,18 @@ const BuyerRenter = () => {
         </div>
 
         <div className="space-y-4">
-          {verificationStatus?.status === 'needs_resubmission' ? (
-            <button
-              onClick={() => {
-                setShowDocumentUpload(true);
-                toast.info('Please upload corrected documents as requested', { icon: '📄' });
-              }}
-              className="px-10 py-4 font-bold text-lg bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white shadow-xl hover:shadow-2xl transition-all duration-300 hover:scale-105 rounded-xl"
-            >
-              <Upload className="inline w-5 h-5 mr-2" />
-              Resubmit Documents
-            </button>
-          ) : isUploadDisabled ? (
-            <button
-              onClick={() => {
-                setShowVerificationRestriction(true);
-                toast.error("Cannot upload new documents during verification");
-              }}
-              className="px-10 py-4 font-bold text-lg bg-gradient-to-r from-gray-500 to-gray-600 text-white mr-4 cursor-not-allowed opacity-70"
-              disabled
-            >
-              <Lock className="inline w-5 h-5 mr-2" />
-              Upload Disabled
-            </button>
-          ) : (
-            <button
-              onClick={() => setShowDocumentUpload(true)}
-              className="px-10 py-4 font-semibold Button2 "
-            >
-              <Upload className="inline w-5 h-5 mr-2" />
-              {hasSubmittedDocuments ? 'Upload Additional Documents' : 'Upload Required Documents'}
-            </button>
-          )}
+          <button
+            onClick={getVerificationMainAction()}
+            disabled={isUploadDisabled}
+            className={`px-10 py-4 font-semibold Button2 ${getVerificationButtonStyles()} ${isUploadDisabled ? 'cursor-not-allowed opacity-70' : ''}`}
+          >
+            {getVerificationMainButtonContent()}
+          </button>
 
           <button
             onClick={handleManualVerificationCheck}
             disabled={isLoading}
-            className="px-10 py-4 font-semibold Button2 bg-gradient-to-r from-blue-500 to-cyan-600 hover:from-blue-600 hover:to-cyan-700 text-white hover:text-white  flex items-center justify-center gap-2 mx-auto"
+            className="px-10 py-4 font-semibold Button2 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white hover:text-white flex items-center justify-center gap-2 mx-auto"
           >
             {isLoading ? (
               <>
@@ -1806,13 +2389,18 @@ const BuyerRenter = () => {
               </>
             )}
           </button>
-
-          {isVerificationInProgress && verificationStatus?.status !== 'verified' && (
-            <p className={`text-sm mt-3 ${theme === "dark" ? "text-amber-400" : "text-amber-600"}`}>
-              You must wait for verification to complete before proceeding
-            </p>
-          )}
         </div>
+
+        {isVerificationInProgress && verificationStatus?.status !== 'verified' && (
+          <div className={`text-center mt-4 p-4 rounded-lg ${theme === "dark" ? "bg-amber-900/20 border border-amber-800/30" : "bg-amber-50 border border-amber-200"}`}>
+            <div className="flex items-center justify-center gap-3">
+              <AlertCircle className={`w-5 h-5 ${theme === "dark" ? "text-amber-400" : "text-amber-500"}`} />
+              <p className={`font-medium ${theme === "dark" ? "text-amber-400" : "text-amber-600"}`}>
+                You must wait for verification to complete before proceeding
+              </p>
+            </div>
+          </div>
+        )}
       </div>
     );
   };
@@ -2161,6 +2749,7 @@ const BuyerRenter = () => {
       {isLoading && <Loader theme={theme} />}
       <ThemeToggle theme={theme} onToggle={toggleTheme} />
 
+
       {/* Hero Background */}
       <div
         className="relative h-[600px] bg-cover bg-center bg-no-repeat"
@@ -2169,7 +2758,7 @@ const BuyerRenter = () => {
         }}
       >
         {/* Header */}
-        <header className="relative w-full max-w-[1580px] mx-auto px-4 sm:px-6 transition-all duration-500 z-10">
+        <header className="relative w-full max-w-[1580px] mx-auto px-4 sm:px-6 transition-all duration-500 z-10  my-0 ">
           <div className="w-full">
             <div className="NavBar flex flex-col sm:flex-row items-center justify-between py-4 sm:py-6">
               <Link to="/">
@@ -2529,13 +3118,13 @@ const BuyerRenter = () => {
                       <div className="space-y-4">
                         <button
                           onClick={() => setShowProfileSetup(true)}
-                          className="px-10 py-4 font-bold text-lg bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white shadow-xl hover:shadow-2xl transition-all duration-300 hover:scale-105 rounded-xl"
+                          className="px-10 py-4 font-semibold ml-5 mr-4 Button2 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white hover:text-white"
                         >
                           Start Profile Setup
                         </button>
                         <button
                           onClick={handleContinueStep}
-                          className="px-10 py-4 font-bold text-lg bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white shadow-xl hover:shadow-2xl transition-all duration-300 hover:scale-105 rounded-xl"
+                          className="px-10 py-4 font-semibold Button2 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white hover:text-white"
                         >
                           Skip for Now & Continue
                         </button>
@@ -2593,7 +3182,6 @@ const BuyerRenter = () => {
                         )}
                       </div>
 
-                      {/* ADD THE VISUAL INDICATOR HERE */}
                       {!completedSteps[3] && (
                         <div className={`mb-6 p-4 rounded-lg ${theme === "dark" ? "bg-amber-900/20 border border-amber-800/30" : "bg-amber-50 border border-amber-200"}`}>
                           <div className="flex items-center justify-center gap-3">
@@ -2618,7 +3206,7 @@ const BuyerRenter = () => {
                           </h5>
                           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                             {savedProperties.slice(0, 3).map((property) => (
-                              <PropertyCardWithChat
+                              <PropertyCard
                                 key={property.id}
                                 property={property}
                                 theme={theme}
@@ -2653,7 +3241,7 @@ const BuyerRenter = () => {
                           </h5>
                           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                             {recommendedProperties.slice(0, 3).map((property) => (
-                              <PropertyCardWithChat
+                              <PropertyCard
                                 key={property.id}
                                 property={property}
                                 theme={theme}
@@ -2685,7 +3273,7 @@ const BuyerRenter = () => {
                           </h5>
                           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                             {properties.slice(0, 6).map((property) => (
-                              <PropertyCardWithChat
+                              <PropertyCard
                                 key={property.id}
                                 property={property}
                                 theme={theme}
@@ -2922,7 +3510,7 @@ const BuyerRenter = () => {
                                   <button
                                     onClick={() => {
                                       setActiveStep(3);
-                                      toast.info('Go to Step 3 to browse and save properties');
+                                      toast('Go to Step 3 to browse and save properties');
                                     }}
                                     className="bg-amber-500 hover:bg-amber-600 text-white px-6 py-2 rounded-lg"
                                   >
@@ -2974,10 +3562,16 @@ const BuyerRenter = () => {
                         </div>
                       </div>
                       <button
-                        onClick={() => navigate("/applications")}
+                        onClick={() => {
+                          if (applications.length > 0) {
+                            toast.success(`You have ${applications.length} application(s) submitted`);
+                          } else {
+                            toast("No applications found. Submit an application first.");
+                          }
+                        }}
                         className="px-10 py-4 font-bold text-lg bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white shadow-xl hover:shadow-2xl transition-all duration-300 hover:scale-105"
                       >
-                        View Application Status
+                        View Application Status ({applications.length})
                       </button>
                     </div>
                   ) : (
@@ -3023,19 +3617,19 @@ const BuyerRenter = () => {
                         </div>
                       </div>
                       {savedProperties.length > 0 ? (
-                        <div className="space-y-4">
+                        <div className="ml-4 mr-4 flex flex-col sm:flex-row gap-6 justify-center">
                           <button
                             onClick={() => {
                               setSelectedProperty(savedProperties[0]);
                               setShowApplicationModal(true);
                             }}
-                            className="px-10 py-4 font-bold text-lg bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white shadow-xl hover:shadow-2xl transition-all duration-300 hover:scale-105 rounded-xl"
+                            className="px-10 py-4 font-semibold Button2 hover:text-white bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white shadow-xl hover:shadow-2xl transition-all duration-300 hover:scale-105"
                           >
                             {userType === 'buyer' ? 'Submit Purchase Application' : 'Submit Rental Application'}
                           </button>
                           <button
                             onClick={handleContinueStep}
-                            className="px-10 py-4 font-bold text-lg bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white shadow-xl hover:shadow-2xl transition-all duration-300 hover:scale-105 rounded-xl"
+                            className="px-10 py-4 font-semibold Button2 hover:text-white bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white shadow-xl hover:shadow-2xl transition-all duration-300 hover:scale-105"
                           >
                             Skip & Continue
                           </button>
@@ -3055,53 +3649,6 @@ const BuyerRenter = () => {
                   )
                 ) : activeStep === 6 ? (
                   <div className="py-8">
-                    {/* Step Header */}
-                    <div className="flex items-center justify-between mb-8">
-                      <div>
-                        <div className="flex items-center gap-3 mb-2">
-                          <div className={`p-3 rounded-xl ${theme === "dark"
-                            ? "bg-gradient-to-r from-amber-900/30 to-orange-900/30"
-                            : "bg-gradient-to-r from-amber-100 to-orange-100"
-                            }`}>
-                            {completedSteps[6] ? (
-                              <CheckCircle className="w-8 h-8 text-green-500" />
-                            ) : userType === 'buyer' ? (
-                              <Award className="w-8 h-8 text-amber-500" />
-                            ) : (
-                              <Key className="w-8 h-8 text-amber-500" />
-                            )}
-                          </div>
-                          <div>
-                            <h4 className={`text-2xl font-bold ${theme === "dark" ? "text-white" : "text-gray-900"}`}>
-                              {completedSteps[6] ? "Payment & Transaction History" : userType === 'buyer' ? "Secure Ownership" : "Move In"}
-                            </h4>
-                            <p className={`text-sm ${theme === "dark" ? "text-gray-300" : "text-gray-600"}`}>
-                              {completedSteps[6] ? "View all your payments, receipts, and transaction history" : userType === 'buyer' ? "Complete payment & transfer ownership" : "Sign lease & make payment"}
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-3">
-                        {!completedSteps[6] && (
-                          <button
-                            onClick={() => setShowPaymentModal(true)}
-                            className="px-6 py-3 font-semibold Button2 flex items-center gap-2"
-                          >
-                            <CreditCard className="w-5 h-5" />
-                            {userType === 'buyer' ? 'Make Payment' : 'Pay Now'}
-                          </button>
-                        )}
-                        <button
-                          onClick={handleContinueStep}
-                          className="px-6 py-3 font-semibold bg-gradient-to-r from-blue-500 to-cyan-600 hover:from-blue-600 hover:to-cyan-700 text-white rounded-xl transition-all duration-300 flex items-center gap-2"
-                          disabled={activeStep >= currentSteps.length}
-                        >
-                          {activeStep >= currentSteps.length ? 'Completed' : 'Finish Journey'}
-                          <ArrowRight className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </div>
 
                     {/* Payment Status Summary */}
                     {!completedSteps[6] && (
@@ -3161,13 +3708,7 @@ const BuyerRenter = () => {
                         </div>
 
                         <div className="mt-6 text-center">
-                          <button
-                            onClick={() => setShowPaymentModal(true)}
-                            className="px-8 py-3 font-bold bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white rounded-xl transition-all duration-300 hover:scale-105 inline-flex items-center gap-2"
-                          >
-                            <CreditCard className="w-5 h-5" />
-                            {userType === 'buyer' ? 'Make Property Payment' : 'Pay First Month Rent'}
-                          </button>
+
                           <p className={`text-xs mt-3 ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`}>
                             {userType === 'buyer'
                               ? 'Secure your property with a secure payment. Transactions protected by Wubland.'
@@ -3424,103 +3965,90 @@ const BuyerRenter = () => {
       />
 
       {/* Modals */}
-      {
-        showProfileSetup && (
-          <ProfileSetupModal
-            isOpen={showProfileSetup}
-            onClose={() => setShowProfileSetup(false)}
-            user={user}
-            onComplete={handleProfileComplete}
-            userType={userType}
-            ethiopianMode={true}
-          />
-        )
-      }
+      {showProfileSetup && (
+        <ProfileSetupModal
+          isOpen={showProfileSetup}
+          onClose={() => setShowProfileSetup(false)}
+          user={user}
+          onComplete={handleProfileComplete}
+          userType={userType}
+          ethiopianMode={true}
+        />
+      )}
 
-      {
-        showDocumentUpload && (
-          <DocumentUploadModal
-            isOpen={showDocumentUpload}
-            onClose={() => setShowDocumentUpload(false)}
-            onSubmit={handleDocumentUploadComplete}
-            requiredDocuments={[]}
-            theme={theme}
-            ethiopianMode={true}
-            userDocuments={userDocuments}
-            isVerificationInProgress={isVerificationInProgress}
-            hasSubmittedDocuments={hasSubmittedDocuments}
-            resubmissionDocument={resubmissionDocument}
-          />
-        )
-      }
+      {showDocumentUpload && (
+        <DocumentUploadModal
+          isOpen={showDocumentUpload}
+          onClose={() => setShowDocumentUpload(false)}
+          onSubmit={handleDocumentUploadComplete}
+          requiredDocuments={[]}
+          theme={theme}
+          ethiopianMode={true}
+          userDocuments={userDocuments}
+          isVerificationInProgress={isVerificationInProgress}
+          hasSubmittedDocuments={hasSubmittedDocuments}
+          resubmissionDocument={resubmissionDocument}
+        />
+      )}
 
-      {
-        showChat && selectedBroker && (
-          <BrokerChatInterface
-            isOpen={showChat}
-            onClose={() => setShowChat(false)}
-            user={user}
-            broker={selectedBroker}
-            property={selectedProperty}
-          />
-        )
-      }
+      {showChat && selectedBroker && (
+        <BrokerChatInterface
+          isOpen={showChat}
+          onClose={() => setShowChat(false)}
+          user={user}
+          broker={selectedBroker}
+          property={selectedProperty}
+        />
+      )}
 
-      {
-        showPropertyDetails && selectedProperty && (
-          <PropertyDetailsModal
-            property={selectedProperty}
-            isOpen={showPropertyDetails}
-            onClose={() => setShowPropertyDetails(false)}
-            theme={theme}
-            onApply={() => {
-              setShowPropertyDetails(false);
-              setShowApplicationModal(true);
-            }}
-          />
-        )
-      }
+      {showPropertyDetails && selectedProperty && (
+        <PropertyDetailsModal
+          property={selectedProperty}
+          isOpen={showPropertyDetails}
+          onClose={() => setShowPropertyDetails(false)}
+          theme={theme}
+          onApply={() => {
+            setShowPropertyDetails(false);
+            setShowApplicationModal(true);
+          }}
+        />
+      )}
 
-      {
-        showApplicationModal && selectedProperty && (
-          <PropertyApplicationModal
-            isOpen={showApplicationModal}
-            onClose={() => setShowApplicationModal(false)}
-            property={selectedProperty}
-            userType={userType}
-            onSubmit={handleApplyForProperty}
-            theme={theme}
-          />
-        )
-      }
+      {showApplicationModal && selectedProperty && (
+        <PropertyApplicationModal
+          isOpen={showApplicationModal}
+          onClose={() => setShowApplicationModal(false)}
+          property={selectedProperty}
+          userType={userType}
+          onSubmit={handleApplyForProperty}
+          theme={theme}
+        />
+      )}
 
-      {
-        showPaymentModal && (
-          <PaymentModal
-            isOpen={showPaymentModal}
-            onClose={() => setShowPaymentModal(false)}
-            onSubmit={handlePaymentSubmit}
-            userType={userType}
-            theme={theme}
-          />
-        )
-      }
+      {showPaymentModal && (
+        <PaymentModal
+          isOpen={showPaymentModal}
+          onClose={() => setShowPaymentModal(false)}
+          onSubmit={handlePaymentSubmit}
+          userType={userType}
+          theme={theme}
+          property={selectedProperty}
+          invoiceId={1}
+        />
+      )}
 
-      {
-        showScheduleViewingModal && selectedProperty && (
-          <ScheduleViewingModal
-            isOpen={showScheduleViewingModal}
-            onClose={() => setShowScheduleViewingModal(false)}
-            property={selectedProperty}
-            broker={selectedBroker}
-            user={user}
-            theme={theme}
-          />
-        )
-      }
+      {showScheduleViewingModal && selectedProperty && (
+        <ScheduleViewingModal
+          isOpen={showScheduleViewingModal}
+          onClose={() => setShowScheduleViewingModal(false)}
+          property={selectedProperty}
+          broker={selectedBroker}
+          onSubmit={handleScheduleSubmit} // Make sure this prop is passed
+        />
+      )}
 
       <Footer />
-    </div >
+    </div>
   );
 };
 

@@ -23,6 +23,43 @@ router.put('/offers/:id/reject', authenticate, offerController.rejectOffer);
 router.get('/properties/:propertyId/offers', authenticate, offerController.getPropertyOffers);
 router.get('/user/offers', authenticate, offerController.getUserOffers);
 
+router.post('/test/create-invoice', authenticate, async (req, res) => {
+  try {
+    const Invoice = require('../models/Invoice.model');
+    
+    const invoice = await Invoice.create({
+      invoice_type: 'sale',
+      from_user_id: req.user.id,
+      to_user_id: 1, // Default admin user
+      property_id: req.body.property_id || null,
+      transaction_id: req.body.transaction_id || null,
+      amount: req.body.amount || 1000,
+      line_items: [
+        {
+          description: 'Test Payment',
+          amount: req.body.amount || 1000,
+          quantity: 1
+        }
+      ],
+      notes: 'Test invoice for payment integration',
+      created_by_user_id: req.user.id
+    });
+
+    res.json({
+      success: true,
+      message: 'Test invoice created',
+      data: invoice
+    });
+  } catch (error) {
+    console.error('Test invoice creation error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error creating test invoice',
+      error: error.message
+    });
+  }
+});
+
 // Payment Routes
 router.post('/invoices/:invoiceId/pay', authenticate, paymentLimiter, paymentController.initializePayment);
 router.get('/payments/verify', paymentController.verifyPayment);

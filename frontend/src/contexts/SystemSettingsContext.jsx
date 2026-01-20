@@ -1,5 +1,6 @@
 // contexts/SystemSettingsContext.jsx
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { directApi } from '../utils/api.endpoints';
 
 const SystemSettingsContext = createContext();
 
@@ -50,57 +51,29 @@ export const SystemSettingsProvider = ({ children }) => {
   // Define functions first before using them in useEffect
   const checkBackendAvailability = async () => {
     try {
-      const token = localStorage.getItem('token');
+      // Use the correct API endpoint from your api.endpoints.js
+      const healthData = await directApi.getSystemHealth();
       
-      // First check if analysis service is running
-      const healthResponse = await fetch('http://localhost:5004/health', {
-        headers: { 
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-      });
-      
-      if (healthResponse.ok) {
-        const healthData = await healthResponse.json();
-        setSystemStatus(healthData);
+      if (healthData && healthData.status === 'healthy') {
+        setSystemStatus({ 
+          overall: 'healthy', 
+          message: 'All systems operational',
+          details: healthData.message || 'System is running normally'
+        });
         setBackendAvailable(true);
       } else {
-        // If specific endpoint not found, check if service is reachable
-        await checkServiceReachability();
-      }
-    } catch (error) {
-      console.log('Backend health endpoint not available, checking service reachability...');
-      await checkServiceReachability();
-    }
-  };
-
-  const checkServiceReachability = async () => {
-    try {
-      // Try to reach the analysis service root
-      const response = await fetch('http://localhost:5004/', {
-        method: 'GET',
-        headers: { 'Content-Type': 'application/json' },
-      });
-      
-      if (response.ok) {
         setSystemStatus({ 
           overall: 'degraded', 
-          message: 'Analysis service running but system endpoints not implemented',
-          details: 'Backend service is reachable but specific system endpoints need to be implemented'
+          message: 'System is experiencing issues',
+          details: healthData?.message || 'System health check failed'
         });
         setBackendAvailable(true);
-      } else {
-        setSystemStatus({ 
-          overall: 'error', 
-          message: 'Analysis service not available',
-          details: 'The analysis service (port 5004) appears to be down or not running'
-        });
-        setBackendAvailable(false);
       }
     } catch (error) {
+      console.log('System health check failed:', error.message);
       setSystemStatus({ 
         overall: 'error', 
-        message: 'Cannot connect to analysis service',
+        message: 'Cannot connect to system services',
         details: `Connection failed: ${error.message}`
       });
       setBackendAvailable(false);
@@ -340,16 +313,46 @@ export const SystemSettingsProvider = ({ children }) => {
     });
   };
 
-  const updateSystemMetrics = () => {
-    setSystemMetrics(prev => ({
-      cpu: Math.min(100, Math.max(5, prev.cpu + (Math.random() * 10 - 5))),
-      memory: Math.min(100, Math.max(10, prev.memory + (Math.random() * 8 - 4))),
-      storage: Math.min(100, Math.max(15, prev.storage + (Math.random() * 2 - 1))),
-      network: Math.min(100, Math.max(0, prev.network + (Math.random() * 15 - 7.5))),
-      activeThreats: securityAlerts.filter(alert => alert.status === 'active').length,
-      activeUsers: Math.floor(Math.random() * 50) + 10,
-      apiRequests: prev.apiRequests + Math.floor(Math.random() * 100)
-    }));
+  const updateSystemMetrics = async () => {
+    try {
+      // Try to get analytics data from the backend
+      const analytics = await directApi.getAnalytics();
+      
+      if (analytics && analytics.data) {
+        setSystemMetrics(prev => ({
+          cpu: analytics.data.cpuUsage || Math.min(100, Math.max(5, prev.cpu + (Math.random() * 10 - 5))),
+          memory: analytics.data.memoryUsage || Math.min(100, Math.max(10, prev.memory + (Math.random() * 8 - 4))),
+          storage: analytics.data.storageUsage || Math.min(100, Math.max(15, prev.storage + (Math.random() * 2 - 1))),
+          network: analytics.data.networkUsage || Math.min(100, Math.max(0, prev.network + (Math.random() * 15 - 7.5))),
+          activeThreats: securityAlerts.filter(alert => alert.status === 'active').length,
+          activeUsers: analytics.data.activeUsers || Math.floor(Math.random() * 50) + 10,
+          apiRequests: analytics.data.totalRequests || prev.apiRequests + Math.floor(Math.random() * 100)
+        }));
+      } else {
+        // Fallback to simulated metrics
+        setSystemMetrics(prev => ({
+          cpu: Math.min(100, Math.max(5, prev.cpu + (Math.random() * 10 - 5))),
+          memory: Math.min(100, Math.max(10, prev.memory + (Math.random() * 8 - 4))),
+          storage: Math.min(100, Math.max(15, prev.storage + (Math.random() * 2 - 1))),
+          network: Math.min(100, Math.max(0, prev.network + (Math.random() * 15 - 7.5))),
+          activeThreats: securityAlerts.filter(alert => alert.status === 'active').length,
+          activeUsers: Math.floor(Math.random() * 50) + 10,
+          apiRequests: prev.apiRequests + Math.floor(Math.random() * 100)
+        }));
+      }
+    } catch (error) {
+      // Fallback to simulated metrics if API fails
+      console.log('Failed to fetch analytics, using simulated metrics:', error.message);
+      setSystemMetrics(prev => ({
+        cpu: Math.min(100, Math.max(5, prev.cpu + (Math.random() * 10 - 5))),
+        memory: Math.min(100, Math.max(10, prev.memory + (Math.random() * 8 - 4))),
+        storage: Math.min(100, Math.max(15, prev.storage + (Math.random() * 2 - 1))),
+        network: Math.min(100, Math.max(0, prev.network + (Math.random() * 15 - 7.5))),
+        activeThreats: securityAlerts.filter(alert => alert.status === 'active').length,
+        activeUsers: Math.floor(Math.random() * 50) + 10,
+        apiRequests: prev.apiRequests + Math.floor(Math.random() * 100)
+      }));
+    }
   };
 
   const updateSetting = (key, value) => {
@@ -508,8 +511,11 @@ export const SystemSettingsProvider = ({ children }) => {
     loadSettings();
     initializeSystemMonitoring();
     
+    // Initial health check
+    checkBackendAvailability();
+    
     const healthInterval = setInterval(checkBackendAvailability, 30000);
-    const metricsInterval = setInterval(updateSystemMetrics, 5000);
+    const metricsInterval = setInterval(updateSystemMetrics, 10000); // Update every 10 seconds
     const securityInterval = setInterval(generateSecurityEvents, 15000);
     
     return () => {

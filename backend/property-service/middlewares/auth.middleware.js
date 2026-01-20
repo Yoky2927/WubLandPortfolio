@@ -1,59 +1,94 @@
-// backend/property-service/middleware/auth.middleware.js
+// backend/property-service/middleware/auth.middleware.js - FIXED
 import jwt from 'jsonwebtoken';
 import axios from 'axios';
 import pool from '../config/database.js';
 
 export const authenticate = async (req, res, next) => {
   try {
-    const token = req.cookies?.token || req.headers.authorization?.split(' ')[1];
+    console.log('🔐 Auth middleware checking request...');
+    
+    // Get token from multiple sources
+    const token = req.cookies?.token || 
+                  req.headers.authorization?.split(' ')[1] ||
+                  req.headers['x-access-token'];
+    
+    console.log('🔐 Token present:', !!token);
     
     if (!token) {
+      console.log('❌ No token found');
       return res.status(401).json({
         success: false,
-        message: 'Authentication required'
+        message: 'Authentication required - No token found'
       });
     }
 
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    
-    // Verify user exists in database
-    const [users] = await pool.execute(
-      'SELECT id, username, email, role, privilege_tier, status FROM users WHERE id = ?',
-      [decoded.userId]
-    );
-
-    if (users.length === 0) {
-      return res.status(401).json({
-        success: false,
-        message: 'User not found'
-      });
-    }
-
-    const user = users[0];
-    
-    if (user.status !== 'active') {
-      return res.status(403).json({
-        success: false,
-        message: 'Account is not active'
-      });
-    }
-
-    req.user = user;
-    next();
-  } catch (error) {
-    if (error.name === 'JsonWebTokenError') {
+    // Verify JWT token
+    let decoded;
+    try {
+      decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key');
+      console.log('✅ Token verified, user ID:', decoded.userId);
+    } catch (error) {
+      console.error('❌ Token verification failed:', error.message);
+      
+      if (error.name === 'TokenExpiredError') {
+        return res.status(401).json({
+          success: false,
+          message: 'Token expired'
+        });
+      }
+      
       return res.status(401).json({
         success: false,
         message: 'Invalid token'
       });
     }
-    if (error.name === 'TokenExpiredError') {
-      return res.status(401).json({
+
+    // Verify user exists in database
+    try {
+      const [users] = await pool.execute(
+        'SELECT id, username, email, first_name, last_name, role, verification_status, verification_step_status, profile_picture FROM users WHERE id = ?',
+        [decoded.userId]
+      );
+
+      if (users.length === 0) {
+        console.error('❌ User not found in database');
+        return res.status(401).json({
+          success: false,
+          message: 'User not found'
+        });
+      }
+
+      const user = users[0];
+      
+      // Add additional verification status
+      user.is_verified = user.verification_step_status === 'verified';
+      user.is_email_verified = true; // Assuming email verified if they have a token
+      
+      // Log successful authentication
+      console.log('✅ User authenticated:', {
+        id: user.id,
+        email: user.email,
+        role: user.role,
+        verification_status: user.verification_step_status
+      });
+
+      req.user = user;
+      next();
+      
+    } catch (dbError) {
+      console.error('❌ Database error:', dbError);
+      return res.status(500).json({
         success: false,
-        message: 'Token expired'
+        message: 'Database error during authentication'
       });
     }
-    next(error);
+    
+  } catch (error) {
+    console.error('❌ Auth middleware error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Authentication failed'
+    });
   }
 };
 

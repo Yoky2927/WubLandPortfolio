@@ -28,12 +28,16 @@ const AnnouncementManager = lazy(() => import("./components/AnnouncementManager"
 const AnalyticsDashboard = lazy(() => import("./components/AnalyticsDashboard"));
 const SystemHealth = lazy(() => import("./components/SystemHealth"));
 const UserVerification = lazy(() => import("./components/UserVerification"));
+const PropertiesRequest = lazy(() => import("./components/PropertiesRequest"));
+const ChatApp = lazy(() => import("../../components/ChatApp.jsx"));
 
 // Import icons
 import {
   Users, Home, Shield, BarChart3, LogOut,
   Menu, X, Globe, Crown, MessageSquare, CreditCard,
-  CheckSquare, AlertTriangle, Database, Server
+  CheckSquare, AlertTriangle, Database, Server,
+  Building, Key, Package, Settings, Bell, FileText,
+  BarChart, ShieldCheck, Calendar, DollarSign
 } from "lucide-react";
 
 const SuperAdminDashboard = () => {
@@ -610,6 +614,10 @@ const SuperAdminDashboard = () => {
         return <UserVerification theme={theme} setToast={setToast} />;
       case "system":
         return <SystemHealth {...commonProps} />;
+      case "properties":
+        return <PropertiesRequest theme={theme} setToast={setToast} />; // Fixed: Added props
+      case "chat":
+        return <ChatApp />;
       default:
         return (
           <div className={`p-12 text-center rounded-xl border ${theme === "dark"
@@ -706,9 +714,9 @@ const SuperAdminDashboard = () => {
                 { id: "announcements", label: "Announcements", icon: AlertTriangle },
                 { id: "analytics", label: "Analytics", icon: Database },
                 { id: "system", label: "System Health", icon: Server },
-                { id: "properties", label: "Properties", icon: Home },
+                { id: "properties", label: "Properties", icon: Building },
                 { id: "transactions", label: "Transactions", icon: CreditCard },
-                { id: "user-verification", label: "User Verification", icon: Shield },
+                { id: "user-verification", label: "User Verification", icon: ShieldCheck },
                 { id: "chat", label: "Chat", icon: MessageSquare },
               ].map((item) => (
                 <button

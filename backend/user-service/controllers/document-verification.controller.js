@@ -48,6 +48,28 @@ const sendNotification = async (userId, title, message, type = 'info') => {
     }
 };
 
+const uploadInProgress = new Map();
+const requestCache = new Map();
+
+setInterval(() => {
+    const now = Date.now();
+    const fiveMinutesAgo = now - (5 * 60 * 1000);
+
+    // Clean uploadInProgress
+    for (const [key, timestamp] of uploadInProgress.entries()) {
+        if (timestamp < fiveMinutesAgo) {
+            uploadInProgress.delete(key);
+        }
+    }
+
+    // Clean requestCache
+    for (const [key, { timestamp }] of requestCache.entries()) {
+        if (timestamp < fiveMinutesAgo) {
+            requestCache.delete(key);
+        }
+    }
+}, 60000);
+
 // 1. Get user verification status
 export const getUserVerificationStatus = async (req, res) => {
     try {
@@ -124,27 +146,94 @@ export const getUserVerificationStatus = async (req, res) => {
 
 // 2. Upload verification document
 export const uploadVerificationDocument = async (req, res) => {
+    let uploadKey = null;
+    let userUploadKey = null;
+    let requestId = null;
+
     try {
         const userId = req.user.id;
+        const documentType = req.body.documentType;
+
+        if (!userId) {
+            return res.status(401).json({
+                success: false,
+                message: "Authentication required"
+            });
+        }
+
+        if (!documentType) {
+            return res.status(400).json({
+                success: false,
+                message: "Document type is required"
+            });
+        }
+
+        // === FIX 1: Request ID tracking to prevent duplicates ===
+        requestId = req.headers['x-request-id'] || req.body.requestId || `req_${userId}_${Date.now()}`;
+        const duplicateCheckKey = `upload_req_${requestId}`;
+
+        if (requestCache.has(duplicateCheckKey)) {
+            return res.status(409).json({
+                success: false,
+                message: "Duplicate upload request detected",
+                code: 'DUPLICATE_REQUEST'
+            });
+        }
+
+        // Store request ID with timestamp
+        requestCache.set(duplicateCheckKey, {
+            timestamp: Date.now(),
+            userId,
+            documentType
+        });
+
+        // === FIX 2: Upload debouncing (prevent rapid retries) ===
+        userUploadKey = `${userId}_${documentType}`;
+        uploadKey = `${userUploadKey}_${Date.now()}`;
+
+        // Check if user is already uploading same document type
+        if (uploadInProgress.has(userUploadKey)) {
+            const lastUploadTime = uploadInProgress.get(userUploadKey);
+            const timeSinceLastUpload = Date.now() - lastUploadTime;
+
+            // If user uploaded same document type within last 5 seconds, reject
+            if (timeSinceLastUpload < 5000) {
+                const waitTime = Math.ceil((5000 - timeSinceLastUpload) / 1000);
+                return res.status(429).json({
+                    success: false,
+                    message: `Please wait ${waitTime} seconds before uploading another ${documentType.replace('_', ' ')}`,
+                    code: 'UPLOAD_TOO_FAST',
+                    retryAfter: waitTime
+                });
+            }
+        }
+
+        // Mark this upload as in progress
+        uploadInProgress.set(userUploadKey, Date.now());
 
         console.log("=== UPLOAD VERIFICATION DOCUMENT ===");
+        console.log("Request ID:", requestId);
         console.log("User ID:", userId);
-        console.log("Request body:", req.body);
-        console.log("File exists:", !!req.file);
+        console.log("Document Type:", documentType);
         console.log("Content-Type:", req.headers['content-type']);
+        console.log("File exists:", !!req.file);
 
+        // === Handle file/document URL ===
         let documentUrl = null;
         let filename = null;
-        let fileBuffer = null;
 
-        // Check if request contains file (FormData) or JSON with URL
         if (req.file) {
             // Handle file upload (FormData)
             console.log("📤 Processing file upload...");
             const file = req.file;
 
+            // Validate file size (server-side check)
+            if (file.size > 10 * 1024 * 1024) { // 10MB
+                throw new Error("File size exceeds 10MB limit");
+            }
+
             // Generate unique filename
-            const fileName = `user-${userId}-${Date.now()}-${file.originalname}`;
+            const fileName = `user-${userId}-${Date.now()}-${file.originalname.replace(/[^a-zA-Z0-9.-]/g, '_')}`;
             const filePath = `Uploads/verification-documents/${fileName}`;
 
             // Ensure upload directory exists
@@ -168,37 +257,34 @@ export const uploadVerificationDocument = async (req, res) => {
 
             // Validate URL format
             if (!documentUrl.startsWith('http') && !documentUrl.startsWith('Uploads/')) {
-                // If it's a base64 data URL, handle it
                 if (documentUrl.startsWith('data:')) {
+                    // Handle base64 data URL
                     const matches = documentUrl.match(/^data:(.+);base64,(.+)$/);
-                    if (matches) {
-                        const mimeType = matches[1];
-                        const base64Data = matches[2];
-                        const ext = mimeType.split('/')[1];
-
-                        // Generate unique filename
-                        const fileName = `user-${userId}-${Date.now()}.${ext}`;
-                        const filePath = `Uploads/verification-documents/${fileName}`;
-
-                        // Ensure upload directory exists
-                        const uploadDir = 'Uploads/verification-documents';
-                        if (!fs.existsSync(uploadDir)) {
-                            fs.mkdirSync(uploadDir, { recursive: true });
-                        }
-
-                        // Save base64 data as file
-                        const buffer = Buffer.from(base64Data, 'base64');
-                        fs.writeFileSync(filePath, buffer);
-
-                        documentUrl = filePath;
-                        filename = fileName;
-                        console.log("✅ Base64 data saved to:", documentUrl);
-                    } else {
-                        return res.status(400).json({
-                            success: false,
-                            message: "Invalid base64 data URL format"
-                        });
+                    if (!matches) {
+                        throw new Error("Invalid base64 data URL format");
                     }
+
+                    const mimeType = matches[1];
+                    const base64Data = matches[2];
+                    const ext = mimeType.split('/')[1] || 'jpg';
+
+                    // Generate unique filename
+                    const fileName = `user-${userId}-${Date.now()}.${ext}`;
+                    const filePath = `Uploads/verification-documents/${fileName}`;
+
+                    // Ensure upload directory exists
+                    const uploadDir = 'Uploads/verification-documents';
+                    if (!fs.existsSync(uploadDir)) {
+                        fs.mkdirSync(uploadDir, { recursive: true });
+                    }
+
+                    // Save base64 data as file
+                    const buffer = Buffer.from(base64Data, 'base64');
+                    fs.writeFileSync(filePath, buffer);
+
+                    documentUrl = filePath;
+                    filename = fileName;
+                    console.log("✅ Base64 data saved to:", documentUrl);
                 } else {
                     // Assume it's a relative path
                     documentUrl = documentUrl;
@@ -208,57 +294,86 @@ export const uploadVerificationDocument = async (req, res) => {
         } else {
             return res.status(400).json({
                 success: false,
-                message: "No file or document URL provided. Please provide either a file upload or a document URL.",
+                message: "No file or document URL provided",
                 received: {
                     hasFile: !!req.file,
-                    hasDocumentUrl: !!req.body.documentUrl,
-                    bodyKeys: Object.keys(req.body)
+                    hasDocumentUrl: !!req.body.documentUrl
                 }
-            });
-        }
-
-        // Get document type from request body
-        const documentType = req.body.documentType;
-
-        if (!documentType) {
-            return res.status(400).json({
-                success: false,
-                message: "Document type is required"
             });
         }
 
         // Get isResubmission from request body
         const isResubmission = req.body.isResubmission === 'true' || req.body.isResubmission === true;
 
-        // Check if this specific document type already exists for the user
-        const [existingDocs] = await db.query(`
-            SELECT id, status, document_type 
-            FROM document_verification_records 
-            WHERE user_id = ? AND document_type = ?
-            ORDER BY created_at DESC
-            LIMIT 1
-        `, [userId, documentType]);
+        // === FIX 3: OPTIMIZED DATABASE QUERIES ===
+        // Get user info, existing docs, and required types in ONE query
+        const [userData] = await db.query(`
+            WITH user_info AS (
+                SELECT 
+                    u.id,
+                    u.country,
+                    u.nationality,
+                    u.verification_step_status,
+                    CASE 
+                        WHEN u.country = 'Ethiopia' OR u.nationality = 'Ethiopian' 
+                             OR u.country LIKE '%ethiopia%' OR u.nationality LIKE '%ethiopian%'
+                        THEN 'kebele_id'
+                        ELSE 'id_card'
+                    END as required_id_type
+                FROM users u
+                WHERE u.id = ?
+            ),
+            existing_docs AS (
+                SELECT 
+                    dvr.id,
+                    dvr.status,
+                    dvr.document_type
+                FROM document_verification_records dvr
+                WHERE dvr.user_id = ? 
+                    AND dvr.document_type = ?
+                    AND dvr.status NOT IN ('archived', 'replaced')
+                ORDER BY dvr.created_at DESC
+                LIMIT 1
+            ),
+            user_all_docs AS (
+                SELECT DISTINCT document_type
+                FROM document_verification_records
+                WHERE user_id = ? 
+                    AND status IN ('pending', 'submitted', 'reviewing')
+                    AND document_type IN ('kebele_id', 'id_card', 'passport', 'proof_of_income')
+            )
+            SELECT 
+                ui.*,
+                ed.id as existing_doc_id,
+                ed.status as existing_doc_status,
+                (SELECT GROUP_CONCAT(document_type) FROM user_all_docs) as uploaded_types
+            FROM user_info ui
+            LEFT JOIN existing_docs ed ON 1=1
+        `, [userId, userId, documentType, userId]);
 
-        let existingDocument = existingDocs.length > 0 ? existingDocs[0] : null;
+        if (!userData || userData.length === 0) {
+            throw new Error("User data not found");
+        }
 
-        // If document exists and is not a resubmission, check its status
-        if (existingDocument && !isResubmission) {
-            if (['pending', 'submitted', 'reviewing'].includes(existingDocument.status)) {
+        const user = userData[0];
+
+        // Check if document already exists and is not a resubmission
+        if (user.existing_doc_id && !isResubmission) {
+            if (['pending', 'submitted', 'reviewing'].includes(user.existing_doc_status)) {
                 return res.status(400).json({
                     success: false,
                     message: `A ${documentType.replace('_', ' ')} document is already uploaded and under review.`,
-                    existingStatus: existingDocument.status,
+                    existingStatus: user.existing_doc_status,
                     documentType: documentType
                 });
             }
         }
 
-        // If resubmission, mark previous version
+        // If resubmission, mark previous version as archived
         let previousVersionId = null;
-        if (existingDocument && isResubmission) {
-            previousVersionId = existingDocument.id;
+        if (user.existing_doc_id && isResubmission) {
+            previousVersionId = user.existing_doc_id;
 
-            // Archive previous version
             await db.query(`
                 UPDATE document_verification_records 
                 SET status = 'archived',
@@ -267,7 +382,7 @@ export const uploadVerificationDocument = async (req, res) => {
             `, [previousVersionId]);
         }
 
-        // Save new document to database
+        // === Save new document to database ===
         const [result] = await db.query(`
             INSERT INTO document_verification_records 
             (user_id, document_type, document_url, document_filename, 
@@ -281,24 +396,11 @@ export const uploadVerificationDocument = async (req, res) => {
             previousVersionId
         ]);
 
-        console.log("✅ Document saved to database with ID:", result.insertId);
+        const documentId = result.insertId;
+        console.log("✅ Document saved to database with ID:", documentId);
 
-        // [Rest of your existing code for user verification status...]
-        // Get user info to determine if Ethiopian
-        const [userInfo] = await db.query(`
-            SELECT id, country, nationality 
-            FROM users 
-            WHERE id = ?
-        `, [userId]);
-
-        // Determine if user is Ethiopian
-        const user = userInfo[0] || {};
-        const isEthiopian = user.country === 'Ethiopia' ||
-            user.nationality === 'Ethiopian' ||
-            (user.country && user.country.toLowerCase().includes('ethiopia')) ||
-            (user.nationality && user.nationality.toLowerCase().includes('ethiopian'));
-
-        // Define required document types based on user location
+        // === Determine required document types ===
+        const isEthiopian = user.required_id_type === 'kebele_id';
         const requiredTypes = isEthiopian
             ? ['kebele_id', 'proof_of_income']
             : ['id_card', 'proof_of_income'];
@@ -306,53 +408,60 @@ export const uploadVerificationDocument = async (req, res) => {
         console.log(`📋 User ${userId} is Ethiopian: ${isEthiopian}`);
         console.log(`📋 Required documents:`, requiredTypes);
 
-        // Check if user has submitted all required documents
-        const [allUserDocs] = await db.query(`
-            SELECT document_type, status 
-            FROM document_verification_records 
-            WHERE user_id = ? 
-            AND status IN ('pending', 'submitted', 'reviewing')
-            AND document_type IN ('kebele_id', 'id_card', 'passport', 'proof_of_income')
-        `, [userId]);
+        // === Check which documents user has uploaded ===
+        const uploadedTypes = user.uploaded_types
+            ? user.uploaded_types.split(',')
+            : [];
 
-        // Check which required documents are uploaded
-        const uploadedTypes = allUserDocs.map(doc => doc.document_type);
+        // Add the current document type if not already in list
+        if (!uploadedTypes.includes(documentType)) {
+            uploadedTypes.push(documentType);
+        }
+
         const missingTypes = requiredTypes.filter(type => !uploadedTypes.includes(type));
 
         console.log(`📋 User ${userId} uploaded types:`, uploadedTypes);
         console.log(`📋 Missing types:`, missingTypes);
 
-        // Update user verification status
+        // === Update user verification status ===
         if (missingTypes.length === 0) {
             // All required documents uploaded
             await db.query(`
-                UPDATE users 
-                SET verification_step_status = 'submitted',
-                    documents_submitted_at = NOW(),
-                    verification_status = 'pending',
-                    has_submitted_documents = true
-                WHERE id = ?
+              UPDATE users 
+              SET verification_step_status = 'submitted',
+                  verification_status = 'pending', // SET TO PENDING ONLY WHEN DOCUMENTS ARE SUBMITTED
+                  documents_submitted_at = NOW(),
+                  has_submitted_documents = true,
+                  document_rejection_reason = NULL,
+                  updated_at = NOW()
+              WHERE id = ?
             `, [userId]);
-            console.log(`✅ User ${userId} all required documents submitted`);
+            console.log(`✅ User ${userId} all required documents submitted, verification_status set to 'pending'`);
         } else {
             // Some documents still missing
             await db.query(`
                 UPDATE users 
                 SET verification_step_status = 'pending',
                     has_submitted_documents = false,
-                    document_rejection_reason = NULL
+                    document_rejection_reason = NULL,
+                    updated_at = NOW()
                 WHERE id = ?
             `, [userId]);
             console.log(`📝 User ${userId} still missing documents: ${missingTypes.join(', ')}`);
         }
 
+        // === Clean up tracking ===
+        uploadInProgress.delete(userUploadKey);
+        requestCache.delete(duplicateCheckKey);
+
+        // === Send success response ===
         return res.status(200).json({
             success: true,
             message: missingTypes.length === 0
                 ? "All required documents uploaded! Verification in progress."
-                : `Document uploaded! Still need: ${missingTypes.map(t => t.replace('_', ' ')).join(', ')}`,
+                : `Document uploaded successfully! Still need: ${missingTypes.map(t => t.replace('_', ' ')).join(', ')}`,
             document: {
-                id: result.insertId,
+                id: documentId,
                 type: documentType,
                 url: documentUrl,
                 filename: filename,
@@ -367,16 +476,45 @@ export const uploadVerificationDocument = async (req, res) => {
                 missing: missingTypes
             },
             isEthiopian: isEthiopian,
-            requiredTypes: requiredTypes
+            requiredTypes: requiredTypes,
+            requestId: requestId
         });
 
     } catch (error) {
-        console.error("Error uploading verification document:", error);
+        console.error("❌ Error uploading verification document:", error);
+
+        // Clean up tracking on error
+        if (userUploadKey) {
+            uploadInProgress.delete(userUploadKey);
+        }
+
+        if (requestId) {
+            requestCache.delete(`upload_req_${requestId}`);
+        }
+
+        // Handle specific error types
+        if (error.message.includes("File size exceeds")) {
+            return res.status(400).json({
+                success: false,
+                message: error.message,
+                code: 'FILE_TOO_LARGE'
+            });
+        }
+
+        if (error.message.includes("Invalid base64")) {
+            return res.status(400).json({
+                success: false,
+                message: error.message,
+                code: 'INVALID_BASE64'
+            });
+        }
+
         return res.status(500).json({
             success: false,
             message: "Error uploading verification document",
             error: error.message,
-            stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+            code: 'UPLOAD_ERROR',
+            requestId: requestId || 'unknown'
         });
     }
 };
@@ -519,47 +657,49 @@ export const getPendingVerifications = async (req, res) => {
         const { page = 1, limit = 20, status = 'all' } = req.query;
         const offset = (page - 1) * limit;
 
-        // Build query dynamically based on status
-        let whereClause = "WHERE u.verification_step_status IN ('pending', 'submitted', 'reviewing', 'needs_resubmission')";
+        // Build query to get users who have submitted documents OR have pending verification
+        let whereClause = "WHERE u.verification_status = 'pending'";
         let whereParams = [];
 
         if (status !== 'all') {
-            whereClause += " AND u.verification_step_status = ?";
+            whereClause += " AND u.verification_status = ?";
             whereParams.push(status);
         }
 
+        // Only show buyers and renters who have submitted documents
         whereClause += " AND u.role IN ('buyer', 'renter')";
+        whereClause += " AND u.has_submitted_documents = true";
 
         const [users] = await db.query(`
-            SELECT 
-                u.id, u.first_name, u.last_name, u.email, u.role,
-                u.verification_status, u.verification_step_status,
-                u.created_at, u.last_verification_review_at,
-                u.has_submitted_documents,
-                u.documents_submitted_at,
-                COUNT(dvr.id) as document_count
-            FROM users u
-            LEFT JOIN document_verification_records dvr ON u.id = dvr.user_id
-            ${whereClause}
-            GROUP BY u.id
-            ORDER BY u.created_at DESC
-            LIMIT ? OFFSET ?
-        `, [...whereParams, parseInt(limit), parseInt(offset)]);
+        SELECT 
+          u.id, u.first_name, u.last_name, u.email, u.role,
+          u.verification_status, u.verification_step_status,
+          u.created_at, u.last_verification_review_at,
+          u.has_submitted_documents,
+          u.documents_submitted_at,
+          COUNT(dvr.id) as document_count
+        FROM users u
+        LEFT JOIN document_verification_records dvr ON u.id = dvr.user_id
+        ${whereClause}
+        GROUP BY u.id
+        ORDER BY u.created_at DESC
+        LIMIT ? OFFSET ?
+      `, [...whereParams, parseInt(limit), parseInt(offset)]);
 
         // Count query
-        let countWhereClause = "WHERE u.verification_step_status IN ('pending', 'submitted', 'reviewing', 'needs_resubmission') AND u.role IN ('buyer', 'renter')";
+        let countWhereClause = "WHERE u.verification_status = 'pending' AND u.role IN ('buyer', 'renter') AND u.has_submitted_documents = true";
         let countParams = [];
 
         if (status !== 'all') {
-            countWhereClause += " AND u.verification_step_status = ?";
+            countWhereClause += " AND u.verification_status = ?";
             countParams.push(status);
         }
 
         const [[{ total }]] = await db.query(`
-            SELECT COUNT(DISTINCT u.id) as total
-            FROM users u
-            ${countWhereClause}
-        `, countParams);
+        SELECT COUNT(DISTINCT u.id) as total
+        FROM users u
+        ${countWhereClause}
+      `, countParams);
 
         res.json({
             success: true,
@@ -584,17 +724,18 @@ export const getPendingVerifications = async (req, res) => {
 export const getVerificationStats = async (req, res) => {
     try {
         const [stats] = await db.query(`
-            SELECT 
-                COUNT(*) as total_users,
-                SUM(CASE WHEN verification_step_status = 'verified' THEN 1 ELSE 0 END) as verified,
-                SUM(CASE WHEN verification_step_status IN ('pending', 'submitted', 'reviewing') THEN 1 ELSE 0 END) as pending,
-                SUM(CASE WHEN verification_step_status = 'submitted' THEN 1 ELSE 0 END) as submitted,
-                SUM(CASE WHEN verification_step_status = 'reviewing' THEN 1 ELSE 0 END) as reviewing,
-                SUM(CASE WHEN verification_step_status = 'needs_resubmission' THEN 1 ELSE 0 END) as needs_resubmission,
-                SUM(CASE WHEN verification_step_status = 'rejected' THEN 1 ELSE 0 END) as rejected
-            FROM users
-            WHERE role IN ('buyer', 'renter')
-        `);
+        SELECT 
+          COUNT(*) as total_users,
+          SUM(CASE WHEN verification_status = 'verified' AND has_submitted_documents = true THEN 1 ELSE 0 END) as verified,
+          SUM(CASE WHEN verification_status = 'pending' AND has_submitted_documents = true THEN 1 ELSE 0 END) as pending,
+          SUM(CASE WHEN verification_status IS NULL AND has_submitted_documents = false THEN 1 ELSE 0 END) as not_submitted,
+          SUM(CASE WHEN verification_step_status = 'submitted' AND has_submitted_documents = true THEN 1 ELSE 0 END) as submitted,
+          SUM(CASE WHEN verification_step_status = 'reviewing' AND has_submitted_documents = true THEN 1 ELSE 0 END) as reviewing,
+          SUM(CASE WHEN verification_step_status = 'needs_resubmission' AND has_submitted_documents = true THEN 1 ELSE 0 END) as needs_resubmission,
+          SUM(CASE WHEN verification_status = 'rejected' AND has_submitted_documents = true THEN 1 ELSE 0 END) as rejected
+        FROM users
+        WHERE role IN ('buyer', 'renter')
+      `);
 
         res.json({
             success: true,
@@ -1368,7 +1509,7 @@ export const getDocumentFeedback = async (req, res) => {
         }
 
         const document = documents[0];
-        
+
         // Get admin info if reviewed
         let adminInfo = null;
         if (document.reviewed_by) {
@@ -1420,60 +1561,50 @@ export const getDocumentFeedback = async (req, res) => {
 // Helper function to update user verification status
 const updateUserVerificationStatus = async (userId) => {
     try {
-        // Get all user's documents
-        const [documents] = await db.query(`
-            SELECT status, document_type
-            FROM document_verification_records 
-            WHERE user_id = ? 
-            AND status NOT IN ('archived', 'replaced')
-        `, [userId]);
+        // Single query to get all document statuses and update user
+        const [result] = await db.query(`
+            WITH document_statuses AS (
+                SELECT 
+                    status,
+                    COUNT(*) as count
+                FROM document_verification_records 
+                WHERE user_id = ? 
+                    AND status NOT IN ('archived', 'replaced')
+                GROUP BY status
+            ),
+            status_summary AS (
+                SELECT 
+                    COALESCE(SUM(CASE WHEN status = 'approved' THEN count ELSE 0 END), 0) as approved_count,
+                    COALESCE(SUM(CASE WHEN status = 'rejected' THEN count ELSE 0 END), 0) as rejected_count,
+                    COALESCE(SUM(CASE WHEN status = 'needs_resubmission' THEN count ELSE 0 END), 0) as needs_resubmission_count,
+                    COALESCE(SUM(CASE WHEN status = 'pending' THEN count ELSE 0 END), 0) as pending_count,
+                    COALESCE(SUM(count), 0) as total_count
+                FROM document_statuses
+            )
+            UPDATE users u
+            CROSS JOIN status_summary s
+            SET 
+                u.verification_status = CASE 
+                    WHEN s.rejected_count > 0 THEN 'rejected'
+                    WHEN s.needs_resubmission_count > 0 THEN 'needs_resubmission'
+                    WHEN s.approved_count = s.total_count AND s.total_count > 0 THEN 'approved'
+                    WHEN s.pending_count > 0 THEN 'pending'
+                    ELSE u.verification_status
+                END,
+                u.verification_step_status = CASE 
+                    WHEN s.rejected_count > 0 THEN 'rejected'
+                    WHEN s.needs_resubmission_count > 0 THEN 'needs_resubmission'
+                    WHEN s.approved_count = s.total_count AND s.total_count > 0 THEN 'verified'
+                    WHEN s.pending_count > 0 THEN 'submitted'
+                    ELSE u.verification_step_status
+                END,
+                u.last_verification_review_at = NOW(),
+                u.updated_at = NOW()
+            WHERE u.id = ?
+        `, [userId, userId]);
 
-        if (documents.length === 0) return;
-
-        const statusCounts = {
-            approved: 0,
-            rejected: 0,
-            needs_resubmission: 0,
-            pending: 0,
-            total: documents.length
-        };
-
-        documents.forEach(doc => {
-            if (statusCounts[doc.status] !== undefined) {
-                statusCounts[doc.status]++;
-            }
-        });
-
-        let userVerificationStatus = 'pending';
-        let userStepStatus = 'pending';
-
-        // Determine overall status based on document statuses
-        if (statusCounts.rejected > 0) {
-            userVerificationStatus = 'rejected';
-            userStepStatus = 'rejected';
-        } else if (statusCounts.needs_resubmission > 0) {
-            userVerificationStatus = 'needs_resubmission';
-            userStepStatus = 'needs_resubmission';
-        } else if (statusCounts.approved === statusCounts.total) {
-            userVerificationStatus = 'approved';
-            userStepStatus = 'verified';
-        } else if (statusCounts.pending > 0) {
-            userVerificationStatus = 'pending';
-            userStepStatus = 'submitted';
-        }
-
-        // Update user verification status
-        await db.query(`
-            UPDATE users 
-            SET verification_status = ?,
-                verification_step_status = ?,
-                last_verification_review_at = NOW()
-            WHERE id = ?
-        `, [userVerificationStatus, userStepStatus, userId]);
-
-        console.log(`✅ Updated user ${userId} verification status: ${userVerificationStatus}`);
-
-        return userVerificationStatus;
+        console.log(`✅ Optimized update for user ${userId}`);
+        return 'success';
 
     } catch (error) {
         console.error("Error updating user verification status:", error);

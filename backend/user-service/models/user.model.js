@@ -72,16 +72,18 @@ export const User = {
     status = 'active',
     phone_number = null,
     is_email_verified = 0,
+    verified = 0, // verified flag
     emailVerificationToken = null,
-    emailVerificationExpires = null
+    emailVerificationExpires = null,
+    verification_status = null // ADD THIS - default to NULL
   ) => {
     const [result] = await db.query(
       `INSERT INTO users 
        (first_name, last_name, username, email, password, role, 
         privilege_tier, status, phone_number,
-        is_email_verified, verified, email_verification_token, email_verification_expires, 
-        created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
+        is_email_verified, verified, email_verification_token, email_verification_expires,
+        verification_status, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
       [
         firstName,
         lastName,
@@ -93,9 +95,10 @@ export const User = {
         status,
         phone_number,
         is_email_verified,
-        is_email_verified, // For verified field
+        verified,
         emailVerificationToken,
         emailVerificationExpires,
+        verification_status, // Pass verification_status
       ]
     );
     return { insertId: result.insertId, emailVerificationToken };

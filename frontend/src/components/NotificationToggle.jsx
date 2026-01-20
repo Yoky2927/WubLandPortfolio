@@ -135,7 +135,7 @@ const NotificationToggle = ({
   const fetchNotifications = async () => {
     try {
       setIsLoading(true);
-      const response = await apiCall('NOTIFICATIONS');
+      const response = await apiCall('GET_NOTIFICATIONS');
 
       if (response && response.success && Array.isArray(response.data)) {
         const formattedNotifications = response.data.map(notification => {

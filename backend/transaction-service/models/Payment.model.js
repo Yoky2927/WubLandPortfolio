@@ -96,12 +96,23 @@ class Payment {
   }
 
   static async findByTransactionRef(transactionRef) {
-    const [rows] = await db.execute(
-      `SELECT * FROM payments 
-     WHERE transaction_id = ? OR payment_method_details LIKE ?`,
-      [transactionRef, `%${transactionRef}%`]
-    );
-    return rows[0] || null;
+    if (!transactionRef) {
+      console.error('Payment.findByTransactionRef called with undefined transactionRef');
+      return null;
+    }
+
+    try {
+      const [rows] = await db.execute(
+        `SELECT * FROM payments 
+       WHERE transaction_id = ? 
+          OR JSON_EXTRACT(payment_method_details, '$.transaction_ref') = ?`,
+        [transactionRef, transactionRef]
+      );
+      return rows[0] || null;
+    } catch (error) {
+      console.error('Error finding payment by transaction ref:', error);
+      return null;
+    }
   }
 
 }

@@ -1419,6 +1419,9 @@ class PropertyModel {
     try {
       await connection.beginTransaction();
 
+      // Convert userId to string for JSON consistency
+      const userIdStr = userId.toString();
+
       // Get current saved_by_users and saves_count
       const [result] = await connection.execute(
         'SELECT saved_by_users, saves_count FROM properties WHERE id = ?',
@@ -1435,45 +1438,50 @@ class PropertyModel {
       console.log(`🔍 Current saves for property ${propertyId}:`, {
         savedByUsers,
         savesCount,
-        userId,
+        userId: userIdStr,
         action: save ? 'save' : 'unsave'
       });
 
+      // Convert all saved users to strings for comparison
+      const savedByUsersStr = savedByUsers.map(id => id.toString());
+
       if (save) {
         // Add user to saved list if not already there
-        if (!savedByUsers.includes(userId)) {
-          savedByUsers.push(userId);
+        if (!savedByUsersStr.includes(userIdStr)) {
+          // Add the string version to the array
+          savedByUsers.push(userIdStr);
           savesCount++;
 
           await connection.execute(
-            'UPDATE properties SET saved_by_users = ?, saves_count = ? WHERE id = ?',
+            'UPDATE properties SET saved_by_users = ?, saves_count = ?, updated_at = NOW() WHERE id = ?',
             [JSON.stringify(savedByUsers), savesCount, propertyId]
           );
 
           await connection.commit();
-          console.log(`✅ Property ${propertyId} saved by user ${userId}. Total saves: ${savesCount}`);
-          return { success: true, action: 'saved', savesCount };
+          console.log(`✅ Property ${propertyId} saved by user ${userIdStr}. Total saves: ${savesCount}`);
+          return { success: true, action: 'saved', savesCount, saved: true };
         }
-        console.log(`ℹ️ Property ${propertyId} already saved by user ${userId}`);
-        return { success: false, message: 'Already saved', savesCount };
+        console.log(`ℹ️ Property ${propertyId} already saved by user ${userIdStr}`);
+        return { success: true, action: 'already_saved', savesCount, saved: true };
       } else {
         // Remove user from saved list
-        const index = savedByUsers.indexOf(userId);
+        const index = savedByUsersStr.indexOf(userIdStr);
         if (index > -1) {
+          // Remove from the original array (not the string version)
           savedByUsers.splice(index, 1);
           savesCount = Math.max(0, savesCount - 1);
 
           await connection.execute(
-            'UPDATE properties SET saved_by_users = ?, saves_count = ? WHERE id = ?',
+            'UPDATE properties SET saved_by_users = ?, saves_count = ?, updated_at = NOW() WHERE id = ?',
             [JSON.stringify(savedByUsers), savesCount, propertyId]
           );
 
           await connection.commit();
-          console.log(`✅ Property ${propertyId} unsaved by user ${userId}. Total saves: ${savesCount}`);
-          return { success: true, action: 'unsaved', savesCount };
+          console.log(`✅ Property ${propertyId} unsaved by user ${userIdStr}. Total saves: ${savesCount}`);
+          return { success: true, action: 'unsaved', savesCount, saved: false };
         }
-        console.log(`ℹ️ Property ${propertyId} not saved by user ${userId}`);
-        return { success: false, message: 'Not saved yet', savesCount };
+        console.log(`ℹ️ Property ${propertyId} not saved by user ${userIdStr}`);
+        return { success: true, action: 'not_saved', savesCount, saved: false };
       }
 
     } catch (error) {
@@ -1486,75 +1494,89 @@ class PropertyModel {
   }
 
   // Check if property is saved by user
-  async isSavedByUser(propertyId, userId) {
-    const connection = await pool.getConnection();
-
-    try {
-      const [result] = await connection.execute(
-        'SELECT saved_by_users FROM properties WHERE id = ?',
-        [propertyId]
-      );
-
-      if (result.length === 0) return false;
-
-      const savedByUsers = safeJsonParse(result[0].saved_by_users, []);
-      return savedByUsers.includes(userId);
-
-    } catch (error) {
-      throw error;
-    } finally {
-      connection.release();
-    }
-  }
-
-  // Get user's saved properties
   async getSavedProperties(userId, page = 1, limit = 20) {
     const connection = await pool.getConnection();
 
     try {
-      // Using JSON_CONTAINS to find properties saved by this user
+      const userIdStr = userId.toString();
+      console.log(`🔍 getSavedProperties: Looking for properties saved by user ${userIdStr}`);
+
+      // FIXED QUERY: Use proper JSON_CONTAINS syntax
       const query = `
         SELECT p.*, 
           u.username as owner_username,
           u.email as owner_email,
-          TRUE as is_saved
+          TRUE as is_saved,
+          (SELECT image_url FROM property_images 
+           WHERE property_id = p.id 
+           ORDER BY is_primary DESC, image_order ASC 
+           LIMIT 1) as main_image
         FROM properties p
         LEFT JOIN users u ON p.owner_user_id = u.id
-        WHERE JSON_CONTAINS(p.saved_by_users, ?)
-          AND p.deleted_at IS NULL
+        WHERE p.deleted_at IS NULL
           AND p.property_status = 'active'
+          AND p.saved_by_users IS NOT NULL
+          AND JSON_CONTAINS(p.saved_by_users, JSON_QUOTE(?))
         ORDER BY p.updated_at DESC
         LIMIT ? OFFSET ?
       `;
 
       const offset = (page - 1) * limit;
 
+      // FIX: Use userIdStr directly, JSON_QUOTE handles quoting
+      console.log(`🔍 Query params: userId=${userIdStr}, limit=${limit}, offset=${offset}`);
+
       const [properties] = await connection.execute(query, [
-        JSON.stringify([userId]),
+        userIdStr, // Pass the string directly, JSON_QUOTE will handle it
         limit,
         offset
       ]);
 
-      // Count total
+      console.log(`✅ Found ${properties.length} saved properties for user ${userIdStr}`);
+
+      if (properties.length > 0) {
+        console.log(`🔍 First saved property:`, {
+          id: properties[0].id,
+          title: properties[0].title,
+          saved_by_users: properties[0].saved_by_users
+        });
+      }
+
+      // Count total - FIXED
       const [countResult] = await connection.execute(
         `SELECT COUNT(*) as total FROM properties 
-         WHERE JSON_CONTAINS(saved_by_users, ?) 
-           AND deleted_at IS NULL 
-           AND property_status = 'active'`,
-        [JSON.stringify([userId])]
+         WHERE deleted_at IS NULL 
+           AND property_status = 'active'
+           AND saved_by_users IS NOT NULL
+           AND JSON_CONTAINS(saved_by_users, JSON_QUOTE(?))`,
+        [userIdStr] // Same fix here
       );
 
       const total = countResult[0].total;
+      console.log(`📊 Total saved properties in DB: ${total}`);
 
       // Parse JSON fields
-      const parsedProperties = properties.map((property) => ({
-        ...property,
-        features: safeJsonParse(property.features, []),
-        amenities: safeJsonParse(property.amenities, []),
-        property_tags: safeJsonParse(property.property_tags, []),
-        saved_by_users: safeJsonParse(property.saved_by_users, []),
-        square_meters: property.sqft || 0,
-      }));
+      const parsedProperties = properties.map((property) => {
+        const safeParse = (str, defaultValue = []) => {
+          try {
+            return str ? JSON.parse(str) : defaultValue;
+          } catch {
+            return defaultValue;
+          }
+        };
+
+        return {
+          ...property,
+          features: safeParse(property.features),
+          amenities: safeParse(property.amenities),
+          property_tags: safeParse(property.property_tags),
+          saved_by_users: safeParse(property.saved_by_users),
+          price_history: safeParse(property.price_history),
+          status_history: safeParse(property.status_history),
+          square_meters: property.sqft || 0,
+          isSaved: true
+        };
+      });
 
       return {
         properties: parsedProperties,
@@ -1567,7 +1589,53 @@ class PropertyModel {
       };
 
     } catch (error) {
-      console.error("Error getting saved properties:", error);
+      console.error("❌ Error in getSavedProperties:", error);
+      if (error.sqlMessage) {
+        console.error("❌ SQL Error:", error.sqlMessage);
+        console.error("❌ SQL State:", error.sqlState);
+      }
+      throw error;
+    } finally {
+      connection.release();
+    }
+  }
+  
+  async isSavedByUser(propertyId, userId) {
+    const connection = await pool.getConnection();
+  
+    try {
+      const userIdStr = userId.toString();
+  
+      const [result] = await connection.execute(
+        'SELECT saved_by_users FROM properties WHERE id = ?',
+        [propertyId]
+      );
+  
+      if (result.length === 0) {
+        console.log(`⚠️ Property ${propertyId} not found`);
+        return false;
+      }
+  
+      const savedByUsers = safeJsonParse(result[0].saved_by_users, []);
+      
+      // Convert all saved users to strings for comparison
+      const savedByUsersStr = savedByUsers.map(id => {
+        if (typeof id === 'number') return id.toString();
+        return String(id);
+      });
+      
+      const isSaved = savedByUsersStr.includes(userIdStr);
+  
+      console.log(`🔍 isSavedByUser check: property=${propertyId}, user=${userIdStr}, isSaved=${isSaved}`);
+      
+      if (savedByUsersStr.length > 0) {
+        console.log(`🔍 First 3 saved users:`, savedByUsersStr.slice(0, 3));
+      }
+  
+      return isSaved;
+  
+    } catch (error) {
+      console.error('❌ Error in isSavedByUser:', error);
       throw error;
     } finally {
       connection.release();

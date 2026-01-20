@@ -362,7 +362,7 @@ router.post('/account/resend-verification', verifyToken, async (req, res) => {
       });
     }
 
-    // Generate new token
+    // Generate NEW token (always generate new one)
     const newVerificationToken = crypto.randomBytes(32).toString('hex');
     const newExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
 
@@ -372,18 +372,20 @@ router.post('/account/resend-verification', verifyToken, async (req, res) => {
       [newVerificationToken, newExpiry, req.user.id]
     );
 
+    console.log("🔄 Generated NEW verification token for user:", req.user.id);
+
     // Send verification email
     try {
       const response = await fetch('http://localhost:5001/api/email/send-verification', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'internal-service-token': 'communication-service-secret-12345' // Add this token
+          'internal-service-token': 'communication-service-secret-12345'
         },
         body: JSON.stringify({
           email: user.email,
           fullName: `${user.first_name || ''} ${user.last_name || ''}`.trim() || user.email,
-          token: newVerificationToken  // <-- Should be "token" not "verificationToken"
+          verificationToken: newVerificationToken  // Use NEW token
         })
       });
 
@@ -417,7 +419,6 @@ router.post('/account/resend-verification', verifyToken, async (req, res) => {
     });
   }
 });
-
 // Admin: Update user status (admin only)
 router.put('/admin/user/:userId/status', verifyToken, verifyAdmin, async (req, res) => {
   try {
@@ -918,6 +919,24 @@ router.get('/documents', verifyToken, async (req, res) => {
       success: false,
       message: 'Failed to get documents',
       error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
+
+router.post('/admin/cleanup-tokens', verifyToken, verifyAdmin, async (req, res) => {
+  try {
+    const result = await cleanupExpiredTokens();
+    res.json({
+      success: true,
+      message: 'Token cleanup completed',
+      result: result
+    });
+  } catch (error) {
+    console.error('Manual cleanup error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Cleanup failed',
+      error: error.message
     });
   }
 });

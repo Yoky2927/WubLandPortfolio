@@ -1,22 +1,26 @@
-// App.jsx - Add maintenance context
+// App.jsx
 import React from 'react';
 import { Outlet } from 'react-router-dom';
-import { SystemSettingsProvider } from './contexts/SystemSettingsContext';
-import { ToastProvider } from './contexts/ToastContext';
-import { NavigationProvider } from './contexts/NavigationContext';
-import './index.css';
+import AnnouncementBanner from './components/AnnouncementBanner';
+import ThemeToggle from './components/ThemeToggle';
+import { useTheme } from './contexts/ThemeContext';
 
 function App() {
+  const { theme } = useTheme();
+
   return (
-    <ToastProvider>
-      <SystemSettingsProvider>
-        <NavigationProvider>
-         <div className="App">
-          <Outlet />
-        </div>
-        </NavigationProvider>
-      </SystemSettingsProvider>
-    </ToastProvider>
+    <div className={` ${theme === 'dark' ? 'dark bg-gray-900' : 'bg-gray-50'}`}>
+      {/* Announcement Banner at the top */}
+      <AnnouncementBanner theme={theme} />
+      
+      {/* Main content */}
+      <main className="relative">
+        <Outlet />
+      </main>
+      
+      {/* Theme Toggle at bottom right */}
+      <ThemeToggle />
+    </div>
   );
 }
 

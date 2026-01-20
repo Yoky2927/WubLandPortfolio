@@ -96,10 +96,11 @@ router.get("/health", (req, res) => {
 
 router.get("/", PropertyController.getAllProperties);
 router.get("/search", PropertyController.searchProperties);
+router.get("/properties/:id", PropertyController.getPropertyById);
 router.get("/featured", PropertyController.getFeaturedProperties);
 router.get("/recent", PropertyController.getRecentProperties);
 router.get("/premium", PropertyController.getPremiumProperties);
-router.get("/:id", PropertyController.getPropertyById);
+
 
 // ================= BROKER ROUTES =================
 router.get(

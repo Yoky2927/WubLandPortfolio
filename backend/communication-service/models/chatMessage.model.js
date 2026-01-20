@@ -84,7 +84,7 @@ const ChatMessage = {
         fileType: data.fileType,
       });
 
-      const messageUuid = generateUUID(); 
+      const messageUuid = generateUUID();
 
       const [result] = await db.execute(
         `INSERT INTO chat_messages 
@@ -100,7 +100,7 @@ const ChatMessage = {
           data.fileSize || null,
           data.fileType || null,
           data.status || "sent",
-          messageUuid, 
+          messageUuid,
         ]
       );
 
@@ -140,12 +140,12 @@ const ChatMessage = {
       // Try to find existing conversation
       const [conversations] = await db.execute(
         `SELECT c.id 
-                 FROM chat_conversations c
-                 JOIN conversation_participants cp1 ON c.id = cp1.conversation_id
-                 JOIN conversation_participants cp2 ON c.id = cp2.conversation_id
-                 WHERE c.conversation_type = 'direct'
-                 AND cp1.user_id = ? AND cp2.user_id = ?
-                 AND cp1.is_active = TRUE AND cp2.is_active = TRUE`,
+         FROM chat_conversations c
+         JOIN conversation_participants cp1 ON c.id = cp1.conversation_id
+         JOIN conversation_participants cp2 ON c.id = cp2.conversation_id
+         WHERE c.conversation_type = 'direct'
+         AND cp1.user_id = ? AND cp2.user_id = ?
+         AND cp1.is_active = TRUE AND cp2.is_active = TRUE`,
         [user1Id, user2Id]
       );
 
@@ -159,7 +159,7 @@ const ChatMessage = {
       const conversationUuid = generateUUID();
       const [conversationResult] = await db.execute(
         `INSERT INTO chat_conversations (conversation_uuid, conversation_type, created_by, created_at) 
-                 VALUES (?, 'direct', ?, NOW())`,
+         VALUES (?, 'direct', ?, NOW())`,
         [conversationUuid, createdBy]
       );
 
@@ -168,13 +168,13 @@ const ChatMessage = {
       // Add both users as participants
       await db.execute(
         `INSERT INTO conversation_participants (conversation_id, user_id, role, joined_at, is_active) 
-                 VALUES (?, ?, 'member', NOW(), TRUE)`,
+         VALUES (?, ?, 'member', NOW(), TRUE)`,
         [conversationId, user1Id]
       );
 
       await db.execute(
         `INSERT INTO conversation_participants (conversation_id, user_id, role, joined_at, is_active) 
-                 VALUES (?, ?, 'member', NOW(), TRUE)`,
+         VALUES (?, ?, 'member', NOW(), TRUE)`,
         [conversationId, user2Id]
       );
 
@@ -182,6 +182,27 @@ const ChatMessage = {
       return conversationId;
     } catch (error) {
       console.error("❌ Error in findOrCreateConversation:", error.message);
+      throw error;
+    }
+  },
+
+  getConversationParticipants: async (conversationId) => {
+    try {
+      const [participants] = await db.execute(
+        `SELECT cp.user_id as id,
+                CONCAT(u.first_name, ' ', u.last_name) as full_name,
+                u.email,
+                u.profile_picture as profile_pic,
+                u.role,
+                cp.role as participant_role
+         FROM conversation_participants cp
+         JOIN users u ON cp.user_id = u.id
+         WHERE cp.conversation_id = ? AND cp.is_active = TRUE`,
+        [conversationId]
+      );
+      return participants;
+    } catch (error) {
+      console.error("Error getting conversation participants:", error);
       throw error;
     }
   },
@@ -429,7 +450,7 @@ const GroupChat = {
       throw error;
     }
   },
-  
+
 
   // Remove user from group
   removeUserFromGroup: async (groupId, userId, removedBy) => {
@@ -456,7 +477,7 @@ const GroupChat = {
       throw error;
     }
   },
-  
+
 
   // Check if user is in group
   isUserInGroup: async (groupId, userId) => {

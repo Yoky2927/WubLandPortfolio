@@ -95,8 +95,6 @@ app.get('/api-docs', (req, res) => {
   res.json(ApiDocs.generateDocs('user', userServiceEndpoints));
 });
 
-// Update health endpoint
-app.get('/health', createHealthCheck('user'));
 
 // File upload - FIXED configuration
 app.use((req, res, next) => {

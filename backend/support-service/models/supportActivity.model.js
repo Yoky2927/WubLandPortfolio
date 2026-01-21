@@ -29,13 +29,24 @@ export const SupportActivity = {
     return activities;
   },
 
-  // Add method to get activities by target
+  // Find by target
   findByTarget: async (targetType, targetId) => {
     const [activities] = await db.query(`
       SELECT * FROM support_agent_activities 
       WHERE target_type = ? AND target_id = ?
       ORDER BY timestamp DESC
     `, [targetType, targetId]);
+    return activities;
+  },
+
+  // Get activities for dashboard
+  getDashboardActivities: async (days = 7) => {
+    const [activities] = await db.query(`
+      SELECT * FROM support_agent_activities 
+      WHERE timestamp >= DATE_SUB(NOW(), INTERVAL ? DAY)
+      ORDER BY timestamp DESC
+      LIMIT 50
+    `, [days]);
     return activities;
   }
 };

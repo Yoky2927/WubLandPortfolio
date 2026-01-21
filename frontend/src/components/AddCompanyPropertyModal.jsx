@@ -1,11 +1,12 @@
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useEffect, useRef } from "react";
 import {
     Building, Home, LandPlot, Key, CheckCircle,
     X, Check, Minus, Plus, Upload, Image as ImageIcon,
     FileText, Phone, Mail, MapPin, DollarSign,
     Bed, Bath, Layers, Maximize2, Crown, PlusCircle,
     Trash2, Calendar, Star, TrendingUp, AlertCircle,
-    Building2, Castle, Warehouse
+    Building2, Castle, Warehouse, Car, TreePine,
+    Shield, FileCheck, CreditCard, Landmark, Hammer
 } from "lucide-react";
 import { apiCall } from "../utils/api.endpoints";
 
@@ -14,148 +15,258 @@ const AddCompanyPropertyModal = ({
     isOpen,
     onClose,
     onSuccess,
-    setToast
+    setToast,
+    currentUserId // Add this prop to get the current user ID
 }) => {
-    console.log('🔧 Modal rendering, isOpen:', isOpen);
-    
     const [loading, setLoading] = useState(false);
+    
+    // Updated state to match your database schema
     const [property, setProperty] = useState({
+        // Basic Info
         title: "",
         description: "",
-        type: "residential",
-        subType: "apartment",
-        price: "",
-        location: "",
+        property_type: "residential",
+        property_status: "active",
         address: "",
         city: "",
+        state: "",
         region: "",
-        bedrooms: 1,
-        bathrooms: 1,
-        area: "",
-        areaUnit: "sqm",
-        floorNumber: "",
-        totalFloors: "",
-        yearBuilt: new Date().getFullYear(),
+        neighborhood: "",
+        country: "Ethiopia",
+        zip_code: "",
+        latitude: "",
+        longitude: "",
+        
+        // Specifications
+        beds: 1,
+        baths: 1,
+        sqft: "",
+        lot_size: "",
+        year_built: new Date().getFullYear(),
+        garage_spaces: 0,
+        parking_spaces: 0,
+        
+        // Pricing
+        price: "",
+        currency: "ETB",
+        price_per_sqft: "",
+        is_negotiable: true,
+        deposit_amount: "",
+        monthly_rent: "",
+        listing_type: "sale",
+        
+        // Additional Info
+        mls_number: "",
+        mls_source: "",
+        listing_date: new Date().toISOString().split('T')[0],
+        expiration_date: "",
         features: [],
         amenities: [],
-        images: [],
+        property_tags: [],
+        
+        // Company specific
+        property_source: "company_owned",
+        company_project_name: "",
+        development_stage: "completed",
+        company_ownership_percentage: 100.00,
+        
+        // Financials
+        tax_amount: "",
+        hoa_fees: "",
+        insurance_amount: "",
+        est_payment: "",
+        
+        // Contact
         contactPhone: "",
         contactEmail: "",
-        isPremium: false,
-        isFeatured: false,
-        listingType: "sale",
+        
+        // Listing settings
+        is_premium: false,
+        is_featured: false,
         availability: "available",
-        parkingSpaces: 0,
-        gardenArea: "",
+        
+        // Additional fields
         balcony: false,
-        storageRoom: false
+        storageRoom: false,
+        gardenArea: "",
+        floorNumber: "",
+        totalFloors: "",
+        areaUnit: "sqm"
     });
 
     const [imageUploads, setImageUploads] = useState([]);
     const [floorPlans, setFloorPlans] = useState([]);
+    const [propertyDocuments, setPropertyDocuments] = useState([]);
     const [activeTab, setActiveTab] = useState("basic");
+    
+    // Use refs to avoid re-renders
+    const modalRef = useRef(null);
+    const inputRef = useRef(null);
 
     const isDark = theme === "dark";
 
-    // Property types configuration
+    // Updated property types to match your ENUM
     const propertyTypes = {
         residential: {
             label: "Residential",
             icon: Home,
-            subtypes: ["apartment", "villa", "condo", "townhouse", "penthouse", "studio"],
-            color: "blue"
+            subtypes: ["house", "apartment", "condo", "townhouse", "villa", "penthouse", "cottage", "loft"],
+            color: "from-blue-500 to-cyan-500"
         },
         commercial: {
             label: "Commercial",
             icon: Building,
-            subtypes: ["office", "retail", "warehouse", "industrial", "mixed-use"],
-            color: "purple"
+            subtypes: ["commercial"],
+            color: "from-purple-500 to-pink-500"
+        },
+        industrial: {
+            label: "Industrial",
+            icon: Warehouse,
+            subtypes: ["industrial"],
+            color: "from-orange-500 to-amber-500"
         },
         land: {
             label: "Land",
             icon: LandPlot,
-            subtypes: ["residential_land", "commercial_land", "agricultural", "investment"],
-            color: "green"
-        },
-        rental: {
-            label: "Rental",
-            icon: Key,
-            subtypes: ["short_term", "long_term", "vacation", "student"],
-            color: "orange"
+            subtypes: ["land"],
+            color: "from-green-500 to-emerald-500"
         }
     };
 
-    // Features and amenities options
+    // Match your features and amenities
     const featuresOptions = [
         "Swimming Pool", "Garden", "Parking", "Security", "Elevator",
         "Air Conditioning", "Heating", "Furnished", "Pet Friendly",
         "Balcony", "Terrace", "Gym", "Playground", "Concierge",
         "Wheelchair Access", "Storage", "Laundry", "Internet",
-        "Smart Home", "CCTV", "Generator", "Water Tank"
+        "Smart Home", "CCTV", "Generator", "Water Tank", "Fireplace",
+        "Central Heating", "Hardwood Floors", "Walk-in Closet", "Wine Cellar"
     ];
 
     const amenitiesOptions = [
         "Shopping Mall", "Hospital", "School", "Park", "Restaurant",
         "Supermarket", "Bank", "Pharmacy", "Public Transport",
         "Sports Center", "Cinema", "University", "Airport", "Gym",
-        "Swimming Pool", "Playground", "Security", "Parking"
+        "Swimming Pool", "Playground", "Security", "Parking", "Beach",
+        "Golf Course", "Tennis Court", "Clubhouse", "Business Center"
     ];
 
-    // Navigation tabs
+    const propertyTagsOptions = [
+        "Waterfront", "Mountain View", "City View", "Gated Community",
+        "New Construction", "Recently Renovated", "Energy Efficient",
+        "Luxury", "Affordable", "Investment", "Fixer Upper", "Historic",
+        "Modern", "Spacious", "Cozy", "Family Friendly", "Pet Friendly",
+        "Senior Living", "Student Housing", "Corporate Housing"
+    ];
+
+    const developmentStages = [
+        { value: "planning", label: "Planning" },
+        { value: "construction", label: "Under Construction" },
+        { value: "completed", label: "Completed" },
+        { value: "launched", label: "Launched" }
+    ];
+
     const tabs = [
-        { id: "basic", label: "Basic Info", icon: Building },
-        { id: "specs", label: "Specifications", icon: Layers },
-        { id: "features", label: "Features", icon: Star },
-        { id: "media", label: "Media", icon: ImageIcon },
-        { id: "contact", label: "Contact", icon: Phone }
+        { id: "basic", label: "Basic Info", icon: Building, color: "from-blue-500 to-cyan-500" },
+        { id: "specs", label: "Specifications", icon: Layers, color: "from-emerald-500 to-teal-500" },
+        { id: "features", label: "Features", icon: Star, color: "from-amber-500 to-orange-500" },
+        { id: "financial", label: "Financial", icon: CreditCard, color: "from-purple-500 to-pink-500" },
+        { id: "media", label: "Media", icon: ImageIcon, color: "from-rose-500 to-red-500" },
+        { id: "contact", label: "Contact", icon: Phone, color: "from-indigo-500 to-blue-500" }
     ];
 
-    // FIXED: Use useCallback for handleInputChange
-    const handleInputChange = useCallback((e) => {
-        const { name, value, type, checked } = e.target;
-        console.log('📝 Input change:', name, value);
+    const getActiveTabColor = () => {
+        const activeTabConfig = tabs.find(tab => tab.id === activeTab);
+        return activeTabConfig ? activeTabConfig.color : "from-amber-500 to-orange-500";
+    };
 
+    const getPopupBackground = () => {
+        return isDark
+            ? "bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900"
+            : "bg-gradient-to-br from-amber-50 via-white to-gray-100";
+    };
+
+    const getCardBackground = () => {
+        return isDark
+            ? "bg-gray-800/80 border-gray-700"
+            : "bg-white border-gray-200";
+    };
+
+    const getTextColor = () => {
+        return isDark ? "text-white" : "text-gray-900";
+    };
+
+    const getSecondaryTextColor = () => {
+        return isDark ? "text-gray-300" : "text-gray-600";
+    };
+
+    const handleInputChange = (e) => {
+        const { name, value, type, checked } = e.target;
         setProperty(prev => ({
             ...prev,
             [name]: type === 'checkbox' ? checked : value
         }));
-    }, []);
+    };
 
-    // FIXED: Handle number input changes
-    const handleNumberChange = useCallback((name, value) => {
-        console.log('🔢 Number change:', name, value);
-        
+    const handleNumberChange = (name, value) => {
         setProperty(prev => ({
             ...prev,
             [name]: typeof value === 'number' ? value : parseFloat(value) || 0
         }));
-    }, []);
+    };
 
-    // FIXED: Handle feature toggle
-    const handleFeatureToggle = useCallback((feature) => {
-        console.log('⭐ Feature toggle:', feature);
-        
+    const handleFeatureToggle = (feature) => {
         setProperty(prev => ({
             ...prev,
             features: prev.features.includes(feature)
                 ? prev.features.filter(f => f !== feature)
                 : [...prev.features, feature]
         }));
-    }, []);
+    };
 
-    // FIXED: Handle amenity toggle
-    const handleAmenityToggle = useCallback((amenity) => {
-        console.log('🏙️ Amenity toggle:', amenity);
-        
+    const handleAmenityToggle = (amenity) => {
         setProperty(prev => ({
             ...prev,
             amenities: prev.amenities.includes(amenity)
                 ? prev.amenities.filter(a => a !== amenity)
                 : [...prev.amenities, amenity]
         }));
-    }, []);
+    };
 
-    // FIXED: Handle image upload
+    const handleTagToggle = (tag) => {
+        setProperty(prev => ({
+            ...prev,
+            property_tags: prev.property_tags.includes(tag)
+                ? prev.property_tags.filter(t => t !== tag)
+                : [...prev.property_tags, tag]
+        }));
+    };
+
+    // Focus on input when modal opens
+    useEffect(() => {
+        if (isOpen) {
+            setTimeout(() => {
+                if (inputRef.current) {
+                    inputRef.current.focus();
+                    inputRef.current.select();
+                }
+            }, 200);
+        }
+    }, [isOpen]);
+
+    // Handle escape key to close modal
+    useEffect(() => {
+        const handleEscape = (e) => {
+            if (e.key === 'Escape' && isOpen) {
+                onClose();
+            }
+        };
+
+        window.addEventListener('keydown', handleEscape);
+        return () => window.removeEventListener('keydown', handleEscape);
+    }, [isOpen, onClose]);
+
+    // Image upload handler
     const handleImageUpload = async (files) => {
         try {
             const uploadPromises = Array.from(files).map(async (file) => {
@@ -172,7 +283,11 @@ const AddCompanyPropertyModal = ({
                         url: response.url,
                         thumbnail: response.thumbnail || response.url,
                         caption: file.name,
-                        type: 'image'
+                        type: 'image',
+                        file_size: file.size,
+                        mime_type: file.type,
+                        width: 0,
+                        height: 0
                     };
                 }
                 return null;
@@ -182,10 +297,6 @@ const AddCompanyPropertyModal = ({
             const validImages = uploadedImages.filter(img => img !== null);
 
             setImageUploads(prev => [...prev, ...validImages]);
-            setProperty(prev => ({
-                ...prev,
-                images: [...prev.images, ...validImages]
-            }));
 
             setToast({
                 show: true,
@@ -202,7 +313,7 @@ const AddCompanyPropertyModal = ({
         }
     };
 
-    // FIXED: Handle floor plan upload
+    // Floor plan upload handler
     const handleFloorPlanUpload = async (files) => {
         try {
             const uploadPromises = Array.from(files).map(async (file) => {
@@ -215,11 +326,15 @@ const AddCompanyPropertyModal = ({
                 });
 
                 if (response && response.url) {
-                    return {
+                    const floorPlan = {
                         url: response.url,
                         caption: `Floor Plan ${floorPlans.length + 1}`,
-                        type: 'floorPlan'
+                        type: 'floor_plan',
+                        file_name: file.name,
+                        file_size: file.size,
+                        mime_type: file.type
                     };
+                    return floorPlan;
                 }
                 return null;
             });
@@ -244,45 +359,165 @@ const AddCompanyPropertyModal = ({
         }
     };
 
-    // FIXED: Remove image
-    const removeImage = (index) => {
-        setImageUploads(prev => prev.filter((_, i) => i !== index));
-        setProperty(prev => ({
-            ...prev,
-            images: prev.images.filter((_, i) => i !== index)
-        }));
+    // Document upload handler
+    const handleDocumentUpload = async (files, documentType) => {
+        try {
+            const uploadPromises = Array.from(files).map(async (file) => {
+                const formData = new FormData();
+                formData.append('document', file);
+                formData.append('type', documentType);
+
+                const response = await apiCall('UPLOAD_PROPERTY_DOCUMENT', {}, {
+                    data: formData,
+                    method: 'POST'
+                });
+
+                if (response && response.url) {
+                    const document = {
+                        url: response.url,
+                        title: file.name.replace(/\.[^/.]+$/, ""),
+                        document_type: documentType,
+                        file_name: file.name,
+                        file_size: file.size,
+                        mime_type: file.type
+                    };
+                    return document;
+                }
+                return null;
+            });
+
+            const uploadedDocs = await Promise.all(uploadPromises);
+            const validDocs = uploadedDocs.filter(doc => doc !== null);
+
+            setPropertyDocuments(prev => [...prev, ...validDocs]);
+
+            setToast({
+                show: true,
+                message: `${validDocs.length} document(s) uploaded successfully`,
+                type: "success",
+            });
+        } catch (error) {
+            console.error('Error uploading documents:', error);
+            setToast({
+                show: true,
+                message: "Failed to upload documents",
+                type: "error",
+            });
+        }
     };
 
-    // FIXED: Remove floor plan
+    const removeImage = (index) => {
+        setImageUploads(prev => prev.filter((_, i) => i !== index));
+    };
+
     const removeFloorPlan = (index) => {
         setFloorPlans(prev => prev.filter((_, i) => i !== index));
     };
 
-    // FIXED: Submit property
+    const removeDocument = (index) => {
+        setPropertyDocuments(prev => prev.filter((_, i) => i !== index));
+    };
+
     const handleSubmit = async () => {
         try {
             setLoading(true);
 
             // Validate required fields
-            if (!property.title || !property.price || !property.location) {
+            if (!property.title || !property.price || !property.address) {
                 setToast({
                     show: true,
-                    message: "Please fill in all required fields",
+                    message: "Please fill in all required fields (Title, Price, Address)",
                     type: "warning",
                 });
                 return;
             }
 
-            // Prepare property data with floor plans
+            // Calculate price per sqft if sqft is provided
+            let pricePerSqft = "";
+            if (property.sqft && property.price) {
+                pricePerSqft = (parseFloat(property.price) / parseFloat(property.sqft)).toFixed(2);
+            }
+
+            // Prepare property data matching your database schema
             const propertyData = {
-                ...property,
-                floorPlans: floorPlans,
-                isCompanyProperty: true,
-                status: 'approved',
-                listedBy: 'company',
-                listedAt: new Date().toISOString(),
-                images: imageUploads
+                // Basic Info
+                title: property.title,
+                description: property.description,
+                property_type: property.property_type,
+                property_status: property.property_status,
+                address: property.address,
+                city: property.city,
+                state: property.state,
+                region: property.region,
+                neighborhood: property.neighborhood,
+                country: property.country,
+                zip_code: property.zip_code,
+                latitude: property.latitude ? parseFloat(property.latitude) : null,
+                longitude: property.longitude ? parseFloat(property.longitude) : null,
+                
+                // Specifications
+                beds: parseInt(property.beds) || 0,
+                baths: parseFloat(property.baths) || 0,
+                sqft: property.sqft ? parseFloat(property.sqft) : null,
+                lot_size: property.lot_size ? parseFloat(property.lot_size) : null,
+                year_built: parseInt(property.year_built) || null,
+                garage_spaces: parseInt(property.garage_spaces) || 0,
+                parking_spaces: parseInt(property.parking_spaces) || 0,
+                
+                // Pricing
+                price: parseFloat(property.price),
+                currency: property.currency,
+                price_per_sqft: pricePerSqft ? parseFloat(pricePerSqft) : null,
+                is_negotiable: property.is_negotiable,
+                deposit_amount: property.deposit_amount ? parseFloat(property.deposit_amount) : null,
+                monthly_rent: property.monthly_rent ? parseFloat(property.monthly_rent) : null,
+                listing_type: property.listing_type,
+                
+                // Additional Info
+                mls_number: property.mls_number || null,
+                mls_source: property.mls_source || null,
+                listing_date: property.listing_date,
+                expiration_date: property.expiration_date || null,
+                features: JSON.stringify(property.features),
+                amenities: JSON.stringify(property.amenities),
+                property_tags: JSON.stringify(property.property_tags),
+                
+                // Company specific
+                property_source: "company_owned",
+                company_project_name: property.company_project_name || null,
+                development_stage: property.development_stage,
+                company_ownership_percentage: parseFloat(property.company_ownership_percentage) || 100.00,
+                
+                // Financials
+                tax_amount: property.tax_amount ? parseFloat(property.tax_amount) : null,
+                hoa_fees: property.hoa_fees ? parseFloat(property.hoa_fees) : null,
+                insurance_amount: property.insurance_amount ? parseFloat(property.insurance_amount) : null,
+                est_payment: property.est_payment ? parseFloat(property.est_payment) : null,
+                
+                // Listing settings
+                is_premium: property.is_premium,
+                is_featured: property.is_featured,
+                
+                // User references
+                owner_user_id: currentUserId,
+                created_by_user_id: currentUserId,
+                assigned_broker_id: null,
+                
+                // Default values for analytics
+                analytics_metadata: JSON.stringify({}),
+                saved_by_users: JSON.stringify([]),
+                viewed_by_users: JSON.stringify([]),
+                price_history: JSON.stringify([]),
+                tax_history: JSON.stringify([]),
+                nearby_schools: JSON.stringify([]),
+                floor_plans: JSON.stringify(floorPlans),
+                
+                // Images and documents will be uploaded separately
+                images: imageUploads,
+                documents: propertyDocuments
             };
+
+            console.log("Submitting property data:", propertyData);
 
             const response = await apiCall('ADD_COMPANY_PROPERTY', {}, {
                 data: propertyData,
@@ -300,36 +535,62 @@ const AddCompanyPropertyModal = ({
                 setProperty({
                     title: "",
                     description: "",
-                    type: "residential",
-                    subType: "apartment",
-                    price: "",
-                    location: "",
+                    property_type: "residential",
+                    property_status: "active",
                     address: "",
                     city: "",
+                    state: "",
                     region: "",
-                    bedrooms: 1,
-                    bathrooms: 1,
-                    area: "",
-                    areaUnit: "sqm",
-                    floorNumber: "",
-                    totalFloors: "",
-                    yearBuilt: new Date().getFullYear(),
+                    neighborhood: "",
+                    country: "Ethiopia",
+                    zip_code: "",
+                    latitude: "",
+                    longitude: "",
+                    beds: 1,
+                    baths: 1,
+                    sqft: "",
+                    lot_size: "",
+                    year_built: new Date().getFullYear(),
+                    garage_spaces: 0,
+                    parking_spaces: 0,
+                    price: "",
+                    currency: "ETB",
+                    price_per_sqft: "",
+                    is_negotiable: true,
+                    deposit_amount: "",
+                    monthly_rent: "",
+                    listing_type: "sale",
+                    mls_number: "",
+                    mls_source: "",
+                    listing_date: new Date().toISOString().split('T')[0],
+                    expiration_date: "",
                     features: [],
                     amenities: [],
-                    images: [],
+                    property_tags: [],
+                    property_source: "company_owned",
+                    company_project_name: "",
+                    development_stage: "completed",
+                    company_ownership_percentage: 100.00,
+                    tax_amount: "",
+                    hoa_fees: "",
+                    insurance_amount: "",
+                    est_payment: "",
                     contactPhone: "",
                     contactEmail: "",
-                    isPremium: false,
-                    isFeatured: false,
-                    listingType: "sale",
+                    is_premium: false,
+                    is_featured: false,
                     availability: "available",
-                    parkingSpaces: 0,
-                    gardenArea: "",
                     balcony: false,
-                    storageRoom: false
+                    storageRoom: false,
+                    gardenArea: "",
+                    floorNumber: "",
+                    totalFloors: "",
+                    areaUnit: "sqm"
                 });
+                
                 setImageUploads([]);
                 setFloorPlans([]);
+                setPropertyDocuments([]);
 
                 // Close modal and trigger success callback
                 onClose();
@@ -339,7 +600,7 @@ const AddCompanyPropertyModal = ({
             console.error('Error adding company property:', error);
             setToast({
                 show: true,
-                message: `Failed: ${error.message}`,
+                message: `Failed: ${error.message || "Unknown error"}`,
                 type: "error",
             });
         } finally {
@@ -347,190 +608,160 @@ const AddCompanyPropertyModal = ({
         }
     };
 
-    // FIXED: Property Type Section with proper event handling
-    const PropertyTypeSection = () => (
-        <div className="mb-6">
-            <h3 className={`font-semibold mb-4 ${isDark ? "text-white" : "text-gray-900"}`}>
-                Property Type
-            </h3>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                {Object.entries(propertyTypes).map(([key, config]) => {
-                    const Icon = config.icon;
-                    const isSelected = property.type === key;
+    // Basic Info Section
+    const renderBasicInfoSection = () => (
+        <div className="space-y-6">
+            <div className={`p-4 rounded-xl border ${getCardBackground()} shadow-sm`}>
+                <h4 className={`text-lg font-semibold mb-4 ${getTextColor()}`}>
+                    Property Type
+                </h4>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    {Object.entries(propertyTypes).map(([key, config]) => {
+                        const Icon = config.icon;
+                        const isSelected = property.property_type === key;
 
-                    return (
-                        <button
-                            key={key}
-                            type="button"
-                            onClick={() => {
-                                console.log('🏠 Type selected:', key);
-                                setProperty(prev => ({ 
-                                    ...prev, 
-                                    type: key, 
-                                    subType: config.subtypes[0] 
-                                }));
-                            }}
-                            className={`p-4 rounded-xl border-2 flex flex-col items-center justify-center transition-all ${
-                                isSelected
-                                    ? isDark
-                                        ? "border-blue-500 bg-blue-900/20"
-                                        : "border-blue-500 bg-blue-50"
-                                    : isDark
-                                        ? "border-gray-700 bg-gray-800/50 hover:bg-gray-700/50"
-                                        : "border-gray-200 bg-white hover:bg-gray-50"
-                            }`}
-                        >
-                            <Icon className={`w-6 h-6 mb-2 ${
-                                isSelected
-                                    ? isDark ? "text-blue-400" : "text-blue-600"
-                                    : isDark ? "text-gray-400" : "text-gray-500"
-                            }`} />
-                            <span className={`text-sm font-medium ${
-                                isSelected
-                                    ? isDark ? "text-blue-300" : "text-blue-700"
-                                    : isDark ? "text-gray-300" : "text-gray-700"
-                            }`}>
-                                {config.label}
-                            </span>
-                        </button>
-                    );
-                })}
-            </div>
-
-            {property.type && (
-                <div className="mt-4">
-                    <label className={`block mb-2 text-sm ${isDark ? "text-gray-300" : "text-gray-700"}`}>
-                        Sub Type
-                    </label>
-                    <div className="flex flex-wrap gap-2">
-                        {propertyTypes[property.type]?.subtypes.map(subtype => (
+                        return (
                             <button
-                                key={subtype}
+                                key={key}
                                 type="button"
                                 onClick={() => {
-                                    console.log('🔧 Subtype selected:', subtype);
-                                    setProperty(prev => ({ ...prev, subType: subtype }));
+                                    setProperty(prev => ({
+                                        ...prev,
+                                        property_type: key
+                                    }));
                                 }}
-                                className={`px-3 py-1.5 rounded-lg text-sm capitalize ${
-                                    property.subType === subtype
-                                        ? isDark
-                                            ? "bg-amber-600 text-white"
-                                            : "bg-amber-100 text-amber-700"
-                                        : isDark
-                                            ? "bg-gray-700 text-gray-300 hover:bg-gray-600"
-                                            : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                                className={`p-4 rounded-xl border-2 flex flex-col items-center justify-center transition-all duration-200 hover:scale-[1.02] ${
+                                    isSelected
+                                        ? `border-white shadow-lg bg-gradient-to-br ${config.color} text-white`
+                                        : `${getCardBackground()} hover:bg-gray-50 dark:hover:bg-gray-700/50 ${
+                                            isDark ? 'border-gray-700' : 'border-gray-200'
+                                        }`
                                 }`}
                             >
-                                {subtype.replace('_', ' ')}
+                                <Icon className={`w-6 h-6 mb-2 ${
+                                    isSelected ? 'text-white' : (isDark ? 'text-gray-400' : 'text-gray-500')
+                                }`} />
+                                <span className={`text-sm font-medium ${
+                                    isSelected ? 'text-white' : getTextColor()
+                                }`}>
+                                    {config.label}
+                                </span>
                             </button>
-                        ))}
-                    </div>
+                        );
+                    })}
                 </div>
-            )}
-        </div>
-    );
+            </div>
 
-    // FIXED: Basic Info Section with controlled inputs
-    const BasicInfoSection = () => (
-        <div className="mb-6">
-            <h3 className={`font-semibold mb-4 ${isDark ? "text-white" : "text-gray-900"}`}>
-                Basic Information
-            </h3>
-            <div className="space-y-4">
-                <div>
-                    <label className={`block mb-2 text-sm ${isDark ? "text-gray-300" : "text-gray-700"}`}>
-                        Property Title *
-                    </label>
-                    <input
-                        type="text"
-                        name="title"
-                        value={property.title}
-                        onChange={handleInputChange}
-                        placeholder="e.g., Modern 3-Bedroom Apartment in City Center"
-                        className={`w-full p-3 rounded-lg border ${
-                            isDark
-                                ? "bg-gray-700 border-gray-600 text-white placeholder-gray-400 focus:border-amber-500"
-                                : "bg-white border-gray-300 text-gray-900 placeholder-gray-500 focus:border-amber-500"
-                        } focus:outline-none focus:ring-2 focus:ring-amber-500/50 transition-colors`}
-                    />
-                </div>
-
-                <div>
-                    <label className={`block mb-2 text-sm ${isDark ? "text-gray-300" : "text-gray-700"}`}>
-                        Description
-                    </label>
-                    <textarea
-                        name="description"
-                        value={property.description}
-                        onChange={handleInputChange}
-                        placeholder="Describe the property in detail..."
-                        rows="4"
-                        className={`w-full p-3 rounded-lg border ${
-                            isDark
-                                ? "bg-gray-700 border-gray-600 text-white placeholder-gray-400 focus:border-amber-500"
-                                : "bg-white border-gray-300 text-gray-900 placeholder-gray-500 focus:border-amber-500"
-                        } focus:outline-none focus:ring-2 focus:ring-amber-500/50 transition-colors`}
-                    />
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className={`p-4 rounded-xl border ${getCardBackground()} shadow-sm`}>
+                <h4 className={`text-lg font-semibold mb-4 ${getTextColor()}`}>
+                    Basic Details
+                </h4>
+                <div className="space-y-4">
                     <div>
-                        <label className={`block mb-2 text-sm ${isDark ? "text-gray-300" : "text-gray-700"}`}>
-                            Price *
-                        </label>
-                        <div className="flex gap-2">
-                            <select
-                                name="listingType"
-                                value={property.listingType}
-                                onChange={handleInputChange}
-                                className={`w-1/3 p-3 rounded-lg border ${
-                                    isDark
-                                        ? "bg-gray-700 border-gray-600 text-white focus:border-amber-500"
-                                        : "bg-white border-gray-300 text-gray-900 focus:border-amber-500"
-                                } focus:outline-none focus:ring-2 focus:ring-amber-500/50 transition-colors`}
-                            >
-                                <option value="sale">For Sale</option>
-                                <option value="rent">For Rent</option>
-                                <option value="lease">For Lease</option>
-                            </select>
-                            <input
-                                type="number"
-                                name="price"
-                                value={property.price}
-                                onChange={handleInputChange}
-                                placeholder="Enter price"
-                                className={`flex-1 p-3 rounded-lg border ${
-                                    isDark
-                                        ? "bg-gray-700 border-gray-600 text-white placeholder-gray-400 focus:border-amber-500"
-                                        : "bg-white border-gray-300 text-gray-900 placeholder-gray-500 focus:border-amber-500"
-                                } focus:outline-none focus:ring-2 focus:ring-amber-500/50 transition-colors`}
-                            />
-                        </div>
-                    </div>
-
-                    <div>
-                        <label className={`block mb-2 text-sm ${isDark ? "text-gray-300" : "text-gray-700"}`}>
-                            Location *
+                        <label className={`block mb-2 text-sm ${getSecondaryTextColor()}`}>
+                            Property Title *
                         </label>
                         <input
+                            ref={inputRef}
                             type="text"
-                            name="location"
-                            value={property.location}
+                            name="title"
+                            value={property.title}
                             onChange={handleInputChange}
-                            placeholder="e.g., Bole, Addis Ababa"
-                            className={`w-full p-3 rounded-lg border ${
+                            placeholder="e.g., Modern 3-Bedroom Apartment in Bole"
+                            className={`w-full p-3 rounded-lg border transition-all duration-200 focus:scale-[1.02] ${
                                 isDark
-                                    ? "bg-gray-700 border-gray-600 text-white placeholder-gray-400 focus:border-amber-500"
-                                    : "bg-white border-gray-300 text-gray-900 placeholder-gray-500 focus:border-amber-500"
-                            } focus:outline-none focus:ring-2 focus:ring-amber-500/50 transition-colors`}
+                                    ? "bg-gray-700/50 border-gray-600 text-white placeholder-gray-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30"
+                                    : "bg-white border-gray-300 text-gray-900 placeholder-gray-500 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
+                            }`}
                         />
                     </div>
-                </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                        <label className={`block mb-2 text-sm ${isDark ? "text-gray-300" : "text-gray-700"}`}>
-                            Full Address
+                        <label className={`block mb-2 text-sm ${getSecondaryTextColor()}`}>
+                            Description
+                        </label>
+                        <textarea
+                            name="description"
+                            value={property.description}
+                            onChange={handleInputChange}
+                            placeholder="Describe the property in detail..."
+                            rows="4"
+                            className={`w-full p-3 rounded-lg border transition-all duration-200 ${
+                                isDark
+                                    ? "bg-gray-700/50 border-gray-600 text-white placeholder-gray-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30"
+                                    : "bg-white border-gray-300 text-gray-900 placeholder-gray-500 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
+                            }`}
+                        />
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label className={`block mb-2 text-sm ${getSecondaryTextColor()}`}>
+                                Price (ETB) *
+                            </label>
+                            <div className="flex gap-2">
+                                <select
+                                    name="listing_type"
+                                    value={property.listing_type}
+                                    onChange={handleInputChange}
+                                    className={`w-1/3 p-3 rounded-lg border ${
+                                        isDark
+                                            ? "bg-gray-700/50 border-gray-600 text-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30"
+                                            : "bg-white border-gray-300 text-gray-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
+                                    }`}
+                                >
+                                    <option value="sale">For Sale</option>
+                                    <option value="rent">For Rent</option>
+                                    <option value="lease">For Lease</option>
+                                </select>
+                                <input
+                                    type="number"
+                                    name="price"
+                                    value={property.price}
+                                    onChange={handleInputChange}
+                                    placeholder="Enter price"
+                                    className={`flex-1 p-3 rounded-lg border transition-all duration-200 focus:scale-[1.02] ${
+                                        isDark
+                                            ? "bg-gray-700/50 border-gray-600 text-white placeholder-gray-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30"
+                                            : "bg-white border-gray-300 text-gray-900 placeholder-gray-500 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
+                                    }`}
+                                />
+                            </div>
+                        </div>
+
+                        <div>
+                            <label className={`block mb-2 text-sm ${getSecondaryTextColor()}`}>
+                                Property Status
+                            </label>
+                            <select
+                                name="property_status"
+                                value={property.property_status}
+                                onChange={handleInputChange}
+                                className={`w-full p-3 rounded-lg border ${
+                                    isDark
+                                        ? "bg-gray-700/50 border-gray-600 text-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30"
+                                        : "bg-white border-gray-300 text-gray-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
+                                }`}
+                            >
+                                <option value="active">Active</option>
+                                <option value="pending">Pending</option>
+                                <option value="sold">Sold</option>
+                                <option value="rented">Rented</option>
+                                <option value="draft">Draft</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div className={`p-4 rounded-xl border ${getCardBackground()} shadow-sm`}>
+                <h4 className={`text-lg font-semibold mb-4 ${getTextColor()}`}>
+                    Location Details
+                </h4>
+                <div className="space-y-4">
+                    <div>
+                        <label className={`block mb-2 text-sm ${getSecondaryTextColor()}`}>
+                            Full Address *
                         </label>
                         <input
                             type="text"
@@ -538,288 +769,207 @@ const AddCompanyPropertyModal = ({
                             value={property.address}
                             onChange={handleInputChange}
                             placeholder="Street address, house number"
-                            className={`w-full p-3 rounded-lg border ${
+                            className={`w-full p-3 rounded-lg border transition-all duration-200 focus:scale-[1.02] ${
                                 isDark
-                                    ? "bg-gray-700 border-gray-600 text-white placeholder-gray-400 focus:border-amber-500"
-                                    : "bg-white border-gray-300 text-gray-900 placeholder-gray-500 focus:border-amber-500"
-                            } focus:outline-none focus:ring-2 focus:ring-amber-500/50 transition-colors`}
+                                    ? "bg-gray-700/50 border-gray-600 text-white placeholder-gray-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30"
+                                    : "bg-white border-gray-300 text-gray-900 placeholder-gray-500 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
+                            }`}
                         />
                     </div>
 
-                    <div>
-                        <label className={`block mb-2 text-sm ${isDark ? "text-gray-300" : "text-gray-700"}`}>
-                            City/Region
-                        </label>
-                        <input
-                            type="text"
-                            name="city"
-                            value={property.city}
-                            onChange={handleInputChange}
-                            placeholder="City and region"
-                            className={`w-full p-3 rounded-lg border ${
-                                isDark
-                                    ? "bg-gray-700 border-gray-600 text-white placeholder-gray-400 focus:border-amber-500"
-                                    : "bg-white border-gray-300 text-gray-900 placeholder-gray-500 focus:border-amber-500"
-                            } focus:outline-none focus:ring-2 focus:ring-amber-500/50 transition-colors`}
-                        />
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label className={`block mb-2 text-sm ${getSecondaryTextColor()}`}>
+                                City *
+                            </label>
+                            <input
+                                type="text"
+                                name="city"
+                                value={property.city}
+                                onChange={handleInputChange}
+                                placeholder="City"
+                                className={`w-full p-3 rounded-lg border ${
+                                    isDark
+                                        ? "bg-gray-700/50 border-gray-600 text-white placeholder-gray-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30"
+                                        : "bg-white border-gray-300 text-gray-900 placeholder-gray-500 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
+                                }`}
+                            />
+                        </div>
+
+                        <div>
+                            <label className={`block mb-2 text-sm ${getSecondaryTextColor()}`}>
+                                State/Region
+                            </label>
+                            <input
+                                type="text"
+                                name="state"
+                                value={property.state}
+                                onChange={handleInputChange}
+                                placeholder="State or Region"
+                                className={`w-full p-3 rounded-lg border ${
+                                    isDark
+                                        ? "bg-gray-700/50 border-gray-600 text-white placeholder-gray-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30"
+                                        : "bg-white border-gray-300 text-gray-900 placeholder-gray-500 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
+                                }`}
+                            />
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label className={`block mb-2 text-sm ${getSecondaryTextColor()}`}>
+                                Neighborhood
+                            </label>
+                            <input
+                                type="text"
+                                name="neighborhood"
+                                value={property.neighborhood}
+                                onChange={handleInputChange}
+                                placeholder="Neighborhood or area"
+                                className={`w-full p-3 rounded-lg border ${
+                                    isDark
+                                        ? "bg-gray-700/50 border-gray-600 text-white placeholder-gray-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30"
+                                        : "bg-white border-gray-300 text-gray-900 placeholder-gray-500 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
+                                }`}
+                            />
+                        </div>
+
+                        <div>
+                            <label className={`block mb-2 text-sm ${getSecondaryTextColor()}`}>
+                                ZIP/Postal Code
+                            </label>
+                            <input
+                                type="text"
+                                name="zip_code"
+                                value={property.zip_code}
+                                onChange={handleInputChange}
+                                placeholder="ZIP code"
+                                className={`w-full p-3 rounded-lg border ${
+                                    isDark
+                                        ? "bg-gray-700/50 border-gray-600 text-white placeholder-gray-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30"
+                                        : "bg-white border-gray-300 text-gray-900 placeholder-gray-500 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
+                                }`}
+                            />
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
     );
 
-    // FIXED: Specifications Section
-    const SpecificationsSection = () => (
-        <div className="mb-6">
-            <h3 className={`font-semibold mb-4 ${isDark ? "text-white" : "text-gray-900"}`}>
-                Specifications
-            </h3>
+    // SPECIFICATIONS SECTION
+    const renderSpecificationsSection = () => (
+        <div className={`p-4 rounded-xl border ${getCardBackground()} shadow-sm`}>
+            <h4 className={`text-lg font-semibold mb-6 ${getTextColor()}`}>
+                Property Specifications
+            </h4>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                <div>
-                    <label className={`block mb-2 text-sm ${isDark ? "text-gray-300" : "text-gray-700"}`}>
-                        Bedrooms
-                    </label>
-                    <div className="flex items-center gap-2">
-                        <button
-                            type="button"
-                            onClick={() => handleNumberChange('bedrooms', Math.max(0, property.bedrooms - 1))}
-                            className={`p-2 rounded-lg ${
-                                isDark
-                                    ? "bg-gray-700 hover:bg-gray-600 text-white"
-                                    : "bg-gray-200 hover:bg-gray-300 text-gray-700"
-                            } transition-colors`}
-                        >
-                            <Minus className="w-4 h-4" />
-                        </button>
-                        <span className={`px-4 py-2 rounded-lg min-w-[60px] text-center ${isDark ? "bg-gray-700" : "bg-gray-100"}`}>
-                            {property.bedrooms}
-                        </span>
-                        <button
-                            type="button"
-                            onClick={() => handleNumberChange('bedrooms', property.bedrooms + 1)}
-                            className={`p-2 rounded-lg ${
-                                isDark
-                                    ? "bg-gray-700 hover:bg-gray-600 text-white"
-                                    : "bg-gray-200 hover:bg-gray-300 text-gray-700"
-                            } transition-colors`}
-                        >
-                            <Plus className="w-4 h-4" />
-                        </button>
+                {[
+                    { label: "Bedrooms", name: "beds", icon: Bed, value: property.beds, step: 1 },
+                    { label: "Bathrooms", name: "baths", icon: Bath, value: property.baths, step: 0.5 },
+                    { label: "Garage Spaces", name: "garage_spaces", icon: Car, value: property.garage_spaces, step: 1 },
+                    { label: "Parking Spaces", name: "parking_spaces", icon: Car, value: property.parking_spaces, step: 1 }
+                ].map((item) => (
+                    <div key={item.name} className={`p-3 rounded-lg border ${isDark ? 'bg-gray-700/30 border-gray-600' : 'bg-gray-50 border-gray-200'}`}>
+                        <label className={`block mb-2 text-sm ${getSecondaryTextColor()}`}>
+                            {item.label}
+                        </label>
+                        <div className="flex items-center gap-2">
+                            <button
+                                type="button"
+                                onClick={() => handleNumberChange(item.name, Math.max(0, item.value - item.step))}
+                                className={`p-2 rounded-lg transition-colors ${
+                                    isDark
+                                        ? "bg-gray-600 hover:bg-gray-500 text-white"
+                                        : "bg-gray-200 hover:bg-gray-300 text-gray-700"
+                                }`}
+                            >
+                                <Minus className="w-4 h-4" />
+                            </button>
+                            <span className={`px-4 py-2 rounded-lg min-w-[60px] text-center font-medium ${
+                                isDark ? "bg-gray-600 text-white" : "bg-white text-gray-900"
+                            }`}>
+                                {item.value}
+                            </span>
+                            <button
+                                type="button"
+                                onClick={() => handleNumberChange(item.name, item.value + item.step)}
+                                className={`p-2 rounded-lg transition-colors ${
+                                    isDark
+                                        ? "bg-gray-600 hover:bg-gray-500 text-white"
+                                        : "bg-gray-200 hover:bg-gray-300 text-gray-700"
+                                }`}
+                            >
+                                <Plus className="w-4 h-4" />
+                            </button>
+                        </div>
                     </div>
+                ))}
+
+                <div>
+                    <label className={`block mb-2 text-sm ${getSecondaryTextColor()}`}>
+                        Square Feet (Sqft)
+                    </label>
+                    <input
+                        type="number"
+                        name="sqft"
+                        value={property.sqft}
+                        onChange={handleInputChange}
+                        placeholder="Total area in sqft"
+                        className={`w-full p-3 rounded-lg border ${
+                            isDark
+                                ? "bg-gray-700/50 border-gray-600 text-white placeholder-gray-400 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/30"
+                                : "bg-white border-gray-300 text-gray-900 placeholder-gray-500 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
+                        }`}
+                    />
                 </div>
 
                 <div>
-                    <label className={`block mb-2 text-sm ${isDark ? "text-gray-300" : "text-gray-700"}`}>
-                        Bathrooms
+                    <label className={`block mb-2 text-sm ${getSecondaryTextColor()}`}>
+                        Lot Size (Sqft)
                     </label>
-                    <div className="flex items-center gap-2">
-                        <button
-                            type="button"
-                            onClick={() => handleNumberChange('bathrooms', Math.max(0.5, property.bathrooms - 0.5))}
-                            className={`p-2 rounded-lg ${
-                                isDark
-                                    ? "bg-gray-700 hover:bg-gray-600 text-white"
-                                    : "bg-gray-200 hover:bg-gray-300 text-gray-700"
-                            } transition-colors`}
-                        >
-                            <Minus className="w-4 h-4" />
-                        </button>
-                        <span className={`px-4 py-2 rounded-lg min-w-[60px] text-center ${isDark ? "bg-gray-700" : "bg-gray-100"}`}>
-                            {property.bathrooms}
-                        </span>
-                        <button
-                            type="button"
-                            onClick={() => handleNumberChange('bathrooms', property.bathrooms + 0.5)}
-                            className={`p-2 rounded-lg ${
-                                isDark
-                                    ? "bg-gray-700 hover:bg-gray-600 text-white"
-                                    : "bg-gray-200 hover:bg-gray-300 text-gray-700"
-                            } transition-colors`}
-                        >
-                            <Plus className="w-4 h-4" />
-                        </button>
-                    </div>
+                    <input
+                        type="number"
+                        name="lot_size"
+                        value={property.lot_size}
+                        onChange={handleInputChange}
+                        placeholder="Lot size in sqft"
+                        className={`w-full p-3 rounded-lg border ${
+                            isDark
+                                ? "bg-gray-700/50 border-gray-600 text-white placeholder-gray-400 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/30"
+                                : "bg-white border-gray-300 text-gray-900 placeholder-gray-500 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
+                        }`}
+                    />
                 </div>
 
                 <div>
-                    <label className={`block mb-2 text-sm ${isDark ? "text-gray-300" : "text-gray-700"}`}>
-                        Total Area
-                    </label>
-                    <div className="flex gap-2">
-                        <input
-                            type="number"
-                            name="area"
-                            value={property.area}
-                            onChange={handleInputChange}
-                            placeholder="Size"
-                            className={`flex-1 p-3 rounded-lg border ${
-                                isDark
-                                    ? "bg-gray-700 border-gray-600 text-white placeholder-gray-400 focus:border-amber-500"
-                                    : "bg-white border-gray-300 text-gray-900 placeholder-gray-500 focus:border-amber-500"
-                            } focus:outline-none focus:ring-2 focus:ring-amber-500/50 transition-colors`}
-                        />
-                        <select
-                            name="areaUnit"
-                            value={property.areaUnit}
-                            onChange={handleInputChange}
-                            className={`w-1/3 p-3 rounded-lg border ${
-                                isDark
-                                    ? "bg-gray-700 border-gray-600 text-white focus:border-amber-500"
-                                    : "bg-white border-gray-300 text-gray-900 focus:border-amber-500"
-                            } focus:outline-none focus:ring-2 focus:ring-amber-500/50 transition-colors`}
-                        >
-                            <option value="sqm">Sq m</option>
-                            <option value="sqft">Sq ft</option>
-                            <option value="hectare">Hectare</option>
-                            <option value="acre">Acre</option>
-                        </select>
-                    </div>
-                </div>
-
-                <div>
-                    <label className={`block mb-2 text-sm ${isDark ? "text-gray-300" : "text-gray-700"}`}>
+                    <label className={`block mb-2 text-sm ${getSecondaryTextColor()}`}>
                         Year Built
                     </label>
                     <input
                         type="number"
-                        name="yearBuilt"
-                        value={property.yearBuilt}
+                        name="year_built"
+                        value={property.year_built}
                         onChange={handleInputChange}
                         placeholder="Year"
                         min="1800"
                         max={new Date().getFullYear()}
                         className={`w-full p-3 rounded-lg border ${
                             isDark
-                                ? "bg-gray-700 border-gray-600 text-white placeholder-gray-400 focus:border-amber-500"
-                                : "bg-white border-gray-300 text-gray-900 placeholder-gray-500 focus:border-amber-500"
-                        } focus:outline-none focus:ring-2 focus:ring-amber-500/50 transition-colors`}
+                                ? "bg-gray-700/50 border-gray-600 text-white placeholder-gray-400 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/30"
+                                : "bg-white border-gray-300 text-gray-900 placeholder-gray-500 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
+                        }`}
                     />
-                </div>
-
-                <div>
-                    <label className={`block mb-2 text-sm ${isDark ? "text-gray-300" : "text-gray-700"}`}>
-                        Floor Number
-                    </label>
-                    <input
-                        type="number"
-                        name="floorNumber"
-                        value={property.floorNumber}
-                        onChange={handleInputChange}
-                        placeholder="Floor number"
-                        min="0"
-                        className={`w-full p-3 rounded-lg border ${
-                            isDark
-                                ? "bg-gray-700 border-gray-600 text-white placeholder-gray-400 focus:border-amber-500"
-                                : "bg-white border-gray-300 text-gray-900 placeholder-gray-500 focus:border-amber-500"
-                        } focus:outline-none focus:ring-2 focus:ring-amber-500/50 transition-colors`}
-                    />
-                </div>
-
-                <div>
-                    <label className={`block mb-2 text-sm ${isDark ? "text-gray-300" : "text-gray-700"}`}>
-                        Total Floors
-                    </label>
-                    <input
-                        type="number"
-                        name="totalFloors"
-                        value={property.totalFloors}
-                        onChange={handleInputChange}
-                        placeholder="Total floors in building"
-                        min="1"
-                        className={`w-full p-3 rounded-lg border ${
-                            isDark
-                                ? "bg-gray-700 border-gray-600 text-white placeholder-gray-400 focus:border-amber-500"
-                                : "bg-white border-gray-300 text-gray-900 placeholder-gray-500 focus:border-amber-500"
-                        } focus:outline-none focus:ring-2 focus:ring-amber-500/50 transition-colors`}
-                    />
-                </div>
-
-                <div>
-                    <label className={`block mb-2 text-sm ${isDark ? "text-gray-300" : "text-gray-700"}`}>
-                        Parking Spaces
-                    </label>
-                    <div className="flex items-center gap-2">
-                        <button
-                            type="button"
-                            onClick={() => handleNumberChange('parkingSpaces', Math.max(0, property.parkingSpaces - 1))}
-                            className={`p-2 rounded-lg ${
-                                isDark
-                                    ? "bg-gray-700 hover:bg-gray-600 text-white"
-                                    : "bg-gray-200 hover:bg-gray-300 text-gray-700"
-                            } transition-colors`}
-                        >
-                            <Minus className="w-4 h-4" />
-                        </button>
-                        <span className={`px-4 py-2 rounded-lg min-w-[60px] text-center ${isDark ? "bg-gray-700" : "bg-gray-100"}`}>
-                            {property.parkingSpaces}
-                        </span>
-                        <button
-                            type="button"
-                            onClick={() => handleNumberChange('parkingSpaces', property.parkingSpaces + 1)}
-                            className={`p-2 rounded-lg ${
-                                isDark
-                                    ? "bg-gray-700 hover:bg-gray-600 text-white"
-                                    : "bg-gray-200 hover:bg-gray-300 text-gray-700"
-                            } transition-colors`}
-                        >
-                            <Plus className="w-4 h-4" />
-                        </button>
-                    </div>
-                </div>
-
-                <div className="md:col-span-2">
-                    <label className={`block mb-2 text-sm ${isDark ? "text-gray-300" : "text-gray-700"}`}>
-                        Garden Area (optional)
-                    </label>
-                    <input
-                        type="text"
-                        name="gardenArea"
-                        value={property.gardenArea}
-                        onChange={handleInputChange}
-                        placeholder="e.g., 100 sqm garden"
-                        className={`w-full p-3 rounded-lg border ${
-                            isDark
-                                ? "bg-gray-700 border-gray-600 text-white placeholder-gray-400 focus:border-amber-500"
-                                : "bg-white border-gray-300 text-gray-900 placeholder-gray-500 focus:border-amber-500"
-                        } focus:outline-none focus:ring-2 focus:ring-amber-500/50 transition-colors`}
-                    />
-                </div>
-
-                <div className="flex items-center gap-3">
-                    <label className={`flex items-center gap-2 ${isDark ? "text-gray-300" : "text-gray-700"}`}>
-                        <input
-                            type="checkbox"
-                            name="balcony"
-                            checked={property.balcony}
-                            onChange={handleInputChange}
-                            className="w-4 h-4 rounded"
-                        />
-                        <span>Balcony</span>
-                    </label>
-                    <label className={`flex items-center gap-2 ${isDark ? "text-gray-300" : "text-gray-700"}`}>
-                        <input
-                            type="checkbox"
-                            name="storageRoom"
-                            checked={property.storageRoom}
-                            onChange={handleInputChange}
-                            className="w-4 h-4 rounded"
-                        />
-                        <span>Storage Room</span>
-                    </label>
                 </div>
             </div>
         </div>
     );
 
-    // FIXED: Features Section
-    const FeaturesSection = () => (
-        <div className="mb-6">
-            <h3 className={`font-semibold mb-4 ${isDark ? "text-white" : "text-gray-900"}`}>
-                Features & Amenities
-            </h3>
-
-            <div className="mb-6">
-                <h4 className={`text-sm font-medium mb-3 ${isDark ? "text-gray-300" : "text-gray-700"}`}>
+    // FEATURES SECTION
+    const renderFeaturesSection = () => (
+        <div className="space-y-6">
+            <div className={`p-4 rounded-xl border ${getCardBackground()} shadow-sm`}>
+                <h4 className={`text-lg font-semibold mb-4 ${getTextColor()}`}>
                     Property Features
                 </h4>
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
@@ -828,25 +978,23 @@ const AddCompanyPropertyModal = ({
                             key={feature}
                             type="button"
                             onClick={() => handleFeatureToggle(feature)}
-                            className={`px-3 py-2 rounded-lg text-sm flex items-center gap-2 justify-center transition-all ${
+                            className={`px-3 py-2 rounded-lg text-sm flex items-center gap-2 justify-center transition-all duration-200 hover:scale-[1.02] ${
                                 property.features.includes(feature)
-                                    ? isDark
-                                        ? "bg-amber-600 text-white"
-                                        : "bg-amber-100 text-amber-700 border-amber-300"
-                                    : isDark
-                                        ? "bg-gray-700 text-gray-300 hover:bg-gray-600 border-gray-600"
-                                        : "bg-gray-100 text-gray-700 hover:bg-gray-200 border-gray-200"
-                            } border`}
+                                    ? "bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-lg"
+                                    : `${getCardBackground()} hover:bg-gray-50 dark:hover:bg-gray-700/50`
+                            } border ${isDark ? 'border-gray-600' : 'border-gray-200'}`}
                         >
-                            <Check className={`w-3 h-3 ${property.features.includes(feature) ? "opacity-100" : "opacity-0"}`} />
+                            <Check className={`w-3 h-3 ${
+                                property.features.includes(feature) ? "opacity-100" : "opacity-0"
+                            }`} />
                             {feature}
                         </button>
                     ))}
                 </div>
             </div>
 
-            <div>
-                <h4 className={`text-sm font-medium mb-3 ${isDark ? "text-gray-300" : "text-gray-700"}`}>
+            <div className={`p-4 rounded-xl border ${getCardBackground()} shadow-sm`}>
+                <h4 className={`text-lg font-semibold mb-4 ${getTextColor()}`}>
                     Nearby Amenities
                 </h4>
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
@@ -855,18 +1003,41 @@ const AddCompanyPropertyModal = ({
                             key={amenity}
                             type="button"
                             onClick={() => handleAmenityToggle(amenity)}
-                            className={`px-3 py-2 rounded-lg text-sm flex items-center gap-2 justify-center transition-all ${
+                            className={`px-3 py-2 rounded-lg text-sm flex items-center gap-2 justify-center transition-all duration-200 hover:scale-[1.02] ${
                                 property.amenities.includes(amenity)
-                                    ? isDark
-                                        ? "bg-blue-600 text-white"
-                                        : "bg-blue-100 text-blue-700 border-blue-300"
-                                    : isDark
-                                        ? "bg-gray-700 text-gray-300 hover:bg-gray-600 border-gray-600"
-                                        : "bg-gray-100 text-gray-700 hover:bg-gray-200 border-gray-200"
-                            } border`}
+                                    ? "bg-gradient-to-r from-blue-500 to-cyan-500 text-white shadow-lg"
+                                    : `${getCardBackground()} hover:bg-gray-50 dark:hover:bg-gray-700/50`
+                            } border ${isDark ? 'border-gray-600' : 'border-gray-200'}`}
                         >
-                            <Check className={`w-3 h-3 ${property.amenities.includes(amenity) ? "opacity-100" : "opacity-0"}`} />
+                            <Check className={`w-3 h-3 ${
+                                property.amenities.includes(amenity) ? "opacity-100" : "opacity-0"
+                            }`} />
                             {amenity}
+                        </button>
+                    ))}
+                </div>
+            </div>
+
+            <div className={`p-4 rounded-xl border ${getCardBackground()} shadow-sm`}>
+                <h4 className={`text-lg font-semibold mb-4 ${getTextColor()}`}>
+                    Property Tags
+                </h4>
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
+                    {propertyTagsOptions.map(tag => (
+                        <button
+                            key={tag}
+                            type="button"
+                            onClick={() => handleTagToggle(tag)}
+                            className={`px-3 py-2 rounded-lg text-sm flex items-center gap-2 justify-center transition-all duration-200 hover:scale-[1.02] ${
+                                property.property_tags.includes(tag)
+                                    ? "bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-lg"
+                                    : `${getCardBackground()} hover:bg-gray-50 dark:hover:bg-gray-700/50`
+                            } border ${isDark ? 'border-gray-600' : 'border-gray-200'}`}
+                        >
+                            <Check className={`w-3 h-3 ${
+                                property.property_tags.includes(tag) ? "opacity-100" : "opacity-0"
+                            }`} />
+                            {tag}
                         </button>
                     ))}
                 </div>
@@ -874,23 +1045,123 @@ const AddCompanyPropertyModal = ({
         </div>
     );
 
-    // FIXED: Media Section
-    const MediaSection = () => (
-        <div className="mb-6">
-            <h3 className={`font-semibold mb-4 ${isDark ? "text-white" : "text-gray-900"}`}>
-                Property Media
-            </h3>
+    // FINANCIAL SECTION
+    const renderFinancialSection = () => (
+        <div className="space-y-6">
+            <div className={`p-4 rounded-xl border ${getCardBackground()} shadow-sm`}>
+                <h4 className={`text-lg font-semibold mb-4 ${getTextColor()}`}>
+                    Financial Details
+                </h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {[
+                        { label: "Tax Amount (ETB/year)", name: "tax_amount", value: property.tax_amount, placeholder: "Annual property tax" },
+                        { label: "HOA Fees (ETB/month)", name: "hoa_fees", value: property.hoa_fees, placeholder: "Monthly HOA fees" },
+                        { label: "Insurance Amount (ETB/year)", name: "insurance_amount", value: property.insurance_amount, placeholder: "Annual insurance" },
+                        { label: "Estimated Monthly Payment (ETB)", name: "est_payment", value: property.est_payment, placeholder: "Estimated monthly payment" },
+                        { label: "Deposit Amount (ETB)", name: "deposit_amount", value: property.deposit_amount, placeholder: "Security deposit" },
+                        { label: "Monthly Rent (ETB)", name: "monthly_rent", value: property.monthly_rent, placeholder: "For rental properties" }
+                    ].map((field) => (
+                        <div key={field.name}>
+                            <label className={`block mb-2 text-sm ${getSecondaryTextColor()}`}>
+                                {field.label}
+                            </label>
+                            <input
+                                type="number"
+                                name={field.name}
+                                value={field.value}
+                                onChange={handleInputChange}
+                                placeholder={field.placeholder}
+                                className={`w-full p-3 rounded-lg border ${
+                                    isDark
+                                        ? "bg-gray-700/50 border-gray-600 text-white placeholder-gray-400 focus:border-purple-500 focus:ring-2 focus:ring-purple-500/30"
+                                        : "bg-white border-gray-300 text-gray-900 placeholder-gray-500 focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20"
+                                }`}
+                            />
+                        </div>
+                    ))}
+                </div>
+            </div>
 
-            {/* Property Images */}
-            <div className="mb-6">
-                <h4 className={`text-sm font-medium mb-3 ${isDark ? "text-gray-300" : "text-gray-700"}`}>
+            <div className={`p-4 rounded-xl border ${getCardBackground()} shadow-sm`}>
+                <h4 className={`text-lg font-semibold mb-4 ${getTextColor()}`}>
+                    Company Information
+                </h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label className={`block mb-2 text-sm ${getSecondaryTextColor()}`}>
+                            Project Name
+                        </label>
+                        <input
+                            type="text"
+                            name="company_project_name"
+                            value={property.company_project_name}
+                            onChange={handleInputChange}
+                            placeholder="Company project name"
+                            className={`w-full p-3 rounded-lg border ${
+                                isDark
+                                    ? "bg-gray-700/50 border-gray-600 text-white placeholder-gray-400 focus:border-purple-500 focus:ring-2 focus:ring-purple-500/30"
+                                    : "bg-white border-gray-300 text-gray-900 placeholder-gray-500 focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20"
+                            }`}
+                        />
+                    </div>
+
+                    <div>
+                        <label className={`block mb-2 text-sm ${getSecondaryTextColor()}`}>
+                            Development Stage
+                        </label>
+                        <select
+                            name="development_stage"
+                            value={property.development_stage}
+                            onChange={handleInputChange}
+                            className={`w-full p-3 rounded-lg border ${
+                                isDark
+                                    ? "bg-gray-700/50 border-gray-600 text-white focus:border-purple-500 focus:ring-2 focus:ring-purple-500/30"
+                                    : "bg-white border-gray-300 text-gray-900 focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20"
+                            }`}
+                        >
+                            {developmentStages.map(stage => (
+                                <option key={stage.value} value={stage.value}>{stage.label}</option>
+                            ))}
+                        </select>
+                    </div>
+
+                    <div>
+                        <label className={`block mb-2 text-sm ${getSecondaryTextColor()}`}>
+                            Company Ownership (%)
+                        </label>
+                        <input
+                            type="number"
+                            name="company_ownership_percentage"
+                            value={property.company_ownership_percentage}
+                            onChange={handleInputChange}
+                            placeholder="100"
+                            min="0"
+                            max="100"
+                            step="0.01"
+                            className={`w-full p-3 rounded-lg border ${
+                                isDark
+                                    ? "bg-gray-700/50 border-gray-600 text-white placeholder-gray-400 focus:border-purple-500 focus:ring-2 focus:ring-purple-500/30"
+                                    : "bg-white border-gray-300 text-gray-900 placeholder-gray-500 focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20"
+                            }`}
+                        />
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+
+    // MEDIA SECTION
+    const renderMediaSection = () => (
+        <div className="space-y-6">
+            <div className={`p-4 rounded-xl border ${getCardBackground()} shadow-sm`}>
+                <h4 className={`text-lg font-semibold mb-4 ${getTextColor()}`}>
                     Property Images
                 </h4>
-                <div className={`p-6 border-2 border-dashed rounded-xl text-center ${
+                <div className={`p-8 border-2 border-dashed rounded-xl text-center transition-all duration-200 hover:scale-[1.01] ${
                     isDark
-                        ? "border-gray-600 bg-gray-800/50"
-                        : "border-gray-300 bg-gray-50"
-                } hover:border-amber-500 transition-colors`}>
+                        ? "border-gray-600 bg-gray-800/50 hover:border-rose-500"
+                        : "border-gray-300 bg-gray-50 hover:border-rose-500"
+                }`}>
                     <input
                         type="file"
                         id="property-images"
@@ -900,11 +1171,13 @@ const AddCompanyPropertyModal = ({
                         className="hidden"
                     />
                     <label htmlFor="property-images" className="cursor-pointer">
-                        <Upload className={`w-12 h-12 mx-auto mb-3 ${isDark ? "text-gray-500" : "text-gray-400"}`} />
-                        <p className={isDark ? "text-gray-300" : "text-gray-700"}>
+                        <Upload className={`w-12 h-12 mx-auto mb-3 ${
+                            isDark ? "text-gray-500" : "text-gray-400"
+                        }`} />
+                        <p className={`text-lg font-medium ${getTextColor()} mb-1`}>
                             Click to upload property images
                         </p>
-                        <p className={`text-sm mt-1 ${isDark ? "text-gray-500" : "text-gray-500"}`}>
+                        <p className={`text-sm ${getSecondaryTextColor()}`}>
                             Upload up to 20 images (JPEG, PNG, WebP)
                         </p>
                     </label>
@@ -915,81 +1188,80 @@ const AddCompanyPropertyModal = ({
                         <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2">
                             {imageUploads.map((image, index) => (
                                 <div key={index} className="relative group">
-                                    <img
-                                        src={image.thumbnail || image.url}
-                                        alt={`Property ${index + 1}`}
-                                        className="w-full h-24 object-cover rounded-lg"
-                                    />
+                                    <div className="aspect-square rounded-lg overflow-hidden">
+                                        <img
+                                            src={image.thumbnail || image.url}
+                                            alt={`Property ${index + 1}`}
+                                            className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-200"
+                                        />
+                                    </div>
                                     <button
                                         type="button"
                                         onClick={() => removeImage(index)}
-                                        className="absolute top-1 right-1 p-1 bg-red-600 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-700"
+                                        className="absolute top-1 right-1 p-1 bg-gradient-to-r from-red-500 to-rose-600 text-white rounded-full opacity-0 group-hover:opacity-100 transition-all duration-200 hover:scale-110 shadow-lg"
                                     >
                                         <X className="w-3 h-3" />
                                     </button>
-                                    <div className="absolute bottom-0 left-0 right-0 bg-black/70 text-white text-xs py-1 px-2 rounded-b-lg truncate">
-                                        {image.caption}
-                                    </div>
                                 </div>
                             ))}
                         </div>
-                        <p className={`text-sm mt-2 ${isDark ? "text-gray-400" : "text-gray-600"}`}>
-                            {imageUploads.length} image(s) uploaded
-                        </p>
                     </div>
                 )}
             </div>
 
-            {/* Floor Plans */}
-            <div>
-                <h4 className={`text-sm font-medium mb-3 ${isDark ? "text-gray-300" : "text-gray-700"}`}>
-                    Floor Plans & Layouts
+            <div className={`p-4 rounded-xl border ${getCardBackground()} shadow-sm`}>
+                <h4 className={`text-lg font-semibold mb-4 ${getTextColor()}`}>
+                    Documents & Plans
                 </h4>
-                <div className={`p-6 border-2 border-dashed rounded-xl text-center ${
-                    isDark
-                        ? "border-gray-600 bg-gray-800/50"
-                        : "border-gray-300 bg-gray-50"
-                } hover:border-blue-500 transition-colors`}>
-                    <input
-                        type="file"
-                        id="floor-plans"
-                        multiple
-                        accept="image/*,.pdf"
-                        onChange={(e) => handleFloorPlanUpload(e.target.files)}
-                        className="hidden"
-                    />
-                    <label htmlFor="floor-plans" className="cursor-pointer">
-                        <Maximize2 className={`w-12 h-12 mx-auto mb-3 ${isDark ? "text-gray-500" : "text-gray-400"}`} />
-                        <p className={isDark ? "text-gray-300" : "text-gray-700"}>
-                            Click to upload floor plans
-                        </p>
-                        <p className={`text-sm mt-1 ${isDark ? "text-gray-500" : "text-gray-500"}`}>
-                            Upload floor layouts and blueprints (JPG, PNG, PDF)
-                        </p>
-                    </label>
-                </div>
+                <div className="space-y-4">
+                    <div className={`p-6 border-2 border-dashed rounded-xl text-center ${
+                        isDark
+                            ? "border-gray-600 bg-gray-800/50 hover:border-blue-500"
+                            : "border-gray-300 bg-gray-50 hover:border-blue-500"
+                    } transition-colors`}>
+                        <input
+                            type="file"
+                            id="floor-plans"
+                            multiple
+                            accept="image/*,.pdf"
+                            onChange={(e) => handleFloorPlanUpload(e.target.files)}
+                            className="hidden"
+                        />
+                        <label htmlFor="floor-plans" className="cursor-pointer">
+                            <Maximize2 className={`w-12 h-12 mx-auto mb-3 ${
+                                isDark ? "text-gray-500" : "text-gray-400"
+                            }`} />
+                            <p className={`font-medium ${getTextColor()} mb-1`}>
+                                Upload Floor Plans
+                            </p>
+                            <p className={`text-sm ${getSecondaryTextColor()}`}>
+                                JPG, PNG, or PDF files
+                            </p>
+                        </label>
+                    </div>
 
-                {floorPlans.length > 0 && (
-                    <div className="mt-4">
-                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                    {floorPlans.length > 0 && (
+                        <div className="space-y-2">
                             {floorPlans.map((plan, index) => (
                                 <div key={index} className={`p-3 rounded-lg border ${
-                                    isDark ? "bg-gray-700/50 border-gray-600" : "bg-gray-50 border-gray-200"
+                                    isDark ? "bg-gray-700/30 border-gray-600" : "bg-gray-50 border-gray-200"
                                 }`}>
                                     <div className="flex items-center gap-3">
-                                        <FileText className={`w-8 h-8 ${isDark ? "text-blue-400" : "text-blue-600"}`} />
+                                        <FileText className={`w-8 h-8 ${
+                                            isDark ? "text-blue-400" : "text-blue-600"
+                                        }`} />
                                         <div className="flex-1">
-                                            <p className={`text-sm font-medium ${isDark ? "text-white" : "text-gray-900"}`}>
+                                            <p className={`text-sm font-medium ${getTextColor()}`}>
                                                 {plan.caption}
                                             </p>
-                                            <p className={`text-xs ${isDark ? "text-gray-400" : "text-gray-600"}`}>
-                                                Floor plan {index + 1}
+                                            <p className={`text-xs ${getSecondaryTextColor()}`}>
+                                                {plan.file_name}
                                             </p>
                                         </div>
                                         <button
                                             type="button"
                                             onClick={() => removeFloorPlan(index)}
-                                            className="p-1 text-red-600 hover:text-red-700"
+                                            className="p-2 text-red-500 hover:text-red-600 transition-colors"
                                         >
                                             <Trash2 className="w-4 h-4" />
                                         </button>
@@ -997,325 +1269,263 @@ const AddCompanyPropertyModal = ({
                                 </div>
                             ))}
                         </div>
-                        <p className={`text-sm mt-2 ${isDark ? "text-gray-400" : "text-gray-600"}`}>
-                            {floorPlans.length} floor plan(s) uploaded
-                        </p>
-                    </div>
-                )}
+                    )}
+                </div>
             </div>
         </div>
     );
 
-    // FIXED: Contact Section
-    const ContactSection = () => (
-        <div className="mb-6">
-            <h3 className={`font-semibold mb-4 ${isDark ? "text-white" : "text-gray-900"}`}>
-                Contact Information
-            </h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                    <label className={`block mb-2 text-sm ${isDark ? "text-gray-300" : "text-gray-700"}`}>
-                        Contact Phone
-                    </label>
-                    <input
-                        type="tel"
-                        name="contactPhone"
-                        value={property.contactPhone}
-                        onChange={handleInputChange}
-                        placeholder="+251 91 234 5678"
-                        className={`w-full p-3 rounded-lg border ${
-                            isDark
-                                ? "bg-gray-700 border-gray-600 text-white placeholder-gray-400 focus:border-amber-500"
-                                : "bg-white border-gray-300 text-gray-900 placeholder-gray-500 focus:border-amber-500"
-                        } focus:outline-none focus:ring-2 focus:ring-amber-500/50 transition-colors`}
-                    />
-                </div>
+    // CONTACT SECTION
+    const renderContactSection = () => (
+        <div className="space-y-6">
+            <div className={`p-4 rounded-xl border ${getCardBackground()} shadow-sm`}>
+                <h4 className={`text-lg font-semibold mb-4 ${getTextColor()}`}>
+                    Contact Information
+                </h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label className={`block mb-2 text-sm ${getSecondaryTextColor()}`}>
+                            Contact Phone
+                        </label>
+                        <input
+                            type="tel"
+                            name="contactPhone"
+                            value={property.contactPhone}
+                            onChange={handleInputChange}
+                            placeholder="+251 91 234 5678"
+                            className={`w-full p-3 rounded-lg border ${
+                                isDark
+                                    ? "bg-gray-700/50 border-gray-600 text-white placeholder-gray-400 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/30"
+                                    : "bg-white border-gray-300 text-gray-900 placeholder-gray-500 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
+                            }`}
+                        />
+                    </div>
 
-                <div>
-                    <label className={`block mb-2 text-sm ${isDark ? "text-gray-300" : "text-gray-700"}`}>
-                        Contact Email
-                    </label>
-                    <input
-                        type="email"
-                        name="contactEmail"
-                        value={property.contactEmail}
-                        onChange={handleInputChange}
-                        placeholder="contact@wubland.com"
-                        className={`w-full p-3 rounded-lg border ${
-                            isDark
-                                ? "bg-gray-700 border-gray-600 text-white placeholder-gray-400 focus:border-amber-500"
-                                : "bg-white border-gray-300 text-gray-900 placeholder-gray-500 focus:border-amber-500"
-                        } focus:outline-none focus:ring-2 focus:ring-amber-500/50 transition-colors`}
-                    />
+                    <div>
+                        <label className={`block mb-2 text-sm ${getSecondaryTextColor()}`}>
+                            Contact Email
+                        </label>
+                        <input
+                            type="email"
+                            name="contactEmail"
+                            value={property.contactEmail}
+                            onChange={handleInputChange}
+                            placeholder="contact@wubland.com"
+                            className={`w-full p-3 rounded-lg border ${
+                                isDark
+                                    ? "bg-gray-700/50 border-gray-600 text-white placeholder-gray-400 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/30"
+                                    : "bg-white border-gray-300 text-gray-900 placeholder-gray-500 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
+                            }`}
+                        />
+                    </div>
                 </div>
             </div>
 
-            <div className="mt-6">
-                <h4 className={`text-sm font-medium mb-3 ${isDark ? "text-gray-300" : "text-gray-700"}`}>
+            <div className={`p-4 rounded-xl border ${getCardBackground()} shadow-sm`}>
+                <h4 className={`text-lg font-semibold mb-4 ${getTextColor()}`}>
                     Listing Settings
                 </h4>
-                <div className="space-y-3">
-                    <label className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer ${
+                <div className="space-y-4">
+                    <label className={`flex items-center gap-3 p-4 rounded-lg border cursor-pointer transition-all duration-200 hover:scale-[1.02] ${
                         isDark
                             ? "border-gray-600 bg-gray-800/50 hover:bg-gray-800"
                             : "border-gray-200 bg-white hover:bg-gray-50"
-                    } transition-colors`}>
+                    }`}>
                         <input
                             type="checkbox"
-                            name="isPremium"
-                            checked={property.isPremium}
+                            name="is_premium"
+                            checked={property.is_premium}
                             onChange={handleInputChange}
                             className="w-4 h-4 rounded"
                         />
                         <div>
-                            <p className={`font-medium ${isDark ? "text-white" : "text-gray-900"}`}>Premium Listing</p>
-                            <p className={`text-sm ${isDark ? "text-gray-400" : "text-gray-600"}`}>
+                            <p className={`font-medium ${getTextColor()}`}>Premium Listing</p>
+                            <p className={`text-sm ${getSecondaryTextColor()}`}>
                                 Feature this property prominently with enhanced visibility
                             </p>
                         </div>
                         <Star className={`w-5 h-5 ml-auto ${
-                            property.isPremium ? "text-amber-500" : isDark ? "text-gray-500" : "text-gray-400"
+                            property.is_premium ? "text-amber-500" : (isDark ? "text-gray-500" : "text-gray-400")
                         }`} />
                     </label>
 
-                    <label className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer ${
+                    <label className={`flex items-center gap-3 p-4 rounded-lg border cursor-pointer transition-all duration-200 hover:scale-[1.02] ${
                         isDark
                             ? "border-gray-600 bg-gray-800/50 hover:bg-gray-800"
                             : "border-gray-200 bg-white hover:bg-gray-50"
-                    } transition-colors`}>
+                    }`}>
                         <input
                             type="checkbox"
-                            name="isFeatured"
-                            checked={property.isFeatured}
+                            name="is_featured"
+                            checked={property.is_featured}
                             onChange={handleInputChange}
                             className="w-4 h-4 rounded"
                         />
                         <div>
-                            <p className={`font-medium ${isDark ? "text-white" : "text-gray-900"}`}>Featured Property</p>
-                            <p className={`text-sm ${isDark ? "text-gray-400" : "text-gray-600"}`}>
+                            <p className={`font-medium ${getTextColor()}`}>Featured Property</p>
+                            <p className={`text-sm ${getSecondaryTextColor()}`}>
                                 Show in featured section on homepage
                             </p>
                         </div>
                         <TrendingUp className={`w-5 h-5 ml-auto ${
-                            property.isFeatured ? "text-green-500" : isDark ? "text-gray-500" : "text-gray-400"
+                            property.is_featured ? "text-green-500" : (isDark ? "text-gray-500" : "text-gray-400")
                         }`} />
                     </label>
-
-                    <div>
-                        <label className={`block mb-2 text-sm ${isDark ? "text-gray-300" : "text-gray-700"}`}>
-                            Availability Status
-                        </label>
-                        <select
-                            name="availability"
-                            value={property.availability}
-                            onChange={handleInputChange}
-                            className={`w-full p-3 rounded-lg border ${
-                                isDark
-                                    ? "bg-gray-700 border-gray-600 text-white focus:border-amber-500"
-                                    : "bg-white border-gray-300 text-gray-900 focus:border-amber-500"
-                            } focus:outline-none focus:ring-2 focus:ring-amber-500/50 transition-colors`}
-                        >
-                            <option value="available">Available</option>
-                            <option value="reserved">Reserved</option>
-                            <option value="sold">Sold</option>
-                            <option value="rented">Rented</option>
-                            <option value="under_construction">Under Construction</option>
-                        </select>
-                    </div>
                 </div>
             </div>
         </div>
     );
 
-    // Render active section
     const renderActiveSection = () => {
-        console.log('🔄 Rendering active section:', activeTab);
-        
         switch (activeTab) {
             case "basic":
-                return (
-                    <>
-                        <PropertyTypeSection />
-                        <BasicInfoSection />
-                    </>
-                );
+                return renderBasicInfoSection();
             case "specs":
-                return <SpecificationsSection />;
+                return renderSpecificationsSection();
             case "features":
-                return <FeaturesSection />;
+                return renderFeaturesSection();
+            case "financial":
+                return renderFinancialSection();
             case "media":
-                return <MediaSection />;
+                return renderMediaSection();
             case "contact":
-                return <ContactSection />;
+                return renderContactSection();
             default:
                 return null;
         }
     };
 
-    if (!isOpen) {
-        console.log('❌ Modal not open, returning null');
-        return null;
-    }
-
-    console.log('✅ Modal open, rendering content');
+    if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
-            {/* Background overlay */}
+        <div className="fixed inset-0 z-[110]" ref={modalRef}>
             <div
-                className="fixed inset-0 bg-black/60 backdrop-blur-sm"
-                onClick={(e) => {
-                    console.log('🖱️ Background clicked');
-                    e.stopPropagation();
-                    onClose();
-                }}
-            />
-
-            <div
-                className={`relative max-w-6xl w-full rounded-xl shadow-2xl ${
-                    isDark ? "bg-gray-800" : "bg-white"
-                } max-h-[90vh] overflow-y-auto`}
-                onClick={(e) => {
-                    console.log('🖱️ Modal content clicked');
-                    e.stopPropagation();
-                }}
-                onMouseDown={(e) => e.stopPropagation()}
+                className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4"
+                onClick={onClose}
             >
-                {/* Header */}
-                <div className={`sticky top-0 z-10 p-6 border-b ${
-                    isDark ? "border-gray-700 bg-gray-800/90" : "border-gray-200 bg-white/90"
-                } backdrop-blur-sm`}>
-                    <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                            <div className={`p-2 rounded-lg ${
-                                isDark ? "bg-amber-900/30" : "bg-amber-100"
-                            }`}>
-                                <PlusCircle className={`w-6 h-6 ${
-                                    isDark ? "text-amber-400" : "text-amber-600"
-                                }`} />
+                <div
+                    className={`relative rounded-2xl shadow-2xl max-w-6xl w-full mx-auto overflow-hidden border ${
+                        isDark ? 'border-gray-600' : 'border-gray-200'
+                    } ${getPopupBackground()} max-h-[90vh] overflow-y-auto`}
+                    onClick={(e) => e.stopPropagation()}
+                >
+                    {/* Header */}
+                    <div className={`p-6 relative overflow-hidden bg-gradient-to-r ${getActiveTabColor()}`}>
+                        {/* Background pattern */}
+                        <div className="absolute inset-0 opacity-10">
+                            <div className="absolute top-0 right-0 w-32 h-32 bg-white rounded-full -mr-16 -mt-16"></div>
+                            <div className="absolute bottom-0 left-0 w-24 h-24 bg-white rounded-full -ml-12 -mb-12"></div>
+                        </div>
+
+                        <button
+                            onClick={onClose}
+                            className={`absolute top-4 right-4 p-2 rounded-full transition-all duration-200 ${
+                                isDark
+                                    ? 'text-white/80 hover:bg-white/20 hover:text-white'
+                                    : 'text-white/90 hover:bg-white/30 hover:text-white'
+                            }`}
+                        >
+                            <X className="w-5 h-5" />
+                        </button>
+
+                        <div className="relative z-10">
+                            <div className="flex items-center gap-3 mb-2">
+                                <div className={`p-2 rounded-lg ${
+                                    isDark ? 'bg-black/20' : 'bg-white/20'
+                                }`}>
+                                    <PlusCircle className="w-6 h-6 text-white" />
+                                </div>
+                                <div>
+                                    <h3 className="text-2xl font-bold text-white">Add Company Property</h3>
+                                    <p className="text-white/80">
+                                        List a property directly under WubLand
+                                    </p>
+                                </div>
                             </div>
-                            <div>
-                                <h3 className={`text-xl font-bold ${
-                                    isDark ? "text-white" : "text-gray-900"
-                                }`}>
-                                    Add Company Property
-                                </h3>
-                                <p className={`text-sm ${
-                                    isDark ? "text-gray-400" : "text-gray-600"
-                                }`}>
-                                    List a property directly under WubLand
-                                </p>
+
+                            {/* Navigation Tabs */}
+                            <div className="mt-6 flex overflow-x-auto pb-2 gap-2">
+                                {tabs.map((tab) => {
+                                    const Icon = tab.icon;
+                                    const isActive = activeTab === tab.id;
+
+                                    return (
+                                        <button
+                                            key={tab.id}
+                                            type="button"
+                                            onClick={() => setActiveTab(tab.id)}
+                                            className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all duration-200 whitespace-nowrap ${
+                                                isActive
+                                                    ? "bg-white/20 text-white backdrop-blur-sm"
+                                                    : "text-white/70 hover:text-white hover:bg-white/10"
+                                            }`}
+                                        >
+                                            <Icon className="w-4 h-4" />
+                                            <span>{tab.label}</span>
+                                        </button>
+                                    );
+                                })}
                             </div>
                         </div>
-                        <button
-                            type="button"
-                            onClick={() => {
-                                console.log('❌ Close button clicked');
-                                onClose();
-                            }}
-                            className={`p-2 rounded-lg ${
-                                isDark
-                                    ? "hover:bg-gray-700 text-gray-400"
-                                    : "hover:bg-gray-100 text-gray-600"
-                            } transition-colors`}
-                        >
-                            <X className="w-6 h-6" />
-                        </button>
                     </div>
 
-                    {/* Navigation Tabs */}
-                    <div className="mt-4">
-                        <div className="flex overflow-x-auto pb-2">
-                            {tabs.map((tab) => {
-                                const Icon = tab.icon;
-                                const isActive = activeTab === tab.id;
+                    {/* Content */}
+                    <div className="p-6">
+                        {renderActiveSection()}
 
-                                return (
+                        {/* Navigation buttons */}
+                        <div className={`mt-8 pt-6 border-t ${
+                            isDark ? "border-gray-700" : "border-gray-200"
+                        }`}>
+                            <div className="flex items-center justify-between">
+                                <div className="flex gap-2">
+                                    {tabs.map((tab) => (
+                                        <button
+                                            key={tab.id}
+                                            type="button"
+                                            onClick={() => setActiveTab(tab.id)}
+                                            className={`w-2 h-2 rounded-full transition-all ${
+                                                activeTab === tab.id
+                                                    ? `bg-gradient-to-r ${tab.color}`
+                                                    : (isDark ? "bg-gray-600" : "bg-gray-300")
+                                            }`}
+                                            title={tab.label}
+                                        />
+                                    ))}
+                                </div>
+
+                                <div className="flex gap-3">
                                     <button
-                                        key={tab.id}
                                         type="button"
-                                        onClick={() => {
-                                            console.log('📌 Tab clicked:', tab.id);
-                                            setActiveTab(tab.id);
-                                        }}
-                                        className={`flex items-center gap-2 px-4 py-2 rounded-lg mr-2 transition-all ${
-                                            isActive
-                                                ? isDark
-                                                    ? "bg-amber-600 text-white"
-                                                    : "bg-amber-100 text-amber-700"
-                                                : isDark
-                                                    ? "text-gray-400 hover:text-gray-300 hover:bg-gray-700"
-                                                    : "text-gray-600 hover:text-gray-900 hover:bg-gray-100"
+                                        onClick={onClose}
+                                        className={`px-6 py-2 rounded-xl transition-all duration-200 ${
+                                            isDark
+                                                ? "bg-gray-700 text-white hover:bg-gray-600 hover:scale-105"
+                                                : "bg-gray-200 text-gray-800 hover:bg-gray-300 hover:scale-105"
                                         }`}
                                     >
-                                        <Icon className="w-4 h-4" />
-                                        <span className="whitespace-nowrap">{tab.label}</span>
+                                        Cancel
                                     </button>
-                                );
-                            })}
-                        </div>
-                    </div>
-                </div>
-
-                {/* Content */}
-                <div className="p-6">
-                    {renderActiveSection()}
-
-                    {/* Navigation buttons */}
-                    <div className={`flex items-center justify-between mt-8 pt-6 border-t ${
-                        isDark ? "border-gray-700" : "border-gray-200"
-                    }`}>
-                        <div className="flex gap-2">
-                            {tabs.map((tab) => (
-                                <button
-                                    key={tab.id}
-                                    type="button"
-                                    onClick={() => setActiveTab(tab.id)}
-                                    className={`w-3 h-3 rounded-full ${
-                                        activeTab === tab.id
-                                            ? "bg-amber-600"
-                                            : isDark
-                                                ? "bg-gray-600"
-                                                : "bg-gray-300"
-                                    }`}
-                                    title={tab.label}
-                                />
-                            ))}
-                        </div>
-
-                        <div className="flex gap-3">
-                            <button
-                                type="button"
-                                onClick={() => {
-                                    console.log('❌ Cancel button clicked');
-                                    onClose();
-                                }}
-                                className={`px-4 py-2 rounded-lg ${
-                                    isDark
-                                        ? "bg-gray-700 text-white hover:bg-gray-600"
-                                        : "bg-gray-200 text-gray-800 hover:bg-gray-300"
-                                } transition-colors`}
-                            >
-                                Cancel
-                            </button>
-                            <button
-                                type="button"
-                                onClick={handleSubmit}
-                                disabled={loading || !property.title || !property.price || !property.location}
-                                className={`px-6 py-2 rounded-lg bg-amber-600 hover:bg-amber-700 text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2`}
-                            >
-                                {loading ? (
-                                    <>
-                                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                                        Adding Property...
-                                    </>
-                                ) : (
-                                    <>
-                                        <CheckCircle className="w-4 h-4" />
-                                        Add Property
-                                    </>
-                                )}
-                            </button>
+                                    <button
+                                        type="button"
+                                        onClick={handleSubmit}
+                                        disabled={loading || !property.title || !property.price || !property.address}
+                                        className={`px-8 py-2 rounded-xl bg-gradient-to-r ${getActiveTabColor()} text-white hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:scale-100 transition-all duration-200 flex items-center gap-2 shadow-lg`}
+                                    >
+                                        {loading ? (
+                                            <>
+                                                <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                                                <span>Adding Property...</span>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <CheckCircle className="w-5 h-5" />
+                                                <span>Add Property</span>
+                                            </>
+                                        )}
+                                    </button>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>

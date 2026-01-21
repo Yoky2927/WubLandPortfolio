@@ -3,11 +3,31 @@ import { SupportActivity } from '../models/supportActivity.model.js';
 
 export const getAllFAQs = async (req, res) => {
   try {
+    console.log('🔍 [GET_FAQS] Controller called');
+    console.log('🔍 User:', req.user?.username || 'No user');
+    
     const faqs = await FAQ.findAll();
+    console.log(`✅ Found ${faqs.length} FAQs`);
+    
     res.json(faqs);
   } catch (error) {
-    console.error('Error fetching FAQs:', error);
-    res.status(500).json({ error: 'Failed to fetch FAQs' });
+    console.error('❌ [GET_FAQS] ERROR:', error);
+    console.error('📊 Error details:', {
+      message: error.message,
+      code: error.code,
+      errno: error.errno,
+      sqlState: error.sqlState,
+      sqlMessage: error.sqlMessage,
+      sql: error.sql
+    });
+    
+    // Return the actual error for debugging
+    res.status(500).json({ 
+      error: 'Failed to fetch FAQs',
+      details: error.message,
+      sqlError: error.sqlMessage,
+      sqlCode: error.code
+    });
   }
 };
 
@@ -15,14 +35,14 @@ export const getFAQById = async (req, res) => {
   try {
     const { id } = req.params;
     const faq = await FAQ.findById(id);
-    
+
     if (!faq) {
       return res.status(404).json({ error: 'FAQ not found' });
     }
-    
+
     // Increment views
     await FAQ.incrementViews(id);
-    
+
     res.json(faq);
   } catch (error) {
     console.error('Error fetching FAQ:', error);
@@ -49,8 +69,8 @@ export const createFAQ = async (req, res) => {
       `Created FAQ: ${title}`
     );
 
-    res.status(201).json({ 
-      success: true, 
+    res.status(201).json({
+      success: true,
       message: 'FAQ created successfully',
       id: faqId
     });
@@ -66,7 +86,7 @@ export const updateFAQ = async (req, res) => {
     const { title, content, category, video_url } = req.body;
 
     const success = await FAQ.update(id, title, content, category, video_url);
-    
+
     if (!success) {
       return res.status(404).json({ error: 'FAQ not found' });
     }
@@ -92,7 +112,7 @@ export const deleteFAQ = async (req, res) => {
     const { id } = req.params;
 
     const success = await FAQ.delete(id);
-    
+
     if (!success) {
       return res.status(404).json({ error: 'FAQ not found' });
     }
@@ -118,7 +138,7 @@ export const markHelpful = async (req, res) => {
     const { id } = req.params;
 
     const success = await FAQ.addHelpfulVote(id);
-    
+
     if (!success) {
       return res.status(404).json({ error: 'FAQ not found' });
     }

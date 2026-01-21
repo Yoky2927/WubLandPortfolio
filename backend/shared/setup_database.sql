@@ -411,6 +411,11 @@ CREATE TABLE properties (
     INDEX idx_development_stage (development_stage)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+ALTER TABLE properties 
+MODIFY COLUMN property_status 
+ENUM('active', 'pending', 'sold', 'rented', 'inactive', 'draft', 'rejected') 
+DEFAULT 'draft';
+
 -- Property images table
 CREATE TABLE property_images (
     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -574,6 +579,9 @@ CREATE TABLE property_viewing_attendees (
     INDEX idx_attendee_status (attendee_status),
     INDEX idx_viewing_broker (viewing_id, broker_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+
+
 
 -- =============================================
 -- TRANSACTION SERVICE TABLES
@@ -1085,6 +1093,407 @@ CREATE TABLE IF NOT EXISTS chat_messages (
     INDEX idx_message_type (message_type)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- DELETE EXISTING SUPPORT DATA AND START FRESH
+-- This will clear all support-related data and reset auto-increment counters
+
+-- 1. First, delete from child tables (due to foreign key constraints)
+DELETE FROM ticket_responses;
+DELETE FROM support_tickets;
+
+-- 2. Reset auto-increment counters
+ALTER TABLE support_tickets AUTO_INCREMENT = 1;
+ALTER TABLE ticket_responses AUTO_INCREMENT = 1;
+
+-- 3. Now insert fresh support tickets
+INSERT INTO support_tickets (ticket_number, user_id, subject, description, category, priority, status, created_at) VALUES
+-- Users: 11(sindu_seller), 13(samuel_buyer), 14(mekdes_renter), 18(yohannes_buyer), 19(marta_renter), 15(kebede_landlord), 12(tigist_seller), 20(berhanu_seller)
+('TICKET-101', 11, 'Document Verification Issue', 'Having trouble uploading my ID document for verification. File size seems to be too large.', 'account', 'medium', 'open', NOW() - INTERVAL 1 DAY),
+('TICKET-102', 13, 'Property Information Request', 'Need more information about property amenities, utility costs, and maintenance fees', 'property', 'low', 'in_progress', NOW() - INTERVAL 12 HOUR),
+('TICKET-103', 14, 'Payment Processing Issue', 'Rental deposit payment not processing successfully. Getting error message during transaction.', 'payment', 'high', 'open', NOW() - INTERVAL 6 HOUR),
+('TICKET-104', 18, 'Broker Contact Request', 'Need to contact my assigned broker urgently about changing viewing time', 'general', 'medium', 'resolved', NOW() - INTERVAL 2 DAY),
+('TICKET-105', 19, 'Account Access Problem', 'Cannot log into my account, password reset not working', 'account', 'urgent', 'open', NOW() - INTERVAL 3 HOUR),
+('TICKET-106', 12, 'Property Listing Question', 'How to list my property for rent? Need guidance on process.', 'property', 'medium', 'in_progress', NOW() - INTERVAL 1 DAY),
+('TICKET-107', 15, 'Invoice Dispute', 'Received incorrect invoice amount for rental property', 'payment', 'high', 'open', NOW() - INTERVAL 4 HOUR),
+('TICKET-108', 20, 'Broker Service Complaint', 'Assigned broker not responding to messages for 3 days', 'general', 'medium', 'resolved', NOW() - INTERVAL 3 DAY);
+
+-- 4. Insert ticket responses (now tickets have IDs 1-8 since we reset auto-increment)
+INSERT INTO ticket_responses (ticket_id, responder_id, response_type, message, created_at) VALUES
+(1, 4, 'public', 'Thank you for your inquiry. I have contacted the broker and they will reach out to you within 1 hour.', NOW() - INTERVAL 1 DAY),
+(1, 4, 'internal_note', 'Broker alerted via WhatsApp. Follow up in 2 hours.', NOW() - INTERVAL 23 HOUR),
+(2, 17, 'public', 'I can provide you with detailed information about the property amenities. The monthly maintenance fee is 1500 ETB and utilities average 2000 ETB per month.', NOW() - INTERVAL 10 HOUR),
+(8, 7, 'public', 'I apologize for the delay. The broker has been reassigned and will contact you shortly.', NOW() - INTERVAL 2 DAY),
+(1, 4, 'public', 'Please try compressing your document or upload a PDF version. Maximum file size is 5MB.', NOW() - INTERVAL 20 HOUR);
+
+-- 5. Insert Knowledge Base Articles (FAQs)
+-- Clear existing FAQ data first
+DELETE FROM knowledge_base_articles;
+ALTER TABLE knowledge_base_articles AUTO_INCREMENT = 1;
+
+INSERT INTO knowledge_base_articles (article_number, title, content, category, author_id, status, slug, is_featured, views, helpful_votes, video_url) VALUES
+('FAQ-001', 'How to Create an Account', 'Step-by-step guide to create your WubLand account...', 'account', 4, 'published', 'how-to-create-account', TRUE, 245, 45, NULL),
+('FAQ-002', 'Property Listing Requirements', 'Documents and information needed to list a property...', 'property', 17, 'published', 'property-listing-requirements', TRUE, 189, 32, 'https://www.youtube.com/watch?v=example1'),
+('FAQ-003', 'Payment Methods Accepted', 'Learn about all accepted payment methods...', 'payment', 4, 'published', 'payment-methods', FALSE, 312, 67, NULL),
+('FAQ-004', 'Document Verification Process', 'Complete guide to document verification...', 'account', 7, 'published', 'document-verification', TRUE, 156, 28, 'https://www.youtube.com/watch?v=example2'),
+('FAQ-005', 'Broker Selection Guide', 'How to choose the right broker for your needs...', 'general', 17, 'published', 'broker-selection', FALSE, 98, 15, NULL),
+('FAQ-006', 'Rental Application Process', 'Step-by-step rental application guide...', 'property', 4, 'published', 'rental-application', TRUE, 201, 42, 'https://www.youtube.com/watch?v=example3'),
+('FAQ-007', 'Security and Privacy', 'Learn about our security measures...', 'safety', 7, 'published', 'security-privacy', FALSE, 87, 19, NULL),
+('FAQ-008', 'Technical Support Guide', 'Troubleshooting common technical issues...', 'technical', 17, 'published', 'technical-support', TRUE, 134, 31, NULL);
+
+
+-- =============================================
+-- SIMPLIFIED FIX: Run this step by step
+-- =============================================
+
+-- Step 1: Just add the columns without trying to check information_schema
+ALTER TABLE users 
+ADD COLUMN broker_status ENUM('inactive', 'pending_verification', 'active', 'rejected', 'suspended') 
+DEFAULT 'inactive';
+
+ALTER TABLE users 
+ADD COLUMN business_license_verified BOOLEAN DEFAULT FALSE;
+
+-- Step 2: Create missing tables if they don't exist
+CREATE TABLE IF NOT EXISTS support_agent_activities (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    agent_username VARCHAR(50) NOT NULL,
+    activity_type VARCHAR(100) NOT NULL,
+    target_id INT NOT NULL,
+    target_type VARCHAR(50) NOT NULL,
+    details TEXT,
+    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_agent_username (agent_username),
+    INDEX idx_activity_type (activity_type),
+    INDEX idx_target (target_type, target_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS user_feedback (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NOT NULL,
+    ticket_id INT,
+    rating INT NOT NULL CHECK (rating BETWEEN 1 AND 5),
+    feedback_text TEXT,
+    responded_to_by VARCHAR(50),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (ticket_id) REFERENCES support_tickets(id) ON DELETE SET NULL,
+    INDEX idx_responded_to (responded_to_by),
+    INDEX idx_created_at (created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS broker_verification_requests (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    broker_id INT NOT NULL,
+    business_license_number VARCHAR(100),
+    business_license_document VARCHAR(500),
+    additional_documents JSON,
+    status ENUM('pending', 'approved', 'rejected') DEFAULT 'pending',
+    submitted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    reviewed_by INT,
+    reviewed_at TIMESTAMP NULL,
+    review_notes TEXT,
+    rejection_reason TEXT,
+    FOREIGN KEY (broker_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (reviewed_by) REFERENCES users(id) ON DELETE SET NULL,
+    INDEX idx_status (status),
+    INDEX idx_submitted_at (submitted_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Step 3: Now insert sample data (check if tables exist first)
+-- First, let's clear ONLY if you want fresh data (comment out if you want to keep existing)
+-- TRUNCATE TABLE support_tickets;
+-- TRUNCATE TABLE ticket_responses;
+-- TRUNCATE TABLE knowledge_base_articles;
+-- ALTER TABLE support_tickets AUTO_INCREMENT = 1;
+-- ALTER TABLE ticket_responses AUTO_INCREMENT = 1;
+-- ALTER TABLE knowledge_base_articles AUTO_INCREMENT = 1;
+
+-- Step 4: Insert Support Tickets
+INSERT IGNORE INTO support_tickets (ticket_number, user_id, subject, description, category, priority, status, source, created_at) VALUES
+('TICKET-001', 11, 'Document Verification Issue', 'Having trouble uploading my ID document for verification. File size seems to be too large.', 'account', 'medium', 'open', 'web', NOW() - INTERVAL 1 DAY),
+('TICKET-002', 13, 'Property Information Request', 'Need more information about property amenities, utility costs, and maintenance fees', 'property', 'low', 'in_progress', 'web', NOW() - INTERVAL 12 HOUR),
+('TICKET-003', 14, 'Payment Processing Issue', 'Rental deposit payment not processing successfully. Getting error message during transaction.', 'payment', 'high', 'open', 'web', NOW() - INTERVAL 6 HOUR),
+('TICKET-004', 18, 'Broker Contact Request', 'Need to contact my assigned broker urgently about changing viewing time', 'general', 'medium', 'resolved', 'web', NOW() - INTERVAL 2 DAY),
+('TICKET-005', 19, 'Account Access Problem', 'Cannot log into my account, password reset not working', 'account', 'urgent', 'open', 'web', NOW() - INTERVAL 3 HOUR),
+('TICKET-006', 12, 'Property Listing Question', 'How to list my property for rent? Need guidance on process.', 'property', 'medium', 'in_progress', 'web', NOW() - INTERVAL 1 DAY),
+('TICKET-007', 15, 'Invoice Dispute', 'Received incorrect invoice amount for rental property', 'payment', 'high', 'open', 'web', NOW() - INTERVAL 4 HOUR),
+('TICKET-008', 20, 'Broker Service Complaint', 'Assigned broker not responding to messages for 3 days', 'general', 'medium', 'resolved', 'web', NOW() - INTERVAL 3 DAY);
+
+-- Step 5: Insert Ticket Responses
+INSERT IGNORE INTO ticket_responses (ticket_id, responder_id, response_type, message, created_at) VALUES
+(1, 4, 'public', 'Thank you for your inquiry. I have contacted the broker and they will reach out to you within 1 hour.', NOW() - INTERVAL 1 DAY),
+(1, 4, 'internal_note', 'Broker alerted via WhatsApp. Follow up in 2 hours.', NOW() - INTERVAL 23 HOUR),
+(2, 17, 'public', 'I can provide you with detailed information about the property amenities. The monthly maintenance fee is 1500 ETB and utilities average 2000 ETB per month.', NOW() - INTERVAL 10 HOUR),
+(8, 7, 'public', 'I apologize for the delay. The broker has been reassigned and will contact you shortly.', NOW() - INTERVAL 2 DAY),
+(1, 4, 'public', 'Please try compressing your document or upload a PDF version. Maximum file size is 5MB.', NOW() - INTERVAL 20 HOUR);
+
+-- Step 6: Insert Knowledge Base Articles
+INSERT IGNORE INTO knowledge_base_articles (article_number, title, content, category, author_id, status, slug, is_featured, views, helpful_votes, video_url) VALUES
+('FAQ-001', 'How to Create an Account', 'Step-by-step guide to create your WubLand account.', 'account', 4, 'published', 'how-to-create-account', TRUE, 245, 45, NULL),
+('FAQ-002', 'Property Listing Requirements', 'Documents needed to list a property.', 'property', 17, 'published', 'property-listing-requirements', TRUE, 189, 32, 'https://www.youtube.com/watch?v=example1'),
+('FAQ-003', 'Payment Methods Accepted', 'Learn about accepted payment methods.', 'payment', 4, 'published', 'payment-methods', FALSE, 312, 67, NULL),
+('FAQ-004', 'Document Verification Process', 'Complete guide to document verification.', 'account', 7, 'published', 'document-verification', TRUE, 156, 28, 'https://www.youtube.com/watch?v=example2'),
+('FAQ-005', 'Broker Selection Guide', 'How to choose the right broker.', 'general', 17, 'published', 'broker-selection', FALSE, 98, 15, NULL),
+('FAQ-006', 'Rental Application Process', 'Step-by-step rental application guide.', 'property', 4, 'published', 'rental-application', TRUE, 201, 42, 'https://www.youtube.com/watch?v=example3'),
+('FAQ-007', 'Security and Privacy', 'Learn about our security measures.', 'safety', 7, 'published', 'security-privacy', FALSE, 87, 19, NULL),
+('FAQ-008', 'Technical Support Guide', 'Troubleshooting common issues.', 'technical', 17, 'published', 'technical-support', TRUE, 134, 31, NULL);
+
+-- Step 7: Insert User Feedback
+INSERT IGNORE INTO user_feedback (user_id, ticket_id, rating, feedback_text, responded_to_by, created_at) VALUES
+(11, 1, 5, 'Quick response and very helpful.', 'birtukan_support', NOW() - INTERVAL 20 HOUR),
+(13, 2, 4, 'Agent provided detailed information.', 'selam_support', NOW() - INTERVAL 8 HOUR),
+(18, 4, 5, 'Excellent service!', 'hana_lead', NOW() - INTERVAL 1 DAY),
+(20, 8, 3, 'Issue resolved but took longer.', 'hana_lead', NOW() - INTERVAL 2 DAY),
+(14, 3, 5, 'Payment issue fixed immediately.', 'birtukan_support', NOW() - INTERVAL 4 HOUR);
+
+-- Step 8: Insert Support Agent Activities
+INSERT IGNORE INTO support_agent_activities (agent_username, activity_type, target_id, target_type, details, timestamp) VALUES
+('birtukan_support', 'ticket_response', 1, 'ticket', 'Responded to document verification issue', NOW() - INTERVAL 1 DAY),
+('selam_support', 'ticket_response', 2, 'ticket', 'Provided property information', NOW() - INTERVAL 10 HOUR),
+('hana_lead', 'ticket_response', 8, 'ticket', 'Resolved broker complaint', NOW() - INTERVAL 2 DAY),
+('selam_support', 'article_created', 2, 'article', 'Created FAQ article', NOW() - INTERVAL 3 DAY);
+
+-- Step 9: Insert Broker Verification Requests
+INSERT IGNORE INTO broker_verification_requests (broker_id, business_license_number, business_license_document, additional_documents, status, submitted_at) VALUES
+(9, 'BROKER-ETH-2024-001', '/uploads/licenses/elias_license.pdf', '["tin_certificate.pdf"]', 'pending', NOW() - INTERVAL 5 DAY),
+(3, 'BROKER-ETH-2023-045', '/uploads/licenses/beza_license.pdf', '["insurance_certificate.pdf"]', 'approved', NOW() - INTERVAL 10 DAY),
+(16, 'BROKER-ETH-2024-002', '/uploads/licenses/alem_license.pdf', '["tin_certificate.pdf"]', 'pending', NOW() - INTERVAL 3 DAY);
+
+-- Step 10: Update broker status
+UPDATE users SET 
+    broker_status = 'pending_verification',
+    business_license_verified = FALSE 
+WHERE id IN (9, 16);
+
+UPDATE users SET 
+    broker_status = 'active',
+    business_license_verified = TRUE 
+WHERE id = 3;
+
+-- Step 11: Check if everything worked
+SELECT 'Success! Database setup complete.' as message;
+
+SELECT 'Support Tickets:' as Table_Name, COUNT(*) as Count FROM support_tickets
+UNION ALL
+SELECT 'Ticket Responses:', COUNT(*) FROM ticket_responses
+UNION ALL
+SELECT 'Knowledge Base:', COUNT(*) FROM knowledge_base_articles
+UNION ALL
+SELECT 'User Feedback:', COUNT(*) FROM user_feedback
+UNION ALL
+SELECT 'Support Activities:', COUNT(*) FROM support_agent_activities
+UNION ALL
+SELECT 'Broker Verifications:', COUNT(*) FROM broker_verification_requests;
+
+-- Step 12: Show broker status updates
+SELECT id, username, role, broker_status, business_license_verified 
+FROM users 
+WHERE id IN (3, 9, 16);
+
+-- 6. Verify the data was inserted correctly
+SELECT 'Support Tickets:' as Table_Name;
+SELECT id, ticket_number, user_id, subject, status FROM support_tickets;
+
+SELECT 'Ticket Responses:' as Table_Name;
+SELECT id, ticket_id, responder_id, response_type, LEFT(message, 50) as preview FROM ticket_responses;
+
+SELECT 'Knowledge Base Articles:' as Table_Name;
+SELECT id, article_number, title, category, author_id, views FROM knowledge_base_articles;
+
+
+-- Create FAQs table if it doesn't exist
+CREATE TABLE IF NOT EXISTS faqs (
+  id INT PRIMARY KEY AUTO_INCREMENT,
+  title VARCHAR(255) NOT NULL,
+  content TEXT NOT NULL,
+  category VARCHAR(100) NOT NULL,
+  author_username VARCHAR(100) NOT NULL,
+  video_url VARCHAR(500),
+  helpful_count INT DEFAULT 0,
+  views INT DEFAULT 0,
+  is_published BOOLEAN DEFAULT TRUE,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX idx_category (category),
+  INDEX idx_author (author_username)
+);
+
+
+
+-- Insert comprehensive FAQ sample data
+INSERT INTO faqs (title, content, category, author_username, helpful_count, views) VALUES
+-- ACCOUNT & PROFILE CATEGORY
+('How do I create an account?', 
+ 'To create an account, click the "Sign Up" button on the homepage. Fill in your name, email address, and create a secure password. You will receive a verification email to confirm your account.',
+ 'Account', 'support_admin', 45, 120),
+
+('How do I reset my password?', 
+ 'Go to the login page and click "Forgot Password". Enter your registered email address, and we will send you a password reset link. The link will expire in 24 hours for security.',
+ 'Account', 'support_admin', 89, 250),
+
+('How do I update my profile information?', 
+ 'Log in to your account, go to "My Profile" from the dashboard menu. Click "Edit Profile" to update your personal information, contact details, and preferences.',
+ 'Account', 'support_agent1', 32, 98),
+
+('How do I verify my email address?', 
+ 'After signing up, check your email inbox for a verification email from WubLand. Click the verification link in the email. If you didn''t receive it, check your spam folder or request a new verification email from your account settings.',
+ 'Account', 'support_admin', 67, 180),
+
+-- PROPERTY LISTINGS CATEGORY
+('How do I list a property for sale?', 
+ 'Navigate to "List a Property" from your dashboard. Fill in the property details including location, price, features, and upload photos. Your listing will be reviewed by our team and published within 24-48 hours.',
+ 'Listings', 'broker_support', 120, 450),
+
+('What information do I need to list a property?', 
+ 'You will need: property address, price, square footage, number of bedrooms/bathrooms, property type, year built, photos, property description, and any special features or amenities.',
+ 'Listings', 'broker_support', 56, 210),
+
+('How long does it take for my property listing to be approved?', 
+ 'Property listings are typically reviewed and approved within 24-48 hours during business days. You will receive an email notification once your listing is live.',
+ 'Listings', 'support_agent2', 42, 165),
+
+('Can I edit my property listing after it''s published?', 
+ 'Yes, you can edit your listing anytime. Go to "My Listings" in your dashboard, select the property, and click "Edit". Changes will be reviewed and updated within 24 hours.',
+ 'Listings', 'broker_support', 31, 140),
+
+-- BUYING & OFFERS CATEGORY
+('How do I make an offer on a property?', 
+ 'When you find a property you''re interested in, click the "Make Offer" button on the property page. Enter your offer amount, financing details, and any contingencies. The seller will be notified of your offer.',
+ 'Buying', 'transaction_support', 95, 320),
+
+('What happens after I make an offer?', 
+ 'The seller receives your offer and has 48 hours to respond. They can accept, reject, or counter your offer. You will be notified via email and in-app notification of any updates.',
+ 'Buying', 'transaction_support', 48, 195),
+
+('Can I withdraw an offer?', 
+ 'Yes, you can withdraw an offer before it is accepted by the seller. Go to "My Offers" in your dashboard, select the offer, and click "Withdraw Offer".',
+ 'Buying', 'support_agent3', 27, 110),
+
+('What is earnest money?', 
+ 'Earnest money is a deposit made to show your serious intent to purchase the property. It is typically 1-3% of the purchase price and is held in escrow until closing.',
+ 'Buying', 'transaction_support', 63, 240),
+
+-- PAYMENTS & FEES CATEGORY
+('What payment methods do you accept?', 
+ 'We accept major credit cards (Visa, MasterCard, American Express), PayPal, bank transfers (ACH), and wire transfers for larger transactions.',
+ 'Payments', 'finance_support', 110, 380),
+
+('Are there any fees for using WubLand?', 
+ 'For buyers: No fees. For sellers: We charge a 2% commission on successful sales. For brokers: Annual subscription fees apply. All fees are clearly displayed before confirmation.',
+ 'Payments', 'finance_support', 78, 290),
+
+('When will I receive my payment after a sale?', 
+ 'Sellers receive payment within 3-5 business days after closing. Funds are transferred directly to your registered bank account after deducting any applicable fees.',
+ 'Payments', 'finance_support', 52, 220),
+
+('Is my payment information secure?', 
+ 'Yes, we use bank-level 256-bit SSL encryption and PCI DSS compliance for all payment processing. We never store your full credit card numbers on our servers.',
+ 'Payments', 'support_admin', 91, 310),
+
+-- VERIFICATION CATEGORY
+('How do I get verified as a broker?', 
+ 'Submit your license information, proof of insurance, and business registration through the verification portal. Our team reviews documents within 3-5 business days.',
+ 'Verification', 'verification_team', 68, 230),
+
+('What documents do I need for verification?', 
+ 'For brokers: Real estate license, E&O insurance, business license. For investors: Government-issued ID, proof of funds. For sellers: Property ownership documents.',
+ 'Verification', 'verification_team', 45, 175),
+
+('How long does verification take?', 
+ 'Standard verification takes 3-5 business days. You will receive email notifications at each stage of the review process. Expedited verification is available for premium members.',
+ 'Verification', 'support_agent4', 39, 155),
+
+('Why was my verification rejected?', 
+ 'Common reasons: Blurry documents, expired licenses, mismatched information, incomplete submissions. Check the specific reason in your rejection email and resubmit with corrected documents.',
+ 'Verification', 'verification_team', 29, 135),
+
+-- SUPPORT & TROUBLESHOOTING CATEGORY
+('How do I contact customer support?', 
+ 'You can contact us through: 1) In-app support ticket system 2) Email: support@wubland.com 3) Phone: 1-800-WUB-LAND during business hours (9AM-6PM EST).',
+ 'Support', 'support_admin', 150, 500),
+
+('What are your support hours?', 
+ 'Phone support: Monday-Friday 9AM-6PM EST. Email and ticket support: 24/7 with typical response within 4 hours during business days and 24 hours on weekends.',
+ 'Support', 'support_admin', 87, 280),
+
+('How do I report a bug or technical issue?', 
+ 'Use the "Report Issue" button in the app footer or submit a support ticket with the category "Technical Issue". Include screenshots and steps to reproduce the issue for faster resolution.',
+ 'Support', 'tech_support', 41, 160),
+
+('The website/app is not loading properly. What should I do?', 
+ '1) Clear your browser cache and cookies 2) Try a different browser 3) Check your internet connection 4) If using mobile app, ensure it''s updated to the latest version. If issues persist, contact technical support.',
+ 'Support', 'tech_support', 58, 210),
+
+-- SECURITY & PRIVACY CATEGORY
+('How do you protect my personal information?', 
+ 'We use industry-standard encryption, secure servers, regular security audits, and comply with GDPR and CCPA regulations. We never sell your personal data to third parties.',
+ 'Security', 'security_team', 73, 260),
+
+('Can I delete my account?', 
+ 'Yes, you can request account deletion from your account settings. Note: This action is irreversible and will permanently delete all your data from our systems.',
+ 'Security', 'support_admin', 34, 145),
+
+('How do I enable two-factor authentication?', 
+ 'Go to Account Settings > Security > Two-Factor Authentication. Choose between SMS, authenticator app, or email verification for enhanced security.',
+ 'Security', 'security_team', 49, 185),
+
+('What should I do if I suspect unauthorized account activity?', 
+ 'Immediately change your password from the login page and enable two-factor authentication. Contact our security team at security@wubland.com to report the incident.',
+ 'Security', 'security_team', 62, 225),
+
+-- MOBILE APP CATEGORY
+('Is there a mobile app available?', 
+ 'Yes, WubLand is available for both iOS (App Store) and Android (Google Play Store). Search for "WubLand Real Estate" to download the app.',
+ 'Mobile', 'mobile_support', 95, 340),
+
+('Do all features work on the mobile app?', 
+ 'The mobile app offers all core features: property search, saved properties, making offers, messaging, and notifications. Some advanced broker tools are optimized for desktop.',
+ 'Mobile', 'mobile_support', 42, 175),
+
+('How do I enable push notifications?', 
+ 'On iOS: Go to Settings > Notifications > WubLand. On Android: Go to App Settings > Notifications. Ensure notifications are enabled both in device settings and app settings.',
+ 'Mobile', 'mobile_support', 38, 165),
+
+('The app keeps crashing. How do I fix it?', 
+ '1) Update to the latest version 2) Clear app cache (Android) or offload app (iOS) 3) Restart your device 4) Reinstall the app. Contact support if issues continue.',
+ 'Mobile', 'mobile_support', 27, 125),
+
+-- BROKER TOOLS CATEGORY
+('How do I use the CRM features?', 
+ 'Access the CRM from your broker dashboard. Features include: lead management, client tracking, automated follow-ups, document management, and transaction pipeline view.',
+ 'Broker Tools', 'broker_support', 56, 210),
+
+('Can I import my existing client list?', 
+ 'Yes, you can import CSV files with client information. Go to CRM > Import Contacts. The system supports standard fields: name, email, phone, and property interests.',
+ 'Broker Tools', 'broker_support', 31, 140),
+
+('How do I generate reports?', 
+ 'Navigate to Analytics > Reports. Select report type (sales, leads, performance), date range, and filters. Reports can be exported as PDF, Excel, or CSV.',
+ 'Broker Tools', 'broker_support', 44, 180),
+
+('Is there training available for broker tools?', 
+ 'Yes, we offer: 1) Onboarding webinars 2) Video tutorials 3) Documentation library 4) One-on-one training sessions for premium members.',
+ 'Broker Tools', 'broker_support', 29, 135);
+
+-- Additional sample data for popular categories
+INSERT INTO faqs (title, content, category, author_username, helpful_count, views) VALUES
+-- LEGAL & DOCUMENTS
+('What legal documents do I need for a property sale?', 
+ 'Standard documents include: Purchase agreement, disclosure forms, title documents, inspection reports, mortgage documents (if applicable), and closing statements.',
+ 'Legal', 'legal_support', 71, 245),
+
+('Who prepares the purchase agreement?', 
+ 'Typically, the seller''s broker or attorney prepares the initial agreement. Both parties should have their legal counsel review before signing.',
+ 'Legal', 'legal_support', 43, 175),
+
+-- MARKETING
+('How do I market my property effectively?', 
+ 'Use professional photography, virtual tours, detailed descriptions, social media sharing, and consider premium listings for increased visibility. Our marketing team can assist with premium packages.',
+ 'Marketing', 'marketing_support', 52, 195),
+
+('What is a virtual tour and how do I create one?', 
+ 'A virtual tour is an interactive 360-degree view of the property. You can schedule a professional virtual tour through our partner services or use our mobile app to create basic tours.',
+ 'Marketing', 'marketing_support', 38, 165);
+ 
 -- Message deletions table
 CREATE TABLE IF NOT EXISTS message_deletions (
     id INT AUTO_INCREMENT PRIMARY KEY,

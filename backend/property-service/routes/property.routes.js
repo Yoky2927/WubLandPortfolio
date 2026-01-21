@@ -1,9 +1,9 @@
-// routes/property.routes.js - FIXED VERSION
+// routes/property.routes.js - FIXED VERSION WITH CORRECT ROUTE ORDER
 import express from "express";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
-import pool from "../config/database.js"; // ADD THIS IMPORT
+import pool from "../config/database.js";
 import PropertyController from "../controllers/property.controller.js";
 import { authenticate } from "../middlewares/auth.middleware.js";
 import {
@@ -94,13 +94,130 @@ router.get("/health", (req, res) => {
   });
 });
 
+// ========== SPECIFIC ROUTES (MUST COME FIRST) ==========
 router.get("/", PropertyController.getAllProperties);
 router.get("/search", PropertyController.searchProperties);
-router.get("/properties/:id", PropertyController.getPropertyById);
 router.get("/featured", PropertyController.getFeaturedProperties);
 router.get("/recent", PropertyController.getRecentProperties);
 router.get("/premium", PropertyController.getPremiumProperties);
 
+// ========== NEW FILTERED PROPERTY ENDPOINTS ==========
+// Add these BEFORE the /:id route
+router.get("/company", async (req, res) => {
+  try {
+    console.log('📊 GET /api/properties/company called');
+    
+    const [properties] = await pool.execute(
+      `SELECT p.*, u.first_name, u.last_name, u.email 
+       FROM properties p
+       LEFT JOIN users u ON p.owner_user_id = u.id
+       WHERE p.property_source = 'company_owned'
+       AND p.deleted_at IS NULL
+       ORDER BY p.created_at DESC
+       LIMIT 50`
+    );
+    
+    res.json({
+      success: true,
+      data: properties || [],
+      count: properties?.length || 0
+    });
+  } catch (error) {
+    console.error('Error fetching company properties:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+router.get("/pending", async (req, res) => {
+  try {
+    console.log('📊 GET /api/properties/pending called');
+    
+    const [properties] = await pool.execute(
+      `SELECT p.*, u.first_name, u.last_name, u.email 
+       FROM properties p
+       LEFT JOIN users u ON p.owner_user_id = u.id
+       WHERE p.property_status IN ('pending', 'pending_review', 'draft')
+       AND p.deleted_at IS NULL
+       ORDER BY p.created_at DESC
+       LIMIT 50`
+    );
+    
+    res.json({
+      success: true,
+      data: properties || [],
+      count: properties?.length || 0
+    });
+  } catch (error) {
+    console.error('Error fetching pending properties:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+router.get("/approved", async (req, res) => {
+  try {
+    console.log('📊 GET /api/properties/approved called');
+    
+    const [properties] = await pool.execute(
+      `SELECT p.*, u.first_name, u.last_name, u.email 
+       FROM properties p
+       LEFT JOIN users u ON p.owner_user_id = u.id
+       WHERE p.property_status = 'active'
+       AND p.deleted_at IS NULL
+       ORDER BY p.created_at DESC
+       LIMIT 50`
+    );
+    
+    res.json({
+      success: true,
+      data: properties || [],
+      count: properties?.length || 0
+    });
+  } catch (error) {
+    console.error('Error fetching approved properties:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+router.get("/rejected", async (req, res) => {
+  try {
+    console.log('📊 GET /api/properties/rejected called');
+    
+    const [properties] = await pool.execute(
+      `SELECT p.*, u.first_name, u.last_name, u.email 
+       FROM properties p
+       LEFT JOIN users u ON p.owner_user_id = u.id
+       WHERE p.property_status = 'rejected'
+       AND p.deleted_at IS NULL
+       ORDER BY p.created_at DESC
+       LIMIT 50`
+    );
+    
+    res.json({
+      success: true,
+      data: properties || [],
+      count: properties?.length || 0
+    });
+  } catch (error) {
+    console.error('Error fetching rejected properties:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// ========== PARAMETERIZED ROUTES (MUST COME LAST) ==========
+// Get property by ID - This must come AFTER specific routes
+router.get("/:id", PropertyController.getPropertyById);  // FIXED: Removed "/properties" prefix
 
 // ================= BROKER ROUTES =================
 router.get(
@@ -116,7 +233,7 @@ router.post(
   authenticate,
   checkRole(["internal_broker", "external_broker", "admin", "super_admin"]),
   canManageProperty,
-  PropertyController.propertyAction  // FIXED: Changed from brokerUpdatePropertyStatus
+  PropertyController.propertyAction
 );
 
 // Property status update route (general status updates)
@@ -388,9 +505,9 @@ router.post(
 router.post(
   "/",
   authenticate,
-  canPostProperties,           // Only brokers/admins can post
-  requireBrokerVerification,   // External brokers must be verified
-  checkListingLimit,           // Tier-based limits
+  canPostProperties,
+  requireBrokerVerification,
+  checkListingLimit,
   upload.fields([
     { name: "images", maxCount: 20 },
     { name: "floor_plans", maxCount: 5 },
@@ -403,7 +520,7 @@ router.post(
   "/premium",
   authenticate,
   canPostProperties,
-  canPostPremium,             // Premium tier required
+  canPostPremium,
   checkListingLimit,
   upload.fields([
     { name: "images", maxCount: 20 },
@@ -683,6 +800,7 @@ router.get(
     }
   }
 );
+
 // ================= PROPERTY REQUESTS FOR BROKERS =================
 router.get(
   "/property-requests/broker",
@@ -902,7 +1020,5 @@ router.use((req, res) => {
     path: req.originalUrl,
   });
 });
-
-
 
 export default router;

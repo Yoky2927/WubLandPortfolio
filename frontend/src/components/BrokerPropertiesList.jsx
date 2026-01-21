@@ -1,61 +1,13 @@
-// components/BrokerPropertiesList.jsx - FIXED WITH REAL BACKEND DATA
 import React, { useState, useRef, useEffect } from "react";
 import {
-  Eye,
-  FileEdit,
-  CheckCircle,
-  XCircle,
-  AlertCircle,
-  RefreshCw,
-  Search,
-  Home,
-  DollarSign,
-  MapPin,
-  ChevronDown,
-  ChevronUp,
-  Image as ImageIcon,
-  Plus,
-  Camera,
-  Edit,
-  Trash2,
-  Download,
-  Share2,
-  Star,
-  User,
-  Calendar,
-  Layers,
-  Maximize2,
-  Filter,
-  X,
-  Upload,
-  Grid,
-  List,
-  Clock,
-  Heart,
-  MessageSquare,
-  Zap,
-  Shield,
-  TrendingUp,
-  Check,
-  Sparkles,
-  ChevronLeft,
-  ChevronRight,
-  CloudUpload,
-  Building,
-  Bath,
-  Ruler,
-  Globe,
-  Crown,
-  Bed,
-  Lock,
-  Users,
-  Key
+  Eye, FileEdit, CheckCircle, XCircle, AlertCircle, RefreshCw, Search, Home,
+  DollarSign, MapPin, ChevronDown, ChevronUp, Image as ImageIcon, Plus, Camera,
+  Edit, Trash2, Download, Share2, Star, User, Calendar, Layers, Maximize2,
+  Filter, X, Upload, Grid, List, Clock, Heart, MessageSquare, Zap, Shield,
+  TrendingUp, Check, Sparkles, ChevronLeft, ChevronRight, CloudUpload, Building,
+  Bath, Ruler, Globe, Crown, Bed, Lock, Users, Key
 } from "lucide-react";
-import PropertyDetailsModal from "./PropertyDetailsModal";
-import CreatePropertyForm from "./CreatePropertyForm";
-import EditPropertyForm from "./EditPropertyForm";
-import { apiCall } from "../utils/api.endpoints.js";
-import { apiClient } from "../utils/api.client.js";
+import { api } from "../utils/api.endpoints";
 
 const BrokerPropertiesList = ({
   theme,
@@ -75,56 +27,74 @@ const BrokerPropertiesList = ({
   const [sortBy, setSortBy] = useState("newest");
   const [expandedProperty, setExpandedProperty] = useState(null);
   const [actionLoading, setActionLoading] = useState({});
-  const [showCreateForm, setShowCreateForm] = useState(false);
   const [showImageUpload, setShowImageUpload] = useState(false);
   const [selectedPropertyForImages, setSelectedPropertyForImages] = useState(null);
   const [viewMode, setViewMode] = useState("grid");
   const [uploadProgress, setUploadProgress] = useState(0);
   const [isUploading, setIsUploading] = useState(false);
   const [selectedFiles, setSelectedFiles] = useState([]);
-  const [showEditForm, setShowEditForm] = useState(false);
-  const [selectedPropertyForEdit, setSelectedPropertyForEdit] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [properties, setProperties] = useState([]);
   const fileInputRef = useRef(null);
 
-  // Ensure brokerProperties is always an array
-  const safeBrokerProperties = Array.isArray(brokerProperties) ? brokerProperties : [];
-  
-  // Fetch broker properties on mount
+  // Fetch broker properties on mount and when user changes
   useEffect(() => {
-    if (!user?.id) return;
-    
-    const fetchBrokerProperties = async () => {
-      try {
-        setLoading(true);
-        const response = await apiCall('GET_BROKER_LISTINGS', {}, {});
-        
-        if (response.success) {
-          const properties = response.data?.properties || response.data || [];
-          if (Array.isArray(properties)) {
-            // Update parent component if needed
-          }
-        }
-      } catch (error) {
-        console.error('Error fetching broker properties:', error);
-        if (setToast) {
-          setToast({
-            show: true,
-            message: "Failed to load properties",
-            type: "error",
-          });
-        }
-      } finally {
-        setLoading(false);
-      }
-    };
-    
-    fetchBrokerProperties();
+    if (user?.id) {
+      fetchBrokerProperties();
+    }
   }, [user?.id]);
+
+  // Also use passed properties if available
+  useEffect(() => {
+    if (Array.isArray(brokerProperties) && brokerProperties.length > 0) {
+      setProperties(brokerProperties);
+    }
+  }, [brokerProperties]);
+
+  // Fetch broker properties from API
+  const fetchBrokerProperties = async () => {
+    try {
+      setLoading(true);
+      const response = await api.getBrokerListings();
+      
+      console.log("Broker properties response:", response);
+      
+      let propertiesData = [];
+      if (response?.data?.properties) {
+        propertiesData = response.data.properties;
+      } else if (response?.data?.data?.properties) {
+        propertiesData = response.data.data.properties;
+      } else if (Array.isArray(response?.data)) {
+        propertiesData = response.data;
+      } else if (Array.isArray(response?.data?.data)) {
+        propertiesData = response.data.data;
+      } else if (Array.isArray(response)) {
+        propertiesData = response;
+      } else if (response?.properties) {
+        propertiesData = response.properties;
+      }
+
+      console.log("Extracted properties:", propertiesData);
+      setProperties(Array.isArray(propertiesData) ? propertiesData : []);
+      
+    } catch (error) {
+      console.error('Error fetching broker properties:', error);
+      if (setToast) {
+        setToast({
+          show: true,
+          message: "Failed to load properties",
+          type: "error",
+        });
+      }
+      setProperties([]);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // Helper to get status from backend property_status field
   const getPropertyStatus = (property) => {
-    return property.property_status || property.status || 'unknown';
+    return property.property_status || property.status || 'draft';
   };
 
   // Format status display
@@ -148,7 +118,7 @@ const BrokerPropertiesList = ({
     // Check property_images array
     if (property.property_images && Array.isArray(property.property_images) && property.property_images.length > 0) {
       const primaryImage = property.property_images.find(img => img.is_primary) || property.property_images[0];
-      return primaryImage.image_url || primaryImage.url || '';
+      return primaryImage.image_url || primaryImage.url || primaryImage.image;
     }
     
     // Check images array
@@ -165,6 +135,10 @@ const BrokerPropertiesList = ({
       return property.featured_image;
     }
     
+    if (property.image) {
+      return property.image;
+    }
+    
     // Fallback image based on property type
     return `https://images.unsplash.com/photo-${property.property_type === 'apartment' ? '1560448204-e02f11c3d0e2' : 
       property.property_type === 'house' ? '1518780664697-55e3ad937233' :
@@ -174,7 +148,7 @@ const BrokerPropertiesList = ({
 
   // Format price with proper currency
   const formatCurrency = (amount, currency = 'ETB') => {
-    if (!amount) return `0 ${currency}`;
+    if (!amount && amount !== 0) return `0 ${currency}`;
     
     const formatter = new Intl.NumberFormat('en-ET', {
       style: 'currency',
@@ -211,12 +185,10 @@ const BrokerPropertiesList = ({
     setActionLoading(prev => ({ ...prev, [propertyId]: true }));
     
     try {
-      // Use the PROPERTY_ACTION endpoint
-      const response = await apiCall('PROPERTY_ACTION', { id: propertyId }, {
-        data: { action }
-      });
+      // Use the propertyAction endpoint
+      const response = await api.propertyAction(propertyId, { action });
       
-      if (response.success) {
+      if (response?.success || response?.data?.success) {
         if (onPropertyAction) {
           onPropertyAction(propertyId, action);
         }
@@ -230,9 +202,14 @@ const BrokerPropertiesList = ({
         }
         
         // Refresh properties list
+        fetchBrokerProperties();
+        
+        // Call parent refresh if provided
         if (onRefresh) {
           onRefresh();
         }
+      } else {
+        throw new Error(response?.message || 'Action failed');
       }
     } catch (error) {
       console.error("Action failed:", error);
@@ -262,9 +239,9 @@ const BrokerPropertiesList = ({
     setActionLoading(prev => ({ ...prev, [propertyId]: true }));
     
     try {
-      const response = await apiCall('DELETE_PROPERTY', { id: propertyId }, {});
+      const response = await api.deleteProperty(propertyId);
       
-      if (response.success) {
+      if (response?.success || response?.data?.success) {
         if (setToast) {
           setToast({
             show: true,
@@ -274,9 +251,14 @@ const BrokerPropertiesList = ({
         }
         
         // Refresh properties list
+        fetchBrokerProperties();
+        
+        // Call parent refresh if provided
         if (onRefresh) {
           onRefresh();
         }
+      } else {
+        throw new Error(response?.message || 'Delete failed');
       }
     } catch (error) {
       console.error("Delete failed:", error);
@@ -297,18 +279,17 @@ const BrokerPropertiesList = ({
     setExpandedProperty(prev => prev === propertyId ? null : propertyId);
   };
 
-  // Function to handle property edit
+  // Function to handle property edit - call parent function
   const handleEditProperty = (property) => {
-    setSelectedPropertyForEdit(property);
-    setShowEditForm(true);
+    if (onViewDetails) {
+      onViewDetails(property);
+    }
   };
 
-  // Function to handle create property
+  // Function to handle create property - call parent function
   const handleCreateProperty = () => {
     if (onCreateProperty) {
       onCreateProperty();
-    } else {
-      setShowCreateForm(true);
     }
   };
 
@@ -330,21 +311,25 @@ const BrokerPropertiesList = ({
 
     try {
       const formData = new FormData();
-      selectedFiles.forEach((file, index) => {
+      selectedFiles.forEach((file) => {
         formData.append('images', file);
-        // Optional: Add metadata for each image
-        formData.append(`image_${index}_caption`, file.name);
       });
 
-      // Use the UPLOAD_PROPERTY_IMAGES endpoint
-      const response = await apiCall('UPLOAD_PROPERTY_IMAGES', 
-        { propertyId: selectedPropertyForImages.id }, 
-        {
-          method: 'POST',
-          body: formData
-        }
-      );
+      // Simulate upload progress
+      const progressInterval = setInterval(() => {
+        setUploadProgress(prev => {
+          if (prev >= 90) {
+            clearInterval(progressInterval);
+            return prev;
+          }
+          return prev + 10;
+        });
+      }, 200);
 
+      // Use the api.uploadPropertyImages function
+      const response = await api.updateProperty(selectedPropertyForImages.id, formData);
+      
+      clearInterval(progressInterval);
       setUploadProgress(100);
       
       setTimeout(() => {
@@ -353,7 +338,7 @@ const BrokerPropertiesList = ({
         setUploadProgress(0);
         setIsUploading(false);
         
-        if (response.success) {
+        if (response?.success) {
           if (setToast) {
             setToast({
               show: true,
@@ -363,11 +348,19 @@ const BrokerPropertiesList = ({
           }
           
           // Refresh properties list
+          fetchBrokerProperties();
+          
+          // Call parent refresh if provided
           if (onRefresh) {
             onRefresh();
           }
+          
+          // Call parent upload images function if provided
+          if (onUploadImages) {
+            onUploadImages(selectedPropertyForImages.id, selectedFiles);
+          }
         } else {
-          throw new Error(response.message || 'Upload failed');
+          throw new Error(response?.message || 'Upload failed');
         }
       }, 500);
 
@@ -410,7 +403,7 @@ const BrokerPropertiesList = ({
   };
 
   // Apply filters
-  const filteredProperties = safeBrokerProperties.filter((property) => {
+  const filteredProperties = properties.filter((property) => {
     const status = getPropertyStatus(property);
     
     if (filterStatus !== "all") {
@@ -544,18 +537,19 @@ const BrokerPropertiesList = ({
   // Calculate stats from properties
   const calculatePropertyStats = () => {
     const stats = {
-      total: safeBrokerProperties.length,
-      active: safeBrokerProperties.filter(p => getPropertyStatus(p) === 'active').length,
-      pending: safeBrokerProperties.filter(p => ['pending', 'draft'].includes(getPropertyStatus(p))).length,
-      withoutImages: safeBrokerProperties.filter(p => 
+      total: properties.length,
+      active: properties.filter(p => getPropertyStatus(p) === 'active').length,
+      pending: properties.filter(p => ['pending', 'draft'].includes(getPropertyStatus(p))).length,
+      withoutImages: properties.filter(p => 
         !p.images && 
         !p.image_url && 
         !p.featured_image && 
+        !p.image &&
         (!p.property_images || p.property_images.length === 0)
       ).length,
-      totalValue: safeBrokerProperties.reduce((sum, p) => sum + (parseFloat(p.price) || 0), 0),
-      sold: safeBrokerProperties.filter(p => getPropertyStatus(p) === 'sold').length,
-      rented: safeBrokerProperties.filter(p => getPropertyStatus(p) === 'rented').length
+      totalValue: properties.reduce((sum, p) => sum + (parseFloat(p.price) || 0), 0),
+      sold: properties.filter(p => getPropertyStatus(p) === 'sold').length,
+      rented: properties.filter(p => getPropertyStatus(p) === 'rented').length
     };
     
     return stats;
@@ -563,13 +557,11 @@ const BrokerPropertiesList = ({
 
   const propertyStats = calculatePropertyStats();
 
-  // Handle refresh if not provided
+  // Handle refresh
   const handleRefresh = () => {
+    fetchBrokerProperties();
     if (onRefresh) {
       onRefresh();
-    } else {
-      // Default refresh behavior
-      window.location.reload();
     }
   };
 
@@ -782,11 +774,11 @@ const BrokerPropertiesList = ({
             No Properties Found
           </h3>
           <p className={`text-lg mb-6 ${theme === "dark" ? "text-gray-400" : "text-gray-600"}`}>
-            {safeBrokerProperties.length === 0 
+            {properties.length === 0 
               ? "You haven't created any properties yet. Start by creating your first listing!" 
               : "No properties match your current filters."}
           </p>
-          {safeBrokerProperties.length === 0 && (
+          {properties.length === 0 && (
             <button
               onClick={handleCreateProperty}
               className="px-8 py-3 bg-gradient-to-r from-amber-500 to-orange-500 text-white rounded-xl hover:from-amber-600 hover:to-orange-600 flex items-center gap-2 mx-auto transition-all duration-300 hover:scale-105 shadow-lg hover:shadow-xl"
@@ -803,7 +795,7 @@ const BrokerPropertiesList = ({
             const statusDisplay = formatStatusDisplay(status);
             const statusColors = getStatusColor(status);
             const propertyImage = getPropertyImage(property);
-            const hasImages = property.images || property.image_url || property.featured_image || (property.property_images && property.property_images.length > 0);
+            const hasImages = property.images || property.image_url || property.featured_image || property.image || (property.property_images && property.property_images.length > 0);
             const propertyId = property.id || property.property_id;
             
             return (
@@ -1067,7 +1059,7 @@ const BrokerPropertiesList = ({
       {sortedProperties.length > 0 && (
         <div className="flex flex-col sm:flex-row justify-between items-center mt-8 pt-6 border-t border-gray-200 dark:border-gray-800">
           <div className={`text-sm mb-4 sm:mb-0 ${theme === "dark" ? "text-gray-400" : "text-gray-600"}`}>
-            Showing <span className={`font-semibold ${theme === "dark" ? "text-gray-400" : "text-gray-600"}`}>{sortedProperties.length}</span> of <span className={`font-semibold ${theme === "dark" ? "text-gray-400" : "text-gray-600"}`}>{safeBrokerProperties.length}</span> properties
+            Showing <span className={`font-semibold ${theme === "dark" ? "text-gray-400" : "text-gray-600"}`}>{sortedProperties.length}</span> of <span className={`font-semibold ${theme === "dark" ? "text-gray-400" : "text-gray-600"}`}>{properties.length}</span> properties
           </div>
           
           <div className="flex gap-3">
@@ -1246,39 +1238,6 @@ const BrokerPropertiesList = ({
             </div>
           </div>
         </div>
-      )}
-
-      {/* Edit Property Form Modal */}
-      {showEditForm && selectedPropertyForEdit && (
-        <EditPropertyForm
-          property={selectedPropertyForEdit}
-          isOpen={showEditForm}
-          onClose={() => {
-            setShowEditForm(false);
-            setSelectedPropertyForEdit(null);
-          }}
-          onSubmit={(updatedProperty) => {
-            console.log("Property updated:", updatedProperty);
-            setShowEditForm(false);
-            setSelectedPropertyForEdit(null);
-            handleRefresh();
-          }}
-          theme={theme}
-        />
-      )}
-
-      {/* Create Property Form Modal */}
-      {showCreateForm && (
-        <CreatePropertyForm
-          isOpen={showCreateForm}
-          onClose={() => setShowCreateForm(false)}
-          onSubmit={(newProperty) => {
-            console.log("Property created:", newProperty);
-            setShowCreateForm(false);
-            handleRefresh();
-          }}
-          theme={theme}
-        />
       )}
     </div>
   );

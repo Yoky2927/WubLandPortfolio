@@ -1,4 +1,4 @@
-// backend/property-service/server.js - COMPLETE VERSION
+// backend/property-service/server.js - CORRECTED VERSION
 import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
@@ -172,7 +172,7 @@ app.get("/health", async (req, res) => {
 });
 
 // ============================================
-// 5. PROPERTY ENDPOINTS
+// 5. PROPERTY ENDPOINTS - MUST COME BEFORE :id
 // ============================================
 
 // Get all properties from database
@@ -312,7 +312,150 @@ app.get("/api/properties", async (req, res) => {
   }
 });
 
-// Get property by ID
+// ============================================
+// 6. SPECIFIC PROPERTY ENDPOINTS (MUST COME BEFORE :id)
+// ============================================
+
+// Get company properties
+app.get("/api/properties/company", async (req, res) => {
+  try {
+    console.log('📊 GET /api/properties/company called');
+
+    const [properties] = await pool.execute(
+      `SELECT p.* FROM properties p
+       WHERE p.property_source = 'company_owned'
+       AND p.deleted_at IS NULL
+       ORDER BY p.created_at DESC`
+    );
+
+    res.json({
+      success: true,
+      data: properties || [],
+      count: properties?.length || 0,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('❌ Error fetching company properties:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message,
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
+// Get pending properties
+app.get("/api/properties/pending", async (req, res) => {
+  try {
+    console.log('📊 GET /api/properties/pending called');
+
+    const [properties] = await pool.execute(
+      `SELECT p.* FROM properties p
+       WHERE p.property_status IN ('pending', 'draft')
+       AND p.deleted_at IS NULL
+       ORDER BY p.created_at DESC`
+    );
+
+    res.json({
+      success: true,
+      data: properties || [],
+      count: properties?.length || 0,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('❌ Error fetching pending properties:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message,
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
+// Get approved properties (active properties)
+app.get("/api/properties/approved", async (req, res) => {
+  try {
+    console.log('📊 GET /api/properties/approved called');
+
+    const [properties] = await pool.execute(
+      `SELECT p.* FROM properties p
+       WHERE p.property_status = 'active'
+       AND p.deleted_at IS NULL
+       ORDER BY p.created_at DESC`
+    );
+
+    res.json({
+      success: true,
+      data: properties || [],
+      count: properties?.length || 0,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('❌ Error fetching approved properties:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message,
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
+// Get rejected properties
+app.get("/api/properties/rejected", async (req, res) => {
+  try {
+    console.log('📊 GET /api/properties/rejected called');
+
+    // Check if 'rejected' exists in the enum, otherwise use 'inactive'
+    const [statusCheck] = await pool.execute(
+      `SELECT COLUMN_TYPE 
+       FROM INFORMATION_SCHEMA.COLUMNS 
+       WHERE TABLE_SCHEMA = DATABASE() 
+         AND TABLE_NAME = 'properties' 
+         AND COLUMN_NAME = 'property_status'`
+    );
+
+    const columnType = statusCheck[0]?.COLUMN_TYPE || '';
+    const hasRejected = columnType.includes("'rejected'");
+
+    let query;
+    if (hasRejected) {
+      query = `SELECT p.* FROM properties p
+               WHERE p.property_status = 'rejected'
+               AND p.deleted_at IS NULL
+               ORDER BY p.created_at DESC`;
+    } else {
+      // Fallback to 'inactive' if 'rejected' doesn't exist
+      console.log('⚠️ "rejected" status not found in enum, using "inactive" as fallback');
+      query = `SELECT p.* FROM properties p
+               WHERE p.property_status = 'inactive'
+               AND p.deleted_at IS NULL
+               ORDER BY p.created_at DESC`;
+    }
+
+    const [properties] = await pool.execute(query);
+
+    res.json({
+      success: true,
+      data: properties || [],
+      count: properties?.length || 0,
+      timestamp: new Date().toISOString(),
+      note: hasRejected ? 'Using "rejected" status' : 'Using "inactive" status as fallback for rejected'
+    });
+  } catch (error) {
+    console.error('❌ Error fetching rejected properties:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message,
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
+// ============================================
+// 7. PROPERTY BY ID (MUST COME AFTER SPECIFIC ROUTES)
+// ============================================
+
+// Get property by ID - THIS MUST COME AFTER THE SPECIFIC ROUTES
 app.get("/api/properties/:id", async (req, res) => {
   try {
     const { id } = req.params;
@@ -386,7 +529,7 @@ app.get("/api/properties/:id", async (req, res) => {
 });
 
 // ============================================
-// 6. BUYER ENDPOINTS - USING CONTROLLER
+// 8. BUYER ENDPOINTS - USING CONTROLLER
 // ============================================
 // Get saved properties - PROTECTED
 app.get("/api/buyer/saved-properties", authenticate, BuyerController.getSavedProperties);
@@ -409,8 +552,85 @@ app.post("/api/buyer/properties/:propertyId/view", authenticate, BuyerController
 // Get property stats - PROTECTED
 app.get("/api/buyer/properties/:propertyId/stats", authenticate, BuyerController.getPropertyStats);
 
+app.get("/api/properties/broker/listings", authenticate, async (req, res) => {
+  try {
+    console.log('📝 GET /api/properties/broker/listings called');
+    
+    const userId = req.user.id;
+    const userRole = req.user.role;
+    
+    console.log(`🔍 Fetching listings for user ${userId} with role ${userRole}`);
+    
+    // Check if user has broker role
+    const allowedRoles = ['internal_broker', 'external_broker', 'admin', 'super_admin'];
+    if (!allowedRoles.includes(userRole)) {
+      return res.status(403).json({
+        success: false,
+        message: "Access denied. Broker role required.",
+        timestamp: new Date().toISOString()
+      });
+    }
+    
+    // Query to get broker's listings
+    const query = `
+      SELECT p.*, 
+        (SELECT image_url FROM property_images 
+         WHERE property_id = p.id 
+         ORDER BY is_primary DESC, image_order ASC 
+         LIMIT 1) as main_image,
+        u.first_name as broker_first_name,
+        u.last_name as broker_last_name
+      FROM properties p
+      LEFT JOIN users u ON p.assigned_broker_id = u.id
+      WHERE p.assigned_broker_id = ? 
+        AND p.deleted_at IS NULL
+      ORDER BY p.created_at DESC
+    `;
+    
+    const [properties] = await pool.execute(query, [userId]);
+    
+    console.log(`✅ Found ${properties.length} listings for broker ${userId}`);
+    
+    // Parse JSON fields
+    const parsedProperties = properties.map(property => {
+      const safeParse = (str, defaultValue = []) => {
+        try {
+          return str ? JSON.parse(str) : defaultValue;
+        } catch {
+          return defaultValue;
+        }
+      };
+      
+      return {
+        ...property,
+        features: safeParse(property.features),
+        amenities: safeParse(property.amenities),
+        saved_by_users: safeParse(property.saved_by_users),
+        price_history: safeParse(property.price_history),
+        status_history: safeParse(property.status_history)
+      };
+    });
+    
+    res.json({
+      success: true,
+      message: "Broker listings retrieved successfully",
+      data: parsedProperties,
+      count: parsedProperties.length,
+      timestamp: new Date().toISOString()
+    });
+    
+  } catch (error) {
+    console.error('❌ Error fetching broker listings:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message || "Failed to fetch broker listings",
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
 // ============================================
-// 7. APPLICATION ENDPOINTS
+// 9. APPLICATION ENDPOINTS
 // ============================================
 
 // Create application
@@ -527,7 +747,7 @@ app.get("/api/applications", async (req, res) => {
 });
 
 // ============================================
-// 8. DEBUG ENDPOINTS
+// 10. DEBUG ENDPOINTS
 // ============================================
 
 // Debug database check
@@ -720,7 +940,7 @@ app.get("/api/debug/check-saves/:propertyId", async (req, res) => {
 });
 
 // ============================================
-// 9. REDIRECT ROUTES FOR FRONTEND
+// 11. REDIRECT ROUTES FOR FRONTEND
 // ============================================
 
 // Redirect /properties to /api/properties
@@ -737,7 +957,7 @@ app.get("/properties/:id", async (req, res) => {
 });
 
 // ============================================
-// 10. 404 HANDLER
+// 12. 404 HANDLER
 // ============================================
 
 app.use((req, res) => {
@@ -753,8 +973,13 @@ app.use((req, res) => {
       "GET /",
       "GET /health",
       "GET /api/properties",
+      "GET /api/properties/company",
+      "GET /api/properties/pending",
+      "GET /api/properties/approved",
+      "GET /api/properties/rejected",
       "GET /api/properties/:id",
       "GET /api/buyer/saved-properties",
+      "GET /api/properties/broker/listings",  
       "POST /api/buyer/properties/:id/save",
       "DELETE /api/buyer/properties/:id/save",
       "GET /api/buyer/properties/:id/is-saved",
@@ -770,7 +995,7 @@ app.use((req, res) => {
 });
 
 // ============================================
-// 11. ERROR HANDLER
+// 13. ERROR HANDLER
 // ============================================
 
 app.use((err, req, res, next) => {
@@ -786,7 +1011,7 @@ app.use((err, req, res, next) => {
 });
 
 // ============================================
-// 12. START SERVER
+// 14. START SERVER
 // ============================================
 
 app.listen(PORT, () => {
@@ -798,17 +1023,22 @@ app.listen(PORT, () => {
   console.log(`\n🔗 MAIN ENDPOINTS:`);
   console.log(`  1. Health:          http://localhost:${PORT}/health`);
   console.log(`  2. All Properties:  http://localhost:${PORT}/api/properties`);
-  console.log(`  3. Property by ID:  http://localhost:${PORT}/api/properties/1`);
+  console.log(`\n🔗 FILTERED PROPERTY ENDPOINTS:`);
+  console.log(`  3. Company:         http://localhost:${PORT}/api/properties/company`);
+  console.log(`  4. Pending:         http://localhost:${PORT}/api/properties/pending`);
+  console.log(`  5. Approved:        http://localhost:${PORT}/api/properties/approved`);
+  console.log(`  6. Rejected:        http://localhost:${PORT}/api/properties/rejected`);
+  console.log(`  7. Property by ID:  http://localhost:${PORT}/api/properties/1`);
   console.log(`\n🔗 BUYER ENDPOINTS:`);
-  console.log(`  4. Saved Properties: http://localhost:${PORT}/api/buyer/saved-properties`);
-  console.log(`  5. Save Property:    POST http://localhost:${PORT}/api/buyer/properties/1/save`);
-  console.log(`  6. Unsave Property:  DELETE http://localhost:${PORT}/api/buyer/properties/1/save`);
-  console.log(`  7. Check Saved:      http://localhost:${PORT}/api/buyer/properties/1/is-saved`);
-  console.log(`  8. Recommended:      http://localhost:${PORT}/api/buyer/recommended-properties`);
+  console.log(`  8. Saved Properties: http://localhost:${PORT}/api/buyer/saved-properties`);
+  console.log(`  9. Save Property:    POST http://localhost:${PORT}/api/buyer/properties/1/save`);
+  console.log(` 10. Unsave Property:  DELETE http://localhost:${PORT}/api/buyer/properties/1/save`);
+  console.log(` 11. Check Saved:      http://localhost:${PORT}/api/buyer/properties/1/is-saved`);
+  console.log(` 12. Recommended:      http://localhost:${PORT}/api/buyer/recommended-properties`);
   console.log(`\n🔗 DEBUG ENDPOINTS:`);
-  console.log(`  9. Database Check:   http://localhost:${PORT}/api/debug/database-check`);
-  console.log(` 10. Save Test:        http://localhost:${PORT}/api/debug/save-test`);
-  console.log(` 11. Check Saves:      http://localhost:${PORT}/api/debug/check-saves/1`);
+  console.log(` 13. Database Check:   http://localhost:${PORT}/api/debug/database-check`);
+  console.log(` 14. Save Test:        http://localhost:${PORT}/api/debug/save-test`);
+  console.log(` 15. Check Saves:      http://localhost:${PORT}/api/debug/check-saves/1`);
   console.log(`\n📌 Note: Using BuyerController for save/unsave operations`);
   console.log(`✨ ========================================\n`);
 });

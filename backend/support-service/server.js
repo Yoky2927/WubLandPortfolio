@@ -5,12 +5,10 @@ import { Server } from "socket.io";
 import http from "http";
 import fileUpload from "express-fileupload";
 import axios from "axios";
-import { ApiDocs, createHealthCheck } from '../shared/api-docs.js';
 
 // Import middleware
 import { authenticateToken, requireSupportAgent } from "./middleware/auth.middleware.js";
 import { errorHandler, notFound } from "./middleware/error.middleware.js";
-
 
 // Import routes
 import ticketRoutes from "./routes/ticket.routes.js";
@@ -21,25 +19,24 @@ import reviewRoutes from "./routes/review.routes.js";
 import brokerRoutes from "./routes/broker.routes.js";
 import analyticsRoutes from './routes/analytics.routes.js';
 
-
 dotenv.config();
 
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server, {
   cors: { 
-    origin: process.env.CLIENT_URL, 
-    methods: ["GET", "POST"],
+    origin: process.env.CLIENT_URL || "http://localhost:3000", 
+    methods: ["GET", "POST", "PUT", "DELETE"],
     credentials: true
   },
 });
 
 // Service URLs
 const USER_SERVICE_URL = process.env.USER_SERVICE_URL || "http://localhost:5000";
-const COMMUNICATION_SERVICE_URL = process.env.COMMUNICATION_SERVICE_URL || "http://localhost:5002";
+const COMMUNICATION_SERVICE_URL = process.env.COMMUNICATION_SERVICE_URL || "http://localhost:5001";
 const ANALYSIS_SERVICE_URL = process.env.ANALYSIS_SERVICE_URL || "http://localhost:5004";
 
-// Helper function to make authenticated requests to other services
+// Helper function to make authenticated requests
 const makeAuthenticatedRequest = async (url, authHeader) => {
   try {
     const response = await axios.get(url, {
@@ -54,7 +51,7 @@ const makeAuthenticatedRequest = async (url, authHeader) => {
 
 // Middleware
 app.use(cors({
-  origin: process.env.CLIENT_URL,
+  origin: process.env.CLIENT_URL || "http://localhost:3000",
   credentials: true
 }));
 app.use(express.json());
@@ -63,20 +60,7 @@ app.use(fileUpload({
   limits: { fileSize: 10 * 1024 * 1024 }
 }));
 
-const supportEndpoints = [
-  ApiDocs.createRoute('GET', '/api/support/tickets', 'Get support tickets', true, ['support_agent', 'admin']),
-  ApiDocs.createRoute('POST', '/api/support/tickets', 'Create ticket', true),
-  // Add more
-];
-
-app.get('/api-docs', (req, res) => {
-  res.json(ApiDocs.generateDocs('support', supportEndpoints));
-});
-
-// Update health endpoint
-app.get('/health', createHealthCheck('support'));
-
-// Make services available to routes
+// Make services and socket.io available to routes
 app.use((req, res, next) => {
   req.io = io;
   req.services = {
@@ -92,9 +76,16 @@ app.use((req, res, next) => {
 io.on("connection", (socket) => {
   console.log("Support service WebSocket client connected");
   
+  // Support agent joins their room
   socket.on("join_support_room", (agentUsername) => {
     socket.join(`support_${agentUsername}`);
     console.log(`Agent ${agentUsername} joined support room`);
+  });
+
+  // Join ticket-specific room
+  socket.on("join_ticket_room", (ticketId) => {
+    socket.join(`ticket_${ticketId}`);
+    console.log(`Client joined ticket room ${ticketId}`);
   });
 
   socket.on("disconnect", () => {
@@ -102,7 +93,7 @@ io.on("connection", (socket) => {
   });
 });
 
-// Public routes
+// Health check
 app.get("/health", (req, res) => {
   res.json({ 
     status: "OK", 
@@ -111,16 +102,16 @@ app.get("/health", (req, res) => {
   });
 });
 
-// Main protected routes
-app.use("/api/support/tickets", authenticateToken, requireSupportAgent, ticketRoutes);
-app.use("/api/support/faqs", faqRoutes);
+// API Routes
+app.use("/api/support/tickets", authenticateToken, ticketRoutes);
+app.use("/api/support/faqs", faqRoutes); // Public for viewing, protected for CRUD
 app.use("/api/support/flagged-content", authenticateToken, requireSupportAgent, flagRoutes);
 app.use("/api/support/activity", authenticateToken, requireSupportAgent, activityRoutes);
 app.use("/api/support/reviews", authenticateToken, requireSupportAgent, reviewRoutes);
 app.use("/api/support/brokers", authenticateToken, brokerRoutes);
 app.use('/api/support/analytics', authenticateToken, requireSupportAgent, analyticsRoutes);
 
-// Error handling middleware (must be last)
+// Error handling
 app.use(notFound);
 app.use(errorHandler);
 

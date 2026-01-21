@@ -9,7 +9,7 @@ export const SERVICE_URLS = {
   ANALYSIS: 'http://localhost:5004'
 };
 
-// Main API endpoints - BASED ON YOUR ACTUAL server.js ENDPOINTS
+// Main API endpoints - UPDATED with all missing endpoints
 export const API_ENDPOINTS = {
   // ========== AUTH ENDPOINTS ==========
   LOGIN: { service: 'USER', path: '/api/auth/login', method: 'POST' },
@@ -27,11 +27,11 @@ export const API_ENDPOINTS = {
   UPLOAD_VERIFICATION_DOCUMENT: { service: 'USER', path: '/api/verification/documents/upload', method: 'POST' },
   GET_MY_DOCUMENTS: { service: 'USER', path: '/api/verification/documents/my', method: 'GET' },
 
-  // ========== PROPERTY ENDPOINTS (Based on your server.js) ==========
+  // ========== PROPERTY ENDPOINTS ==========
   GET_PROPERTIES: { service: 'PROPERTY', path: '/api/properties', method: 'GET' },
   GET_PROPERTY_BY_ID: { service: 'PROPERTY', path: '/api/properties/{id}', method: 'GET' },
 
-  // ========== BUYER ENDPOINTS (Based on your server.js) ==========
+  // ========== BUYER ENDPOINTS ==========
   GET_SAVED_PROPERTIES: { service: 'PROPERTY', path: '/api/buyer/saved-properties', method: 'GET' },
   SAVE_PROPERTY: { service: 'PROPERTY', path: '/api/buyer/properties/{propertyId}/save', method: 'POST' },
   UNSAVE_PROPERTY: { service: 'PROPERTY', path: '/api/buyer/properties/{propertyId}/save', method: 'DELETE' },
@@ -40,14 +40,14 @@ export const API_ENDPOINTS = {
   TRACK_PROPERTY_VIEW: { service: 'PROPERTY', path: '/api/buyer/properties/{propertyId}/view', method: 'POST' },
   GET_PROPERTY_STATS: { service: 'PROPERTY', path: '/api/buyer/properties/{propertyId}/stats', method: 'GET' },
 
-  // ========== APPLICATION ENDPOINTS (Based on your server.js) ==========
+  // ========== APPLICATION ENDPOINTS ==========
   GET_APPLICATIONS: { service: 'PROPERTY', path: '/api/applications', method: 'GET' },
   CREATE_APPLICATION: { service: 'PROPERTY', path: '/api/applications', method: 'POST' },
 
   // ========== BROKER ENDPOINTS ==========
   GET_BROKERS: { service: 'USER', path: '/api/brokers', method: 'GET' },
 
-  // ========== DEBUG ENDPOINTS (Based on your server.js) ==========
+  // ========== DEBUG ENDPOINTS ==========
   DEBUG_DATABASE_CHECK: { service: 'PROPERTY', path: '/api/debug/database-check', method: 'GET' },
   DEBUG_SAVED_PROPERTIES: { service: 'PROPERTY', path: '/api/debug/saved-properties/{userId}', method: 'GET' },
   DEBUG_SAVE_TEST: { service: 'PROPERTY', path: '/api/debug/save-test', method: 'GET' },
@@ -57,7 +57,6 @@ export const API_ENDPOINTS = {
   GET_NOTIFICATIONS: { service: 'COMMUNICATION', path: '/api/notifications', method: 'GET' },
   MARK_NOTIFICATION_READ: { service: 'COMMUNICATION', path: '/api/notifications/{id}/read', method: 'PUT' },
   GET_UNREAD_NOTIFICATIONS_COUNT: { service: 'COMMUNICATION', path: '/api/notifications/unread-count', method: 'GET' },
-
 
   // ========== TODO ENDPOINTS ==========
   GET_TODOS: { service: 'COMMUNICATION', path: '/api/todos', method: 'GET' },
@@ -107,7 +106,6 @@ export const API_ENDPOINTS = {
   // ========== INTERNAL ENDPOINTS ==========
   CREATE_INVOICE_INTERNAL: { service: 'TRANSACTION', path: '/api/transactions/internal/create-invoice', method: 'POST' },
   GET_TRANSACTION_INTERNAL: { service: 'TRANSACTION', path: '/api/transactions/internal/transaction/{id}', method: 'GET' },
-
   CREATE_TEST_INVOICE: { service: 'TRANSACTION', path: '/api/transactions/test/create-invoice', method: 'POST' },
 
   // ========== TRANSACTION HISTORY ENDPOINTS ==========
@@ -166,7 +164,7 @@ export const API_ENDPOINTS = {
   GET_TRANSACTION_ANALYTICS: { service: 'ANALYSIS', path: '/api/analytics/transactions', method: 'GET' },
   GET_PROPERTY_ANALYTICS: { service: 'ANALYSIS', path: '/api/analytics/properties', method: 'GET' },
 
-// ========== ANNOUNCEMENT ENDPOINTS ==========
+  // ========== ANNOUNCEMENT ENDPOINTS ==========
   GET_ANNOUNCEMENTS: { service: 'COMMUNICATION', path: '/api/announcements', method: 'GET' },
   GET_ANNOUNCEMENT_BY_ID: { service: 'COMMUNICATION', path: '/api/announcements/{id}', method: 'GET' },
   CREATE_ANNOUNCEMENT: { service: 'COMMUNICATION', path: '/api/announcements', method: 'POST' },
@@ -180,6 +178,54 @@ export const API_ENDPOINTS = {
   MARK_ANNOUNCEMENT_VIEWED: { service: 'COMMUNICATION', path: '/api/announcements/{id}/view', method: 'POST' },
   MARK_ANNOUNCEMENT_CLICKED: { service: 'COMMUNICATION', path: '/api/announcements/{id}/click', method: 'POST' },
   GET_PUBLIC_ANNOUNCEMENTS: { service: 'COMMUNICATION', path: '/api/announcements/public', method: 'GET' },
+
+  // ========== PROPERTY MANAGEMENT ENDPOINTS ==========
+  GET_COMPANY_PROPERTIES: { service: 'PROPERTY', path: '/api/properties/company', method: 'GET' },
+  GET_PENDING_PROPERTIES: { service: 'PROPERTY', path: '/api/properties/pending', method: 'GET' },
+  GET_APPROVED_PROPERTIES: { service: 'PROPERTY', path: '/api/properties/approved', method: 'GET' },
+  GET_REJECTED_PROPERTIES: { service: 'PROPERTY', path: '/api/properties/rejected', method: 'GET' },
+  GET_BROKER_LISTINGS: { service: 'PROPERTY', path: '/api/properties/broker/listings', method: 'GET' },
+
+  // ========== PROPERTY ACTIONS ==========
+  CREATE_PROPERTY: { service: 'PROPERTY', path: '/api/properties', method: 'POST' },
+  UPDATE_PROPERTY: { service: 'PROPERTY', path: '/api/properties/{id}', method: 'PUT' },
+  DELETE_PROPERTY: { service: 'PROPERTY', path: '/api/properties/{id}', method: 'DELETE' },
+  UPDATE_PROPERTY_STATUS: { service: 'PROPERTY', path: '/api/properties/{id}/status', method: 'PATCH' },
+  UPDATE_PROPERTY_PRICE: { service: 'PROPERTY', path: '/api/properties/{id}/price', method: 'PATCH' },
+  PROPERTY_ACTION: { service: 'PROPERTY', path: '/api/properties/{id}/action', method: 'POST' },
+
+  // ========== SUPPORT ENDPOINTS ==========
+  GET_TICKETS: { service: 'SUPPORT', path: '/api/support/tickets', method: 'GET' },
+  GET_TICKET_BY_ID: { service: 'SUPPORT', path: '/api/support/tickets/{id}', method: 'GET' },
+  CREATE_TICKET: { service: 'SUPPORT', path: '/api/support/tickets', method: 'POST' },
+  GET_MY_TICKETS: { service: 'SUPPORT', path: '/api/support/tickets/my', method: 'GET' },
+  RESPOND_TO_TICKET: { service: 'SUPPORT', path: '/api/support/tickets/{id}/respond', method: 'POST' },
+  UPDATE_TICKET_STATUS: { service: 'SUPPORT', path: '/api/support/tickets/{id}/status', method: 'PUT' },
+  ASSIGN_TICKET: { service: 'SUPPORT', path: '/api/support/tickets/{id}/assign', method: 'PUT' },
+  GET_FAQS: { service: 'SUPPORT', path: '/api/support/faqs', method: 'GET' },
+  GET_FAQ_BY_ID: { service: 'SUPPORT', path: '/api/support/faqs/{id}', method: 'GET' },
+  CREATE_FAQ: { service: 'SUPPORT', path: '/api/support/faqs', method: 'POST' },
+  UPDATE_FAQ: { service: 'SUPPORT', path: '/api/support/faqs/{id}', method: 'PUT' },
+  DELETE_FAQ: { service: 'SUPPORT', path: '/api/support/faqs/{id}', method: 'DELETE' },
+  MARK_FAQ_HELPFUL: { service: 'SUPPORT', path: '/api/support/faqs/{id}/helpful', method: 'POST' },
+  GET_FLAGGED_CONTENT: { service: 'SUPPORT', path: '/api/support/flagged-content', method: 'GET' },
+  GET_FLAG_BY_ID: { service: 'SUPPORT', path: '/api/support/flagged-content/{id}', method: 'GET' },
+  RESOLVE_FLAG: { service: 'SUPPORT', path: '/api/support/flagged-content/{id}/resolve', method: 'PUT' },
+  ASSIGN_FLAG: { service: 'SUPPORT', path: '/api/support/flagged-content/{id}/assign', method: 'PUT' },
+  GET_REVIEWS: { service: 'SUPPORT', path: '/api/support/reviews', method: 'GET' },
+  GET_AGENT_REVIEWS: { service: 'SUPPORT', path: '/api/support/reviews/{username}', method: 'GET' },
+  CREATE_REVIEW: { service: 'SUPPORT', path: '/api/support/reviews', method: 'POST' },
+  GET_ACTIVITIES: { service: 'SUPPORT', path: '/api/support/activity/activities', method: 'GET' },
+  GET_AGENT_ACTIVITIES: { service: 'SUPPORT', path: '/api/support/activity/activities/{username}', method: 'GET' },
+  GET_SUPPORT_ANALYTICS: { service: 'SUPPORT', path: '/api/support/analytics', method: 'GET' },
+  GET_TEAM_ANALYTICS: { service: 'SUPPORT', path: '/api/support/activity/team-analytics', method: 'GET' },
+  GET_PENDING_VERIFICATIONS: { service: 'SUPPORT', path: '/api/support/brokers/verification/pending', method: 'GET' },
+  SUBMIT_VERIFICATION_REQUEST: { service: 'SUPPORT', path: '/api/support/brokers/verification/request', method: 'POST' },
+  GET_VERIFICATION_STATUS: { service: 'SUPPORT', path: '/api/support/brokers/verification/status', method: 'GET' },
+  REVIEW_VERIFICATION: { service: 'SUPPORT', path: '/api/support/brokers/verification/review', method: 'POST' },
+  UPDATE_BROKER_STATUS: { service: 'SUPPORT', path: '/api/support/brokers/status', method: 'PUT' },
+  GET_BROKER_ANALYTICS: { service: 'SUPPORT', path: '/api/support/brokers/analytics', method: 'GET' }
+
 };
 
 // Helper to replace path parameters
@@ -387,7 +433,7 @@ export const api = {
     apiCall(endpointKey, params, { ...options, method: 'DELETE' }),
 };
 
-// Direct API calls for common endpoints - Updated with correct paths
+// Direct API calls for common endpoints
 export const directApi = {
   // Property endpoints
   getProperties: (params = {}) => apiCall('GET_PROPERTIES', {}, { data: params }),
@@ -410,11 +456,9 @@ export const directApi = {
   initializePayment: (invoiceId, data) => apiCall('INITIALIZE_PAYMENT', { invoiceId }, { data }),
   verifyPayment: (transactionRef) => {
     console.log('🛠️ verifyPayment called with:', transactionRef);
-
     const result = apiCall('VERIFY_PAYMENT', {}, {
       data: { transaction_ref: transactionRef }
     });
-
     return result;
   },
   getPayment: (id) => apiCall('GET_PAYMENT', { id }),
@@ -431,7 +475,6 @@ export const directApi = {
   // ========== INVOICE ENDPOINTS ==========
   getInvoice: (id) => apiCall('GET_INVOICE', { id }),
   getUserInvoices: (type = 'from') => apiCall('GET_USER_INVOICES', {}, { data: { type } }),
-
 
   // ========== APPOINTMENT ENDPOINTS ==========
   getAppointments: () => apiCall('GET_APPOINTMENTS'),
@@ -525,21 +568,64 @@ export const directApi = {
 
 
   // ========== ANNOUNCEMENT ENDPOINTS ==========
-getAnnouncements: (filters = {}) => apiCall('GET_ANNOUNCEMENTS', {}, { data: filters }),
-getAnnouncementById: (id) => apiCall('GET_ANNOUNCEMENT_BY_ID', { id }),
-createAnnouncement: (data) => apiCall('CREATE_ANNOUNCEMENT', {}, { data }),
-updateAnnouncement: (id, data) => apiCall('UPDATE_ANNOUNCEMENT', { id }, { data }),
-deleteAnnouncement: (id) => apiCall('DELETE_ANNOUNCEMENT', { id }),
-sendAnnouncement: (id, data) => apiCall('SEND_ANNOUNCEMENT', { id }, { data }),
-scheduleAnnouncement: (id, data) => apiCall('SCHEDULE_ANNOUNCEMENT', { id }, { data }),
-getAnnouncementStats: (id) => apiCall('GET_ANNOUNCEMENT_STATS', { id }),
-getAnnouncementAnalytics: (filters = {}) => apiCall('GET_ANNOUNCEMENT_ANALYTICS', {}, { data: filters }),
-getUserAnnouncements: (filters = {}) => apiCall('GET_USER_ANNOUNCEMENTS', {}, { data: filters }),
-markAnnouncementViewed: (id) => apiCall('MARK_ANNOUNCEMENT_VIEWED', { id }),
-markAnnouncementClicked: (id) => apiCall('MARK_ANNOUNCEMENT_CLICKED', { id }),
-getPublicAnnouncements: () => apiCall('GET_PUBLIC_ANNOUNCEMENTS'),
+  getAnnouncements: (filters = {}) => apiCall('GET_ANNOUNCEMENTS', {}, { data: filters }),
+  getAnnouncementById: (id) => apiCall('GET_ANNOUNCEMENT_BY_ID', { id }),
+  createAnnouncement: (data) => apiCall('CREATE_ANNOUNCEMENT', {}, { data }),
+  updateAnnouncement: (id, data) => apiCall('UPDATE_ANNOUNCEMENT', { id }, { data }),
+  deleteAnnouncement: (id) => apiCall('DELETE_ANNOUNCEMENT', { id }),
+  sendAnnouncement: (id, data) => apiCall('SEND_ANNOUNCEMENT', { id }, { data }),
+  scheduleAnnouncement: (id, data) => apiCall('SCHEDULE_ANNOUNCEMENT', { id }, { data }),
+  getAnnouncementStats: (id) => apiCall('GET_ANNOUNCEMENT_STATS', { id }),
+  getAnnouncementAnalytics: (filters = {}) => apiCall('GET_ANNOUNCEMENT_ANALYTICS', {}, { data: filters }),
+  getUserAnnouncements: (filters = {}) => apiCall('GET_USER_ANNOUNCEMENTS', {}, { data: filters }),
+  markAnnouncementViewed: (id) => apiCall('MARK_ANNOUNCEMENT_VIEWED', { id }),
+  markAnnouncementClicked: (id) => apiCall('MARK_ANNOUNCEMENT_CLICKED', { id }),
+  getPublicAnnouncements: () => apiCall('GET_PUBLIC_ANNOUNCEMENTS'),
+
+  // ========== PROPERTY MANAGEMENT ==========
+  getCompanyProperties: (params = {}) => apiCall('GET_COMPANY_PROPERTIES', {}, { data: params }),
+  getPendingProperties: (params = {}) => apiCall('GET_PENDING_PROPERTIES', {}, { data: params }),
+  getApprovedProperties: (params = {}) => apiCall('GET_APPROVED_PROPERTIES', {}, { data: params }),
+  getRejectedProperties: (params = {}) => apiCall('GET_REJECTED_PROPERTIES', {}, { data: params }),
+  getBrokerListings: (params = {}) => apiCall('GET_BROKER_LISTINGS', {}, { data: params }),
+
+  // ========== PROPERTY ACTIONS ==========
+  createProperty: (data) => apiCall('CREATE_PROPERTY', {}, { data }),
+  updateProperty: (id, data) => apiCall('UPDATE_PROPERTY', { id }, { data }),
+  deleteProperty: (id) => apiCall('DELETE_PROPERTY', { id }),
+  updatePropertyStatus: (id, data) => apiCall('UPDATE_PROPERTY_STATUS', { id }, { data }),
+  updatePropertyPrice: (id, data) => apiCall('UPDATE_PROPERTY_PRICE', { id }, { data }),
+  propertyAction: (id, data) => apiCall('PROPERTY_ACTION', { id }, { data }),
 
 
+  // ========== SUPPORT ENDPOINTS ==========
+  getTickets: () => apiCall('GET_TICKETS'),
+  getTicketById: (id) => apiCall('GET_TICKET_BY_ID', { id }),
+  respondToTicket: (id, data) => apiCall('RESPOND_TO_TICKET', { id }, { data }),
+  updateTicketStatus: (id, data) => apiCall('UPDATE_TICKET_STATUS', { id }, { data }),
+  getFAQs: () => apiCall('GET_FAQS'),
+  getFAQById: (id) => apiCall('GET_FAQ_BY_ID', { id }),
+  createFAQ: (data) => apiCall('CREATE_FAQ', {}, { data }),
+  updateFAQ: (id, data) => apiCall('UPDATE_FAQ', { id }, { data }),
+  deleteFAQ: (id) => apiCall('DELETE_FAQ', { id }),
+  markFAQHelpful: (id) => apiCall('MARK_FAQ_HELPFUL', { id }),
+  getFlaggedContent: () => apiCall('GET_FLAGGED_CONTENT'),
+  getFlagById: (id) => apiCall('GET_FLAG_BY_ID', { id }),
+  resolveFlag: (id, data) => apiCall('RESOLVE_FLAG', { id }, { data }),
+  assignFlag: (id, data) => apiCall('ASSIGN_FLAG', { id }, { data }),
+  getReviews: () => apiCall('GET_REVIEWS'),
+  getAgentReviews: (username) => apiCall('GET_AGENT_REVIEWS', { username }),
+  createReview: (data) => apiCall('CREATE_REVIEW', {}, { data }),
+  getActivities: () => apiCall('GET_ACTIVITIES'),
+  getAgentActivities: (username) => apiCall('GET_AGENT_ACTIVITIES', { username }),
+  getSupportAnalytics: () => apiCall('GET_SUPPORT_ANALYTICS'),
+  getTeamAnalytics: () => apiCall('GET_TEAM_ANALYTICS'),
+  getPendingVerifications: (params = {}) => apiCall('GET_PENDING_VERIFICATIONS', {}, { data: params }),
+  submitVerificationRequest: (data) => apiCall('SUBMIT_VERIFICATION_REQUEST', {}, { data }),
+  getVerificationStatus: () => apiCall('GET_VERIFICATION_STATUS'),
+  reviewVerification: (data) => apiCall('REVIEW_VERIFICATION', {}, { data }),
+  updateBrokerStatus: (data) => apiCall('UPDATE_BROKER_STATUS', {}, { data }),
+  getBrokerAnalytics: () => apiCall('GET_BROKER_ANALYTICS')
 
 };
 

@@ -1,57 +1,45 @@
-# 🏠 WubLand Portfolio
+# 🏠 WubLand – Online House Renting & Selling System
 
-## 👋 Welcome Team Members!
-
-**Important Notice for All Members:** Please navigate to the appropriate backend subsystem that you've been assigned by **Beza**. Each team member has a specific role and subsystem to work on.
-
-## 🎯 Getting Started
-
-### 1. **Navigate to Your Subsystem**
-- Go to the `backend/` directory
-- Find the folder with your name or assigned subsystem:
-  - 📊 `property-management/` - Assigned to: Beza
-  - 💰 `transaction-management/` - Assigned to: Saron 
-  - 📈 `analysis-service/` - Assigned to: Beletu
-
-### 2. **Read Your README.md File**
-Once you're in your assigned subsystem folder:
-- 📖 **Scroll down** to find the `README.md` file
-- 🔍 **Read it carefully** - it contains your specific instructions, deadlines, and resources
-- 🎯 **Follow the guidelines** provided by Beza
-
-## ⚠️ Strong Recommendation
-
-**Before you start working with GitHub, please watch these essential Git tutorials:**
-
-🎥 **Must-Watch Git Tutorials:**
-- [Git & GitHub Crash Course For Beginners](https://www.youtube.com/watch?v=SWYqp7iY_Tc) (20 minutes)
-- [Git for Professionals Tutorial](https://www.youtube.com/watch?v=Uszj_k0DGsg) (30 minutes)
-- [How to Use GitHub](https://www.youtube.com/watch?v=iv8rSLsi1xo) (15 minutes)
-
-**Why watch these?**
-- Avoid common mistakes 🚫
-- Learn proper workflow ✅  
-- Understand branching and merging 🔀
-- Prevent code conflicts ⚠️
-
-## 📋 Important Instructions
-
-1. **Do NOT** modify other team members' subsystems
-2. **Do NOT** push directly to main branch - use feature branches
-3. **Read your specific README.md** thoroughly before starting
-4. **Ask Beza** if you're unsure about anything
-5. **Commit regularly** with descriptive messages
-
-## 🆘 Need Help?
-
-If you encounter issues:
-1. **First**: Re-watch the Git tutorials above
-2. **Second**: Check your subsystem's README.md file
-3. **Third**: Ask your team members for guidance
-4. **Finally**: Contact Beza for clarification
+WubLand is a collaborative, full-stack microservices-based web application designed to streamline property listings, renting workflows, and transaction management. Built with modern web technologies, the platform splits core functionalities into specialized backend subsystems to ensure scalability, security, and clean code separation.
 
 ---
 
-**Remember:** This is a collaborative project. Your careful attention to the instructions and proper use of Git will ensure everyone works together smoothly! 
+## 🛠️ Tech Stack & Architecture
 
-**Happy coding!** 💻✨
+- **Frontend:** React.js, Tailwind CSS, Figma (UI/UX Design)
+- **Backend:** Node.js, Express.js
+- **Database:** MySQL (Structured database relationships & data validation)
+- **Version Control:** Git & GitHub (Strict feature-branching workflow)
+- **System Architecture:** Microservices / Decoupled Subsystems
+
+---
+
+## 🏗️ System Components & Subsystems
+
+The backend architecture is divided into specialized services to handle distinct business logic independently:
+
+- **Property Management Service (`backend/property-management/`)**  
+  Handles property creation, real estate filtering, metadata entry, and structural listing details.
+- **Transaction Management Service (`backend/transaction-management/`)**  
+  Manages secure renting and selling workflows, tenant-owner user management, and core data validation.
+- **Analysis & Reporting Service (`backend/analysis-service/`)**  
+  Processes platform data metrics to track property trends, user interactions, and system activity logs.
+
+---
+
+## 💻 My Role & Contributions
+
+As a core developer on this collaborative project, my responsibilities spanned both infrastructure setup and feature implementation:
+- **Full-Stack Implementation:** Contributed to building decoupled components using **React.js** for a responsive user interface and **Node.js/Express.js** to handle backend workflows.
+- **Database Architecture:** Structured **MySQL** schemas, defined complex database relationships, and wrote secure SQL queries ensuring strict server-side data validation.
+- **Git Workflow & Integration:** Collaborated closely within a 5-peer development team using Git Bash. Spearheaded the repository organization, established branching/merging rules, and implemented structured documentation policies to prevent code conflicts.
+- **UI Design:** Leveraged **Figma** to wireframe layouts and design user-focused navigation flows before translating them into **Tailwind CSS** components.
+
+---
+
+## 🚀 Development & Workflow Rules
+
+To maintain high code quality and smooth system performance, the project enforces strict operational procedures:
+1. **Branch Protection:** Direct pushes to the `main` branch are restricted. All features are developed in isolated branches and integrated via formal Pull Requests.
+2. **Modular Integrity:** Developers work exclusively within their isolated subsystems to maintain microservice independence and reduce coupling.
+3. **Comprehensive Documentation:** Every microservice contains isolated operational procedures detailing specific API expectations and configuration guidelines.

@@ -1,24 +1,62 @@
 // communication-service/services/notificationService.js
-import NotificationModel from '../models/notification.model.js';
+import NotificationModel from "../models/notification.model.js";
 // Import from utils folder instead
-import { emitNotification } from '../utils/socket.js';
+import { emitNotification } from "../utils/socket.js";
 
 class NotificationService {
   async createNotification(data) {
     try {
       // Create notification in database
       const notificationId = await NotificationModel.createNotification(data);
-      
+
       // Get the created notification
-      const notifications = await NotificationModel.getUserNotifications(data.userId, {
+      const result = await NotificationModel.getUserNotifications(data.userId, {
         limit: 1,
-        offset: 0
+        offset: 0,
       });
-      
-      const notification = notifications.find(n => n.id === notificationId);
-      
+
+      // Handle different response formats
+      let notificationsArray;
+
+      if (Array.isArray(result)) {
+        notificationsArray = result;
+      } else if (result && result.data && Array.isArray(result.data)) {
+        notificationsArray = result.data;
+      } else if (
+        result &&
+        result.success &&
+        result.data &&
+        Array.isArray(result.data)
+      ) {
+        notificationsArray = result.data;
+      } else {
+        console.error(
+          "Unexpected response format from getUserNotifications:",
+          result
+        );
+        // Fallback: create a minimal notification object
+        return {
+          id: notificationId,
+          ...data,
+          created_at: new Date().toISOString(),
+          read: false,
+        };
+      }
+
+      const notification = notificationsArray.find(
+        (n) => n.id === notificationId
+      );
+
       if (!notification) {
-        throw new Error('Failed to retrieve created notification');
+        console.log(
+          "Created notification not found in array, returning minimal object"
+        );
+        return {
+          id: notificationId,
+          ...data,
+          created_at: new Date().toISOString(),
+          read: false,
+        };
       }
 
       // Send real-time notification via WebSocket
@@ -26,7 +64,7 @@ class NotificationService {
 
       return notification;
     } catch (error) {
-      console.error('Error creating notification:', error);
+      console.error("Error creating notification:", error);
       throw error;
     }
   }
@@ -34,15 +72,15 @@ class NotificationService {
   async sendRealTimeNotification(userId, notification) {
     try {
       // Use the socket function from your utils/socket.js
-      if (typeof emitNotification === 'function') {
+      if (typeof emitNotification === "function") {
         emitNotification(userId, notification);
         return true;
       } else {
-        console.log('Socket notification function not available');
+        console.log("Socket notification function not available");
         return false;
       }
     } catch (error) {
-      console.error('Error sending real-time notification:', error);
+      console.error("Error sending real-time notification:", error);
       return false;
     }
   }
@@ -55,25 +93,25 @@ class NotificationService {
     // Notify seller
     await this.createNotification({
       userId: sellerId,
-      title: 'New Offer Received',
+      title: "New Offer Received",
       message: `You have received a new offer of ${amount} on your property.`,
-      type: 'transaction',
-      relatedEntityType: 'offer',
+      type: "transaction",
+      relatedEntityType: "offer",
       relatedEntityId: propertyId,
-      priority: 'high',
-      actionUrl: `/offers/${propertyId}`
+      priority: "high",
+      actionUrl: `/offers/${propertyId}`,
     });
 
     // Notify broker if assigned
     if (brokerId) {
       await this.createNotification({
         userId: brokerId,
-        title: 'New Offer on Your Listing',
+        title: "New Offer on Your Listing",
         message: `A new offer has been made on property #${propertyId}.`,
-        type: 'transaction',
-        relatedEntityType: 'offer',
+        type: "transaction",
+        relatedEntityType: "offer",
         relatedEntityId: propertyId,
-        priority: 'medium'
+        priority: "medium",
       });
     }
   }
@@ -83,12 +121,12 @@ class NotificationService {
 
     await this.createNotification({
       userId,
-      title: 'Appointment Reminder',
+      title: "Appointment Reminder",
       message: `Your appointment "${title}" at ${propertyAddress} is scheduled for ${startTime}.`,
-      type: 'reminder',
-      relatedEntityType: 'appointment',
+      type: "reminder",
+      relatedEntityType: "appointment",
       relatedEntityId: appointmentData.id,
-      priority: 'medium'
+      priority: "medium",
     });
   }
 
@@ -97,23 +135,23 @@ class NotificationService {
 
     await this.createNotification({
       userId,
-      title: 'Support Ticket Updated',
+      title: "Support Ticket Updated",
       message: `Your support ticket #${ticketId} status has been updated to ${status}.`,
-      type: 'info',
-      relatedEntityType: 'ticket',
+      type: "info",
+      relatedEntityType: "ticket",
       relatedEntityId: ticketId,
-      actionUrl: `/support/tickets/${ticketId}`
+      actionUrl: `/support/tickets/${ticketId}`,
     });
 
     if (assignedTo) {
       await this.createNotification({
         userId: assignedTo,
-        title: 'New Ticket Assigned',
+        title: "New Ticket Assigned",
         message: `You have been assigned to support ticket #${ticketId}.`,
-        type: 'info',
-        relatedEntityType: 'ticket',
+        type: "info",
+        relatedEntityType: "ticket",
         relatedEntityId: ticketId,
-        priority: 'medium'
+        priority: "medium",
       });
     }
   }

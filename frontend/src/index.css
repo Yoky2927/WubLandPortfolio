@@ -1,9 +1,12 @@
 /* Import fonts from Google Fonts */
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Montserrat:wght@400;500;600;700;800&display=swap');
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Montserrat:wght@400;500;600;700;800&display=swap");
 
 :root {
-  --font-inter: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  --font-montserrat: 'Montserrat', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-inter:
+    "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-montserrat:
+    "Montserrat", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+    sans-serif;
 }
 
 /* Ensure body uses Inter */
@@ -17,8 +20,45 @@ body {
 }
 
 /* Explicitly set font for specific elements */
-h1, h2, h3, h4, h5, h6 {
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
   font-family: var(--font-montserrat) !important;
+}
+
+/* Add to your CSS file or component */
+.modal-content-grid {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 2rem;
+}
+
+@media (max-width: 1024px) {
+  .modal-content-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.specialization-tag:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);
+}
+
+.stats-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+}
+
+.contact-item:hover {
+  background: linear-gradient(
+    135deg,
+    rgba(245, 158, 11, 0.1),
+    rgba(245, 158, 11, 0.05)
+  );
+  border-color: #f59e0b;
 }
 
 /* ========== TAILWIND CSS ========== */
@@ -26,13 +66,15 @@ h1, h2, h3, h4, h5, h6 {
 @tailwind components;
 @tailwind utilities;
 
-
 /* ========== BASE STYLES & THEME SETUP ========== */
 @layer base {
   /* Base body styles with theme transitions */
   body {
     @apply transition-colors duration-300 bg-black text-white font-inter;
-    font-feature-settings: 'kern' 1, 'liga' 1, 'calt' 1;
+    font-feature-settings:
+      "kern" 1,
+      "liga" 1,
+      "calt" 1;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
@@ -52,27 +94,57 @@ h1, h2, h3, h4, h5, h6 {
 @layer utilities {
   /* Custom breakpoint for extra small screens (xs) - screens smaller than 640px */
   @media (max-width: 639px) {
-    .xs\:px-4 { padding-left: 1rem; padding-right: 1rem; }
-    .xs\:px-3 { padding-left: 0.75rem; padding-right: 0.75rem; }
-    .xs\:text-lg { font-size: 1.125rem; line-height: 1.75rem; }
-    .xs\:text-base { font-size: 1rem; line-height: 1.5rem; }
-    .xs\:pt-\[10\%\] { padding-top: 10%; }
-    .xs\:pt-\[15\%\] { padding-top: 15%; }
-    .xs\:pt-\[20\%\] { padding-top: 20%; }
-    .xs\:pt-\[25\%\] { padding-top: 25%; }
-    .xs\:px-\[5\%\] { padding-left: 5%; padding-right: 5%; }
-    .xs\:px-\[10\%\] { padding-left: 10%; padding-right: 10%; }
+    .xs\:px-4 {
+      padding-left: 1rem;
+      padding-right: 1rem;
+    }
+    .xs\:px-3 {
+      padding-left: 0.75rem;
+      padding-right: 0.75rem;
+    }
+    .xs\:text-lg {
+      font-size: 1.125rem;
+      line-height: 1.75rem;
+    }
+    .xs\:text-base {
+      font-size: 1rem;
+      line-height: 1.5rem;
+    }
+    .xs\:pt-\[10\%\] {
+      padding-top: 10%;
+    }
+    .xs\:pt-\[15\%\] {
+      padding-top: 15%;
+    }
+    .xs\:pt-\[20\%\] {
+      padding-top: 20%;
+    }
+    .xs\:pt-\[25\%\] {
+      padding-top: 25%;
+    }
+    .xs\:px-\[5\%\] {
+      padding-left: 5%;
+      padding-right: 5%;
+    }
+    .xs\:px-\[10\%\] {
+      padding-left: 10%;
+      padding-right: 10%;
+    }
   }
-  
+
   /* Font smoothing utilities */
   .font-smooth {
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
-  
+
   /* Better letter spacing for headlines */
-  .tracking-tight { letter-spacing: -0.025em; }
-  .tracking-tighter { letter-spacing: -0.05em; }
+  .tracking-tight {
+    letter-spacing: -0.025em;
+  }
+  .tracking-tighter {
+    letter-spacing: -0.05em;
+  }
 }
 
 /* ========== COMPONENT STYLES ========== */
@@ -87,16 +159,25 @@ h1, h2, h3, h4, h5, h6 {
 
   /* Card responsive adjustments */
   @media (min-width: 768px) {
-    .Cards { @apply w-[calc(50%-1rem)]; } /* 16px gap equivalent */
+    .Cards {
+      @apply w-[calc(50%-1rem)];
+    } /* 16px gap equivalent */
   }
   @media (min-width: 1024px) {
-    .Cards { @apply w-80; } /* 320px */
+    .Cards {
+      @apply w-80;
+    } /* 320px */
   }
   @media (max-width: 480px) {
-    .Cards { @apply min-h-[470px] max-w-[90vw]; }
+    .Cards {
+      @apply min-h-[470px] max-w-[90vw];
+    }
   }
   @media (min-width: 777px) and (max-width: 1021px) {
-    .Cards { min-width: 300px !important; width: 300px !important; }
+    .Cards {
+      min-width: 300px !important;
+      width: 300px !important;
+    }
   }
 
   /* Card theme variants */
@@ -134,36 +215,55 @@ h1, h2, h3, h4, h5, h6 {
   }
 
   /* Testimonial text styling */
-  .testimonial-text { 
+  .testimonial-text {
     @apply text-sm sm:text-base italic font-inter;
     line-height: 1.6;
   }
-  .testimonial-author { 
+  .testimonial-author {
     @apply font-semibold text-right mt-3 text-sm sm:text-base font-montserrat;
   }
 
   /* Testimonial responsive adjustments */
   @media (max-width: 768px) {
-    .TestimonialsCard { @apply min-h-[130px] p-3; }
-    .TestimonialsProfile { @apply w-14 h-14 sm:w-16 sm:h-16 mr-3; }
+    .TestimonialsCard {
+      @apply min-h-[130px] p-3;
+    }
+    .TestimonialsProfile {
+      @apply w-14 h-14 sm:w-16 sm:h-16 mr-3;
+    }
   }
   @media (max-width: 640px) {
-    .TestimonialsCard { @apply min-h-[120px] p-3; }
-    .testimonial-text { @apply text-xs sm:text-sm; }
-    .testimonial-author { @apply text-xs sm:text-sm mt-2; }
+    .TestimonialsCard {
+      @apply min-h-[120px] p-3;
+    }
+    .testimonial-text {
+      @apply text-xs sm:text-sm;
+    }
+    .testimonial-author {
+      @apply text-xs sm:text-sm mt-2;
+    }
   }
 }
 
 /* ========== ANIMATIONS & KEYFRAMES ========== */
 /* Floating animation for diamonds */
 @keyframes float-up-down {
-  0%, 100% { transform: translate(-50%, -50%) translateY(0px); }
-  50% { transform: translate(-50%, -50%) translateY(-15px); }
+  0%,
+  100% {
+    transform: translate(-50%, -50%) translateY(0px);
+  }
+  50% {
+    transform: translate(-50%, -50%) translateY(-15px);
+  }
 }
-.animate-float-up-down { animation: float-up-down 3s ease-in-out infinite; }
+.animate-float-up-down {
+  animation: float-up-down 3s ease-in-out infinite;
+}
 
 /* Diamond shape styling with glow */
-.diamond-shape { filter: drop-shadow(0 2px 4px rgba(211, 164, 16, 0.6)); }
+.diamond-shape {
+  filter: drop-shadow(0 2px 4px rgba(211, 164, 16, 0.6));
+}
 
 /* Backdrop blur consistency */
 .backdrop-blur-md {
@@ -171,27 +271,82 @@ h1, h2, h3, h4, h5, h6 {
   -webkit-backdrop-filter: blur(12px);
 }
 
+/* Add to your global.css or App.css */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slideUp {
+  from {
+    transform: translateY(20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.animate-fadeIn {
+  animation: fadeIn 0.3s ease-out;
+}
+
+.animate-slideUp {
+  animation: slideUp 0.3s ease-out;
+}
+
 /* Copy feedback animation */
 @keyframes bounceIn {
-  0% { transform: scale(0.8); opacity: 0; }
-  50% { transform: scale(1.1); }
-  100% { transform: scale(1); opacity: 1; }
+  0% {
+    transform: scale(0.8);
+    opacity: 0;
+  }
+  50% {
+    transform: scale(1.1);
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
 }
-.copy-feedback { animation: bounceIn 0.3s ease-out; }
+.copy-feedback {
+  animation: bounceIn 0.3s ease-out;
+}
 
 /* Existing custom animations */
 @keyframes bounce-custom {
-  0%, 100% { transform: translateY(36px); }
-  50% { transform: translateY(46px); }
+  0%,
+  100% {
+    transform: translateY(36px);
+  }
+  50% {
+    transform: translateY(46px);
+  }
 }
 @keyframes bounce-custom-2 {
-  0%, 100% { transform: translateY(46px); }
-  50% { transform: translateY(56px); }
+  0%,
+  100% {
+    transform: translateY(46px);
+  }
+  50% {
+    transform: translateY(56px);
+  }
 }
 @keyframes umbral {
-  0% { stop-color: #d3a5102e; }
-  50% { stop-color: rgba(211, 165, 16, 0.519); }
-  100% { stop-color: #d3a5102e; }
+  0% {
+    stop-color: #d3a5102e;
+  }
+  50% {
+    stop-color: rgba(211, 165, 16, 0.519);
+  }
+  100% {
+    stop-color: #d3a5102e;
+  }
 }
 
 .animate-bounce-custom {
@@ -203,7 +358,9 @@ h1, h2, h3, h4, h5, h6 {
   transform: translateY(46px);
   animation-delay: 0.5s;
 }
-.animate-umbral { animation: umbral 4s infinite; }
+.animate-umbral {
+  animation: umbral 4s infinite;
+}
 
 /* ========== NAVIGATION STYLES ========== */
 .NavBar {
@@ -213,7 +370,9 @@ h1, h2, h3, h4, h5, h6 {
 .NavBarBottom {
   @apply absolute bottom-0 left-1/2 transform -translate-x-1/2 bg-[#FFC511] h-[80px] w-[800px];
 }
-.dark .NavBarBottom { @apply bg-[#332500]/50; }
+.dark .NavBarBottom {
+  @apply bg-[#332500]/50;
+}
 
 /* Navigation link styling with hover effects */
 .NavBarBottom a,
@@ -232,7 +391,7 @@ h1, h2, h3, h4, h5, h6 {
 
 .NavBarBottom a::after,
 .NavBarBottom button.nav-bottom-link::after {
-  content: '';
+  content: "";
   position: absolute;
   bottom: 0;
   left: 0;
@@ -243,15 +402,14 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .NavBarBottom a:hover,
-.NavBarBottom button.nav-bottom-link:hover { 
-  @apply text-white; 
+.NavBarBottom button.nav-bottom-link:hover {
+  @apply text-white;
 }
 
 /* Add to your global CSS or component CSS */
 .typing-animation {
   display: inline-block;
 }
-
 
 .typing-animation .cursor {
   display: inline-block;
@@ -262,8 +420,13 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 @keyframes blink {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0; }
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0;
+  }
 }
 
 .NavBarBottom a:hover::after,
@@ -273,19 +436,30 @@ h1, h2, h3, h4, h5, h6 {
 }
 /* Navigation responsive adjustments */
 @media (max-width: 640px) {
-  .NavBarBottom { @apply py-3; }
-  .NavBarBottom a { padding-bottom: 2px; }
+  .NavBarBottom {
+    @apply py-3;
+  }
+  .NavBarBottom a {
+    padding-bottom: 2px;
+  }
 }
 @media (max-width: 400px) {
-  .NavBarBottom ul { @apply gap-1; }
-  .NavBarBottom a { @apply text-xs; }
+  .NavBarBottom ul {
+    @apply gap-1;
+  }
+  .NavBarBottom a {
+    @apply text-xs;
+  }
 }
-
 
 /* Add to your index.css or main CSS file */
 @keyframes marquee {
-  0% { transform: translateX(100%); }
-  100% { transform: translateX(-100%); }
+  0% {
+    transform: translateX(100%);
+  }
+  100% {
+    transform: translateX(-100%);
+  }
 }
 
 .animate-marquee {
@@ -302,7 +476,9 @@ h1, h2, h3, h4, h5, h6 {
   scrollbar-width: none; /* Firefox */
   -ms-overflow-style: none; /* IE and Edge */
 }
-.hide-scrollbar::-webkit-scrollbar { display: none; } /* Chrome, Safari, Opera */
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;
+} /* Chrome, Safari, Opera */
 
 /* Logo styling */
 .logoTop {
@@ -315,9 +491,11 @@ h1, h2, h3, h4, h5, h6 {
   transition: all 0.3s ease-in-out;
   @apply text-sm md:text-base font-medium;
 }
-.nav-link:hover { color: #f59e0b; }
+.nav-link:hover {
+  color: #f59e0b;
+}
 .nav-link::after {
-  content: '';
+  content: "";
   @apply absolute bottom-0 left-1/2 w-0 h-0.5 bg-transparent transition-all duration-500 ease-in-out;
 }
 .nav-link:hover::after {
@@ -325,15 +503,15 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 /* ========== TYPOGRAPHY ========== */
-h1 { 
+h1 {
   @apply text-4xl font-bold mb-6 font-montserrat tracking-tight;
   font-weight: 700;
 }
-h2 { 
+h2 {
   @apply text-3xl font-bold mb-3 font-montserrat tracking-tight;
   font-weight: 600;
 }
-h3 { 
+h3 {
   @apply text-2xl font-bold mb-2 font-montserrat tracking-tight;
   font-weight: 600;
 }
@@ -349,9 +527,10 @@ h6 {
 
 /* Amber text for both themes */
 
-
 /* Paragraph and body text */
-p, li, .body-text {
+p,
+li,
+.body-text {
   @apply font-inter leading-relaxed;
   line-height: 1.6;
 }
@@ -367,21 +546,42 @@ p, li, .body-text {
 
 /* ========== GLOBAL ANIMATIONS ========== */
 @keyframes float {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-20px); }
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-20px);
+  }
 }
 @keyframes float-slow {
-  0%, 100% { transform: translateY(0) rotate(0deg); }
-  50% { transform: translateY(-20px) rotate(5deg); }
+  0%,
+  100% {
+    transform: translateY(0) rotate(0deg);
+  }
+  50% {
+    transform: translateY(-20px) rotate(5deg);
+  }
 }
 @keyframes twinkle {
-  0%, 100% { opacity: 0.7; }
-  50% { opacity: 1; }
+  0%,
+  100% {
+    opacity: 0.7;
+  }
+  50% {
+    opacity: 1;
+  }
 }
 
-.animate-float { animation: float 6s ease-in-out infinite; }
-.animate-float-slow { animation: float-slow 8s ease-in-out infinite; }
-.animate-twinkle { animation: twinkle 3s ease-in-out infinite; }
+.animate-float {
+  animation: float 6s ease-in-out infinite;
+}
+.animate-float-slow {
+  animation: float-slow 8s ease-in-out infinite;
+}
+.animate-twinkle {
+  animation: twinkle 3s ease-in-out infinite;
+}
 
 /* ========== HEADER STYLES ========== */
 header {
@@ -396,14 +596,22 @@ header {
   @apply -bottom-[15%] left-[20%] -translate-x-1/2 z-0 animate-float-slow;
 }
 @keyframes pulse-glow {
-  0%, 100% { filter: drop-shadow(0 0 15px rgba(245, 158, 11, 0.6)); }
-  50% { filter: drop-shadow(0 0 25px rgba(245, 158, 11, 0.9)); }
+  0%,
+  100% {
+    filter: drop-shadow(0 0 15px rgba(245, 158, 11, 0.6));
+  }
+  50% {
+    filter: drop-shadow(0 0 25px rgba(245, 158, 11, 0.9));
+  }
 }
 
 /* White shadow for dark mode testimonials */
-.hover-white-shadow { transition: all 0.3s ease-in-out; }
-.dark .hover-white-shadow:hover { box-shadow: 0 10px 30px rgba(255, 255, 255, 0.15); }
-
+.hover-white-shadow {
+  transition: all 0.3s ease-in-out;
+}
+.dark .hover-white-shadow:hover {
+  box-shadow: 0 10px 30px rgba(255, 255, 255, 0.15);
+}
 
 @keyframes fadeIn {
   from {
@@ -437,39 +645,66 @@ header {
 .social-icon {
   @apply transition-all duration-300 transform hover:scale-110;
 }
-.social-icon img { transition: all 0.3s ease-in-out; }
+.social-icon img {
+  transition: all 0.3s ease-in-out;
+}
 
 /* Social icon hover effects */
 .social-icon:hover img {
-  filter: brightness(0) saturate(100%) invert(72%) sepia(90%) saturate(500%) hue-rotate(360deg) brightness(90%);
+  filter: brightness(0) saturate(100%) invert(72%) sepia(90%) saturate(500%)
+    hue-rotate(360deg) brightness(90%);
 }
-.dark .social-icon img { filter: brightness(0) invert(1); }
+.dark .social-icon img {
+  filter: brightness(0) invert(1);
+}
 .dark .social-icon:hover img {
-  filter: brightness(0) saturate(100%) invert(72%) sepia(90%) saturate(500%) hue-rotate(360deg) brightness(90%);
+  filter: brightness(0) saturate(100%) invert(72%) sepia(90%) saturate(500%)
+    hue-rotate(360deg) brightness(90%);
 }
 
 /* ========== FOOTER STYLES ========== */
-footer p, footer a {
+footer p,
+footer a {
   @apply py-1 text-sm cursor-pointer hover:text-amber-400 transition-colors duration-500 font-inter;
 }
 
 /* ========== FONT SETUP ========== */
 /* Define font families for use throughout the app */
-body { 
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+body {
+  font-family:
+    "Inter",
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    Roboto,
+    sans-serif;
 }
 
 /* Font family classes */
 .font-inter {
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-family:
+    "Inter",
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    Roboto,
+    sans-serif;
 }
 
 .font-montserrat {
-  font-family: 'Montserrat', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-family:
+    "Montserrat",
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    Roboto,
+    sans-serif;
 }
 
 /* ========== ICON CONTAINER EFFECTS ========== */
-.icon-container { transition: all 0.3s ease; }
+.icon-container {
+  transition: all 0.3s ease;
+}
 .icon-container:hover {
   transform: translateY(-2px);
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
@@ -477,15 +712,23 @@ body {
 
 /* ========== BOUNCE ANIMATION ========== */
 @keyframes bounce {
-  0%, 80%, 100% { transform: translateY(0); }
-  40% { transform: translateY(-5px); }
+  0%,
+  80%,
+  100% {
+    transform: translateY(0);
+  }
+  40% {
+    transform: translateY(-5px);
+  }
 }
-.animate-bounce { animation: bounce 1s infinite; }
+.animate-bounce {
+  animation: bounce 1s infinite;
+}
 
 /* ========== CUSTOM SCROLLBAR STYLES ========== */
-::-webkit-scrollbar { 
-  height: 8px; 
-  width: 8px; 
+::-webkit-scrollbar {
+  height: 8px;
+  width: 8px;
 }
 ::-webkit-scrollbar-thumb {
   border-radius: 9999px;
@@ -494,18 +737,35 @@ body {
 .dark ::-webkit-scrollbar-thumb {
   background: linear-gradient(135deg, hsl(232, 10%, 43%), hsl(232, 62%, 16%));
 }
-::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-track {
+  background: transparent;
+}
 
 /* ========== GRADIENT BORDER CLASSES ========== */
-.gradient-border-amber, .gradient-border-blue, .gradient-border-red, .gradient-border-teal {
+.gradient-border-amber,
+.gradient-border-blue,
+.gradient-border-red,
+.gradient-border-teal {
   border: 2px solid transparent;
   background-origin: border-box;
   background-clip: padding-box, border-box;
 }
-.gradient-border-amber { background: linear-gradient(45deg, #f59e0b, #d97706, #fbbf24, #f59e0b) border-box; }
-.gradient-border-blue { background: linear-gradient(45deg, #3b82f6, #1d4ed8, #60a5fa, #3b82f6) border-box; }
-.gradient-border-red { background: linear-gradient(45deg, #ef4444, #dc2626, #f87171, #ef4444) border-box; }
-.gradient-border-teal { background: linear-gradient(45deg, #14b8a6, #0d9488, #2dd4bf, #14b8a6) border-box; }
+.gradient-border-amber {
+  background: linear-gradient(45deg, #f59e0b, #d97706, #fbbf24, #f59e0b)
+    border-box;
+}
+.gradient-border-blue {
+  background: linear-gradient(45deg, #3b82f6, #1d4ed8, #60a5fa, #3b82f6)
+    border-box;
+}
+.gradient-border-red {
+  background: linear-gradient(45deg, #ef4444, #dc2626, #f87171, #ef4444)
+    border-box;
+}
+.gradient-border-teal {
+  background: linear-gradient(45deg, #14b8a6, #0d9488, #2dd4bf, #14b8a6)
+    border-box;
+}
 
 /* ========== GLASSMORPHISM EFFECT ========== */
 .glass-effect {
@@ -517,11 +777,18 @@ body {
 
 /* ========== LEAFLET MAP STYLES ========== */
 /* High contrast dark mode styling for maps */
-.leaflet-container-dark { filter: contrast(1.1) brightness(0.9); }
-.leaflet-container-light { filter: contrast(1); }
+.leaflet-container-dark {
+  filter: contrast(1.1) brightness(0.9);
+}
+.leaflet-container-light {
+  filter: contrast(1);
+}
 
 /* Custom marker styling */
-.custom-marker { background: transparent !important; border: none !important; }
+.custom-marker {
+  background: transparent !important;
+  border: none !important;
+}
 
 /* Enhanced popup styling for both themes */
 .leaflet-popup-content-wrapper {
@@ -554,32 +821,48 @@ body {
 }
 
 /* Tile layer contrast adjustments */
-.tile-layer-dark { filter: contrast(1.2) brightness(0.8); }
-.tile-layer-light { filter: contrast(1); }
+.tile-layer-dark {
+  filter: contrast(1.2) brightness(0.8);
+}
+.tile-layer-light {
+  filter: contrast(1);
+}
 
 /* Enhanced container styling */
-.leaflet-container { font-family: 'Inter', sans-serif !important; }
-.leaflet-container a { color: #3b82f6 !important; }
-.leaflet-container.dark-mode a { color: #60a5fa !important; }
+.leaflet-container {
+  font-family: "Inter", sans-serif !important;
+}
+.leaflet-container a {
+  color: #3b82f6 !important;
+}
+.leaflet-container.dark-mode a {
+  color: #60a5fa !important;
+}
 
 /* Custom scrollbar for popup content */
 .leaflet-popup-content {
   margin: 0 !important;
   max-height: 200px;
   overflow-y: auto;
-  font-family: 'Inter', sans-serif !important;
+  font-family: "Inter", sans-serif !important;
 }
-.leaflet-popup-content::-webkit-scrollbar { width: 6px; }
+.leaflet-popup-content::-webkit-scrollbar {
+  width: 6px;
+}
 .leaflet-popup-content::-webkit-scrollbar-track {
   background: #f1f1f1;
   border-radius: 3px;
 }
-.leaflet-popup-content.dark-popup::-webkit-scrollbar-track { background: #374151; }
+.leaflet-popup-content.dark-popup::-webkit-scrollbar-track {
+  background: #374151;
+}
 .leaflet-popup-content::-webkit-scrollbar-thumb {
   background: #cbd5e1;
   border-radius: 3px;
 }
-.leaflet-popup-content.dark-popup::-webkit-scrollbar-thumb { background: #6b7280; }
+.leaflet-popup-content.dark-popup::-webkit-scrollbar-thumb {
+  background: #6b7280;
+}
 
 /* ========== REAL ESTATE MAP SPECIFIC STYLES ========== */
 /* Enhanced popup close button visibility */
@@ -626,7 +909,7 @@ body {
 }
 
 /* Custom scrollbar for popup content */
-.leaflet-popup-content::-webkit-scrollbar { 
+.leaflet-popup-content::-webkit-scrollbar {
   width: 6px !important;
 }
 
@@ -686,17 +969,17 @@ body {
     max-width: 95vw !important;
     min-width: 280px !important;
   }
-  
+
   .leaflet-popup-content {
     max-width: 90vw !important;
     min-width: 260px !important;
     max-height: 300px !important; /* Smaller max height on mobile */
   }
-  
+
   .custom-popup .leaflet-popup-content-wrapper {
     max-width: 95vw !important;
   }
-  
+
   .custom-popup .leaflet-popup-content {
     max-width: 90vw !important;
     max-height: 300px !important;
@@ -735,17 +1018,17 @@ body {
   @apply px-3 py-1 rounded-full text-xs font-semibold backdrop-blur-sm font-inter;
 }
 
-.badge-sales { 
-  background: rgba(220, 38, 38, 0.15); 
+.badge-sales {
+  background: rgba(220, 38, 38, 0.15);
   border: 1px solid rgba(220, 38, 38, 0.3);
   color: #dc2626;
 }
-.badge-rental { 
+.badge-rental {
   background: rgba(16, 185, 129, 0.15);
   border: 1px solid rgba(16, 185, 129, 0.3);
   color: #059669;
 }
-.badge-commercial { 
+.badge-commercial {
   background: rgba(139, 92, 246, 0.15);
   border: 1px solid rgba(139, 92, 246, 0.3);
   color: #7c3aed;
@@ -766,18 +1049,35 @@ body {
 .revenue-chart {
   @apply h-2 rounded-full overflow-hidden;
 }
-.chart-sales { background: linear-gradient(90deg, #dc2626, #ef4444); }
-.chart-rental { background: linear-gradient(90deg, #059669, #10b981); }
-.chart-commercial { background: linear-gradient(90deg, #7c3aed, #8b5cf6); }
+.chart-sales {
+  background: linear-gradient(90deg, #dc2626, #ef4444);
+}
+.chart-rental {
+  background: linear-gradient(90deg, #059669, #10b981);
+}
+.chart-commercial {
+  background: linear-gradient(90deg, #7c3aed, #8b5cf6);
+}
 
 /* ========== LOADER AND ANIMATION COLORS ========== */
-.bg-amber-200 { background-color: #fde68a; }
-.bg-amber-400 { background-color: #fbbf24; }
-.bg-amber-600 { background-color: #d97706; }
-.bg-amber-700 { background-color: #b45309; }
+.bg-amber-200 {
+  background-color: #fde68a;
+}
+.bg-amber-400 {
+  background-color: #fbbf24;
+}
+.bg-amber-600 {
+  background-color: #d97706;
+}
+.bg-amber-700 {
+  background-color: #b45309;
+}
 
 /* Ensure navigation dots are visible */
-.loader-svg-container { position: relative; z-index: 10; }
+.loader-svg-container {
+  position: relative;
+  z-index: 10;
+}
 
 /* Typing cursor animation */
 .typing-cursor {
@@ -785,10 +1085,12 @@ body {
 }
 
 @keyframes blink {
-  0%, 50% {
+  0%,
+  50% {
     border-color: white;
   }
-  51%, 100% {
+  51%,
+  100% {
     border-color: transparent;
   }
 }
@@ -825,7 +1127,9 @@ body {
 
 .stats-card:hover {
   transform: none;
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  box-shadow:
+    0 4px 6px -1px rgba(0, 0, 0, 0.1),
+    0 2px 4px -1px rgba(0, 0, 0, 0.06);
 }
 
 /* Remove hover scaling from contact items */
@@ -876,7 +1180,9 @@ body {
 
 .modal-button:hover {
   transform: none;
-  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  box-shadow:
+    0 10px 15px -3px rgba(0, 0, 0, 0.1),
+    0 4px 6px -2px rgba(0, 0, 0, 0.05);
 }
 
 /* Ensure images don't overflow */
@@ -891,6 +1197,10 @@ img {
 }
 
 @keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }

@@ -1,5 +1,22 @@
 import pool from "../config/database.js";
 
+import { v4 as uuidv4 } from 'uuid';
+
+
+// Status constants for workflow - ADD THESE
+const PROPERTY_STATUS = {
+  DRAFT: 'draft',
+  PENDING_CLIENT_APPROVAL: 'pending_client_approval',
+  PENDING_ADMIN_APPROVAL: 'pending_admin_approval',
+  ACTIVE: 'active',
+  REJECTED: 'rejected',
+  PENDING: 'pending',
+  SOLD: 'sold',
+  RENTED: 'rented',
+  INACTIVE: 'inactive'
+};
+
+
 // Helper function - MUST BE OUTSIDE THE CLASS
 function safeJsonParse(str, defaultValue = []) {
   try {
@@ -22,6 +39,7 @@ function safeJsonStringify(data) {
     return "[]";
   }
 }
+
 
 class PropertyModel {
   // CREATE PROPERTY - FIXED VERSION
@@ -1876,7 +1894,465 @@ class PropertyModel {
       connection.release();
     }
   }
+// ========== NEW WORKFLOW METHODS (ADD THESE TO YOUR EXISTING CLASS) ==========
 
+  // CREATE PROPERTY FROM BROKER REQUEST (WORKFLOW VERSION)
+  async createFromBrokerRequest(propertyData, brokerId, requestId = null) {
+    const connection = await pool.getConnection();
+    
+    try {
+      await connection.beginTransaction();
+      
+      const propertyUuid = uuidv4();
+      
+      // Add workflow-specific fields
+      const workflowData = {
+        ...propertyData,
+        property_uuid: propertyUuid,
+        property_status: PROPERTY_STATUS.PENDING_CLIENT_APPROVAL, // Start workflow here
+        assigned_broker_id: brokerId,
+        created_by_user_id: brokerId,
+        status_history: JSON.stringify([{
+          status: PROPERTY_STATUS.PENDING_CLIENT_APPROVAL,
+          changed_at: new Date().toISOString(),
+          changed_by: brokerId,
+          notes: requestId ? `Created from property request #${requestId}` : 'Created by broker'
+        }])
+      };
+      
+      // Use your existing create logic but with workflow status
+      const columns = [];
+      const placeholders = [];
+      const values = [];
+
+      // Manually build to ensure perfect match
+      for (const [key, value] of Object.entries(workflowData)) {
+        columns.push(key);
+        
+        if (value === null) {
+          placeholders.push("NULL");
+        } else {
+          placeholders.push("?");
+          values.push(value);
+        }
+      }
+
+      const columnsStr = columns.join(", ");
+      const placeholdersStr = placeholders.join(", ");
+      const query = `INSERT INTO properties (${columnsStr}) VALUES (${placeholdersStr})`;
+
+      console.log("Creating property from broker request:", {
+        propertyUuid,
+        brokerId,
+        requestId,
+        status: PROPERTY_STATUS.PENDING_CLIENT_APPROVAL
+      });
+
+      const [result] = await connection.execute(query, values);
+      const propertyId = result.insertId;
+
+      // If there's a requestId, update the property request status
+      if (requestId) {
+        await connection.execute(
+          `UPDATE property_requests 
+           SET status = 'in_progress', 
+               current_step = 3,
+               updated_at = NOW()
+           WHERE id = ?`,
+          [requestId]
+        );
+      }
+
+      await connection.commit();
+
+      // Return the created property
+      return await this.findById(propertyId);
+      
+    } catch (error) {
+      await connection.rollback();
+      console.error("Error creating property from broker request:", error);
+      throw error;
+    } finally {
+      connection.release();
+    }
+  }
+
+  // UPDATE PROPERTY STATUS WITH WORKFLOW VALIDATION
+  async updateStatusWithWorkflow(propertyId, newStatus, userId, userRole, notes = '') {
+    const connection = await pool.getConnection();
+    
+    try {
+      await connection.beginTransaction();
+      
+      // Get current property
+      const [properties] = await connection.execute(
+        'SELECT * FROM properties WHERE id = ?',
+        [propertyId]
+      );
+      
+      if (properties.length === 0) {
+        throw new Error('Property not found');
+      }
+      
+      const property = properties[0];
+      const currentStatus = property.property_status;
+      
+      // Validate status transition
+      const validation = this.validateStatusTransition(currentStatus, newStatus, userRole);
+      if (!validation.valid) {
+        throw new Error(validation.message);
+      }
+      
+      // Update status history
+      let statusHistory = safeJsonParse(property.status_history, []);
+      statusHistory.push({
+        from: currentStatus,
+        to: newStatus,
+        changed_at: new Date().toISOString(),
+        changed_by: userId,
+        user_role: userRole,
+        notes: notes
+      });
+      
+      // Update property
+      const updateQuery = `
+        UPDATE properties 
+        SET property_status = ?, 
+            status_history = ?,
+            updated_at = NOW(),
+            last_modified_by_user_id = ?
+        WHERE id = ?
+      `;
+      
+      await connection.execute(updateQuery, [
+        newStatus,
+        JSON.stringify(statusHistory),
+        userId,
+        propertyId
+      ]);
+      
+      // Log workflow action
+      await this.logWorkflowAction(
+        propertyId,
+        currentStatus,
+        newStatus,
+        userId,
+        'status_change',
+        notes
+      );
+      
+      // Handle special status transitions
+      if (newStatus === PROPERTY_STATUS.ACTIVE) {
+        await this.handleActiveListing(propertyId, property.owner_user_id, userId);
+      }
+      
+      await connection.commit();
+      
+      // Return updated property
+      return await this.findById(propertyId);
+      
+    } catch (error) {
+      await connection.rollback();
+      console.error("Error updating property status with workflow:", error);
+      throw error;
+    } finally {
+      connection.release();
+    }
+  }
+
+  // VALIDATE STATUS TRANSITION
+  validateStatusTransition(currentStatus, newStatus, userRole) {
+    const transitions = {
+      [PROPERTY_STATUS.DRAFT]: {
+        allowed: [PROPERTY_STATUS.PENDING_CLIENT_APPROVAL, PROPERTY_STATUS.PENDING],
+        roles: ['internal_broker', 'external_broker', 'admin', 'super_admin']
+      },
+      [PROPERTY_STATUS.PENDING_CLIENT_APPROVAL]: {
+        allowed: [PROPERTY_STATUS.PENDING_ADMIN_APPROVAL, PROPERTY_STATUS.DRAFT],
+        roles: ['seller', 'landlord', 'user', 'admin', 'super_admin']
+      },
+      [PROPERTY_STATUS.PENDING_ADMIN_APPROVAL]: {
+        allowed: [PROPERTY_STATUS.ACTIVE, PROPERTY_STATUS.REJECTED],
+        roles: ['admin', 'super_admin', 'support_admin']
+      },
+      [PROPERTY_STATUS.ACTIVE]: {
+        allowed: [PROPERTY_STATUS.SOLD, PROPERTY_STATUS.RENTED, PROPERTY_STATUS.INACTIVE],
+        roles: ['admin', 'super_admin', 'internal_broker', 'external_broker']
+      },
+      [PROPERTY_STATUS.REJECTED]: {
+        allowed: [PROPERTY_STATUS.DRAFT],
+        roles: ['internal_broker', 'external_broker', 'admin', 'super_admin']
+      }
+    };
+    
+    if (!transitions[currentStatus]) {
+      return { valid: false, message: `Invalid current status: ${currentStatus}` };
+    }
+    
+    if (!transitions[currentStatus].allowed.includes(newStatus)) {
+      return { 
+        valid: false, 
+        message: `Cannot transition from ${currentStatus} to ${newStatus}` 
+      };
+    }
+    
+    if (!transitions[currentStatus].roles.includes(userRole)) {
+      return { 
+        valid: false, 
+        message: `Role ${userRole} cannot perform this transition` 
+      };
+    }
+    
+    return { valid: true };
+  }
+
+  // HANDLE ACTIVE LISTING WITH PREMIUM CHECK
+  async handleActiveListing(propertyId, ownerId, updatedBy) {
+    try {
+      // Check user privilege tier
+      const [userResult] = await pool.execute(
+        'SELECT privilege_tier FROM users WHERE id = ?',
+        [ownerId]
+      );
+      
+      let isPremium = false;
+      let userTier = 'basic';
+      
+      if (userResult.length > 0) {
+        userTier = userResult[0].privilege_tier || 'basic';
+        isPremium = ['premium', 'enterprise'].includes(userTier);
+      }
+      
+      // Update property with premium flag and publish date
+      await pool.execute(
+        `UPDATE properties 
+         SET is_premium = ?, 
+             published_at = NOW(),
+             updated_at = NOW()
+         WHERE id = ?`,
+        [isPremium ? 1 : 0, propertyId]
+      );
+      
+      console.log(`🏆 Property ${propertyId} set as ${isPremium ? 'premium' : 'regular'} listing for tier ${userTier}`);
+      
+    } catch (error) {
+      console.error('Error handling active listing:', error);
+      throw error;
+    }
+  }
+
+  // LOG WORKFLOW ACTION
+  async logWorkflowAction(propertyId, fromStatus, toStatus, userId, actionType, notes = '') {
+    try {
+      await pool.execute(
+        `INSERT INTO property_workflow_logs 
+         (property_id, from_status, to_status, action_by_user_id, action_type, notes)
+         VALUES (?, ?, ?, ?, ?, ?)`,
+        [propertyId, fromStatus, toStatus, userId, actionType, notes]
+      );
+    } catch (error) {
+      console.error('Error logging workflow action:', error);
+    }
+  }
+
+  // GET PROPERTIES BY WORKFLOW STATUS
+  async getByWorkflowStatus(status, userId = null, userRole = null) {
+    try {
+      let query = `
+        SELECT p.*, 
+          u.username as owner_username,
+          u.email as owner_email,
+          u.privilege_tier as owner_tier,
+          b.username as broker_username,
+          b.email as broker_email,
+          pr.id as request_id,
+          pr.user_type as request_user_type
+        FROM properties p
+        LEFT JOIN users u ON p.owner_user_id = u.id
+        LEFT JOIN users b ON p.assigned_broker_id = b.id
+        LEFT JOIN property_requests pr ON pr.user_id = u.id AND pr.status = 'in_progress'
+        WHERE p.property_status = ? AND p.deleted_at IS NULL
+      `;
+      
+      const params = [status];
+      
+      // Filter by user role
+      if (userId && userRole) {
+        if (userRole.includes('broker')) {
+          query += ' AND p.assigned_broker_id = ?';
+          params.push(userId);
+        } else if (['seller', 'landlord', 'user'].includes(userRole)) {
+          query += ' AND p.owner_user_id = ?';
+          params.push(userId);
+        }
+      }
+      
+      query += ' ORDER BY p.updated_at DESC';
+      
+      const [properties] = await pool.execute(query, params);
+      
+      // Parse JSON fields using your existing helper
+      return properties.map(property => ({
+        ...property,
+        features: safeJsonParse(property.features, []),
+        amenities: safeJsonParse(property.amenities, []),
+        property_tags: safeJsonParse(property.property_tags, []),
+        price_history: safeJsonParse(property.price_history, []),
+        status_history: safeJsonParse(property.status_history, []),
+        square_meters: property.sqft || 0
+      }));
+      
+    } catch (error) {
+      console.error('Error getting properties by workflow status:', error);
+      throw error;
+    }
+  }
+
+  // GET ADMIN APPROVAL QUEUE
+  async getAdminApprovalQueue(page = 1, limit = 20) {
+    try {
+      const offset = (page - 1) * limit;
+      
+      const query = `
+        SELECT p.*, 
+          u.username as owner_username,
+          u.email as owner_email,
+          u.privilege_tier as owner_tier,
+          b.username as broker_username,
+          b.email as broker_email,
+          pr.id as request_id,
+          pr.user_type as request_user_type
+        FROM properties p
+        LEFT JOIN users u ON p.owner_user_id = u.id
+        LEFT JOIN users b ON p.assigned_broker_id = b.id
+        LEFT JOIN property_requests pr ON pr.user_id = u.id AND pr.status = 'in_progress'
+        WHERE p.property_status = 'pending_admin_approval'
+          AND p.deleted_at IS NULL
+        ORDER BY p.created_at ASC
+        LIMIT ? OFFSET ?
+      `;
+      
+      const [properties] = await pool.execute(query, [limit, offset]);
+      
+      // Count total
+      const [countResult] = await pool.execute(
+        `SELECT COUNT(*) as total 
+         FROM properties 
+         WHERE property_status = 'pending_admin_approval' AND deleted_at IS NULL`
+      );
+      
+      return {
+        properties: properties.map(property => ({
+          ...property,
+          features: safeJsonParse(property.features, []),
+          amenities: safeJsonParse(property.amenities, []),
+          status_history: safeJsonParse(property.status_history, [])
+        })),
+        pagination: {
+          page,
+          limit,
+          total: countResult[0].total,
+          pages: Math.ceil(countResult[0].total / limit)
+        }
+      };
+      
+    } catch (error) {
+      console.error('Error getting admin approval queue:', error);
+      throw error;
+    }
+  }
+
+  // GET PREMIUM LISTINGS FOR HOMEPAGE
+  async getPremiumListings(limit = 6) {
+    try {
+      const query = `
+        SELECT p.*, 
+          u.username as owner_username,
+          b.username as broker_username
+        FROM properties p
+        LEFT JOIN users u ON p.owner_user_id = u.id
+        LEFT JOIN users b ON p.assigned_broker_id = b.id
+        WHERE p.property_status = 'active'
+          AND p.is_premium = 1
+          AND p.deleted_at IS NULL
+        ORDER BY p.published_at DESC
+        LIMIT ?
+      `;
+      
+      const [properties] = await pool.execute(query, [limit]);
+      
+      return properties.map(property => ({
+        ...property,
+        features: safeJsonParse(property.features, []),
+        amenities: safeJsonParse(property.amenities, []),
+        isPremium: true
+      }));
+      
+    } catch (error) {
+      console.error('Error getting premium listings:', error);
+      throw error;
+    }
+  }
+
+  // GET WORKFLOW HISTORY FOR PROPERTY
+  async getWorkflowHistory(propertyId) {
+    try {
+      // First check if table exists
+      const [tableCheck] = await pool.execute(
+        `SHOW TABLES LIKE 'property_workflow_logs'`
+      );
+      
+      if (tableCheck.length === 0) {
+        return [];
+      }
+      
+      const [logs] = await pool.execute(
+        `SELECT wl.*, 
+          u.username as action_by_username,
+          u.role as action_by_role
+         FROM property_workflow_logs wl
+         LEFT JOIN users u ON wl.action_by_user_id = u.id
+         WHERE wl.property_id = ?
+         ORDER BY wl.created_at DESC`,
+        [propertyId]
+      );
+      
+      return logs;
+      
+    } catch (error) {
+      console.error('Error getting workflow history:', error);
+      return [];
+    }
+  }
+
+  // GET PROPERTY WITH CHAT INFO
+  async getPropertyWithChatInfo(propertyId, userId) {
+    try {
+      const property = await this.findById(propertyId);
+      if (!property) return null;
+      
+      // Check for active chat session
+      const [chatSessions] = await pool.execute(
+        `SELECT cs.* 
+         FROM chat_sessions cs
+         JOIN property_requests pr ON cs.property_request_id = pr.id
+         WHERE pr.user_id = ? 
+           AND cs.broker_id = ?
+           AND cs.status = 'active'`,
+        [property.owner_user_id, property.assigned_broker_id]
+      );
+      
+      return {
+        ...property,
+        chatAvailable: chatSessions.length > 0,
+        chatSessionId: chatSessions.length > 0 ? chatSessions[0].id : null
+      };
+      
+    } catch (error) {
+      console.error('Error getting property with chat info:', error);
+      throw error;
+    }
+  }
 
 } // END OF CLASS
 

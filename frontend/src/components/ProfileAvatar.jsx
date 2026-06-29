@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useTheme } from '../contexts/ThemeContext';
 import Portal from './Portal';
+import ProfilePictureModal from './ProfilePictureModal'; // Import the modal
 import { 
   Settings, LogOut, Edit3, Shield, Home, MessageSquare, BarChart3, 
   Users as UsersIcon, CreditCard, Eye, FileText, Calendar, Bell, 
@@ -27,6 +28,7 @@ const ProfileAvatar = ({
 }) => {
   const { theme } = useTheme();
   const [showPopup, setShowPopup] = useState(false);
+  const [showProfilePictureModal, setShowProfilePictureModal] = useState(false);
   const [imageError, setImageError] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [editingUsername, setEditingUsername] = useState(false);
@@ -746,28 +748,18 @@ const ProfileAvatar = ({
     }
   };
 
-  const handleProfilePictureUpload = async (event) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    const formData = new FormData();
-    formData.append('profilePicture', file);
-    formData.append('userId', userId);
-
-    try {
-      await api.post('UPLOAD_PROFILE', {}, formData);
-      
-      const imageUrl = URL.createObjectURL(file);
-      
-      if (onUploadImage) {
-        onUploadImage(imageUrl);
-      }
-      
-      alert('Profile picture uploaded successfully!');
-    } catch (error) {
-      console.error('Failed to upload profile picture:', error);
-      alert('Failed to upload profile picture. Please try again.');
+  // Handler for profile picture upload completion
+  const handleProfilePictureUploadComplete = (newProfilePictureUrl) => {
+    // Call the parent callback if provided
+    if (onUploadImage) {
+      onUploadImage(newProfilePictureUrl);
     }
+    
+    // Close the modal
+    setShowProfilePictureModal(false);
+    
+    // You could also update local state here if needed
+    console.log('Profile picture updated:', newProfilePictureUrl);
   };
 
   const formatMemberSince = (dateString) => {
@@ -844,9 +836,9 @@ const ProfileAvatar = ({
                     <div className={`w-8 h-8 rounded-full ${getLeftSideGradient()} opacity-80 shadow-lg`}></div>
                   </div>
 
-                  <div className="flex flex-col md:flex-row min-h-[600px]">
-                    {/* Left Panel - Profile Info - CENTERED */}
-                    <div className={`md:w-2/5 p-8 flex flex-col relative overflow-hidden ${getLeftPanelBackground()}`}>
+                  <div className="flex flex-col md:flex-row h-[85vh] max-h-[700px]">
+                    {/* Left Panel - Profile Info - FIXED HEIGHT */}
+                    <div className={`md:w-2/5 p-8 flex flex-col relative overflow-hidden ${getLeftPanelBackground()} md:overflow-y-auto`}>
                       <div className="relative z-10 flex flex-col items-center justify-center h-full">
                         {/* Center the entire profile section */}
                         <div className="flex flex-col items-center justify-center flex-1 w-full">
@@ -854,24 +846,35 @@ const ProfileAvatar = ({
                           <div className="absolute -top-8 -left-8 w-32 h-32 rounded-full bg-white/5 blur-xl"></div>
                           <div className="absolute -bottom-8 -right-8 w-32 h-32 rounded-full bg-white/5 blur-xl"></div>
                           
-                          {/* Centered Profile Image */}
+                          {/* Centered Profile Image with click handler */}
                           <div className="flex justify-center mb-8">
                             {userProfilePicture && !imageError ? (
-                              <div className="relative">
+                              <div 
+                                className="relative cursor-pointer group"
+                                onClick={() => setShowProfilePictureModal(true)}
+                              >
                                 <img 
                                   src={userProfilePicture} 
                                   alt="Profile" 
-                                  className="w-32 h-32 rounded-full object-cover border-4 border-white/30 shadow-2xl" 
+                                  className="w-32 h-32 rounded-full object-cover border-4 border-white/30 shadow-2xl group-hover:opacity-90 transition-all duration-300" 
                                   onError={() => setImageError(true)} 
                                 />
-                                <div className="absolute bottom-2 right-2 w-6 h-6 bg-green-500 rounded-full border-2 border-white shadow-lg"></div>
+                                <div className="absolute bottom-2 right-2 w-6 h-6 bg-green-500 rounded-full border-2 border-white shadow-lg flex items-center justify-center group-hover:scale-110 transition-transform">
+                                  <Camera className="w-3 h-3 text-white" />
+                                </div>
+                                <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 rounded-full transition-all duration-300"></div>
                               </div>
                             ) : (
-                              <div className="relative">
-                                <div className={`w-32 h-32 ${getActorColor()} rounded-full flex items-center justify-center text-white text-3xl font-bold border-4 border-white/30 shadow-2xl`}>
+                              <div 
+                                className="relative cursor-pointer group"
+                                onClick={() => setShowProfilePictureModal(true)}
+                              >
+                                <div className={`w-32 h-32 ${getActorColor()} rounded-full flex items-center justify-center text-white text-3xl font-bold border-4 border-white/30 shadow-2xl group-hover:opacity-90 transition-all duration-300`}>
                                   {getInitials()}
                                 </div>
-                                <div className="absolute bottom-2 right-2 w-6 h-6 bg-green-500 rounded-full border-2 border-white shadow-lg"></div>
+                                <div className="absolute bottom-2 right-2 w-6 h-6 bg-green-500 rounded-full border-2 border-white shadow-lg flex items-center justify-center group-hover:scale-110 transition-transform">
+                                  <Camera className="w-3 h-3 text-white" />
+                                </div>
                               </div>
                             )}
                           </div>
@@ -964,164 +967,168 @@ const ProfileAvatar = ({
                       </div>
                     </div>
 
-                    {/* Right Panel - Actor-Specific Content */}
-                    <div className="md:w-3/5 p-6 flex flex-col">
-                      {/* Header Title */}
-                      <h4 className={`text-xl font-bold mb-6 ${getTextColor()}`}>{getHeaderTitle()}</h4>
+                    {/* Right Panel - Actor-Specific Content - SCROLLABLE */}
+                    <div className="md:w-3/5 p-6 flex flex-col overflow-hidden">
+                      <div className="flex flex-col h-full">
+                        {/* Header Title - Fixed */}
+                        <div className="flex-shrink-0">
+                          <h4 className={`text-xl font-bold mb-6 ${getTextColor()}`}>{getHeaderTitle()}</h4>
+                        </div>
 
-                      {/* Progress Section for Consumers */}
-                      {showProgress && progressSteps.length > 0 && (
-                        <div className="mb-8">
-                          {isLoadingStats ? (
-                            <div className="text-center py-8">
-                              <div className="w-8 h-8 border-2 border-amber-500 border-t-transparent rounded-full animate-spin mx-auto mb-3"></div>
-                              <p className={`text-sm ${getSecondaryTextColor()}`}>Loading progress...</p>
-                            </div>
-                          ) : (
-                            <>
-                              {/* Progress Bar */}
-                              <div className="relative mb-8">
-                                <div className="flex items-center justify-between mb-2">
-                                  <span className={`text-sm font-medium ${getTextColor()}`}>
-                                    Step {currentStep} of {totalSteps}
-                                  </span>
-                                  <span className={`text-sm font-medium ${getTextColor()}`}>
-                                    {progressPercentage}% Complete
-                                  </span>
+                        {/* Scrollable Content Area */}
+                        <div className="flex-1 overflow-y-auto pr-2">
+                          {/* Progress Section for Consumers */}
+                          {showProgress && progressSteps.length > 0 && (
+                            <div className="mb-8">
+                              {isLoadingStats ? (
+                                <div className="text-center py-8">
+                                  <div className="w-8 h-8 border-2 border-amber-500 border-t-transparent rounded-full animate-spin mx-auto mb-3"></div>
+                                  <p className={`text-sm ${getSecondaryTextColor()}`}>Loading progress...</p>
                                 </div>
-                                <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3">
-                                  <div 
-                                    className="bg-gradient-to-r from-amber-400 to-amber-600 h-3 rounded-full transition-all duration-500"
-                                    style={{ width: `${progressPercentage}%` }}
-                                  ></div>
-                                </div>
-                              </div>
+                              ) : (
+                                <>
+                                  {/* Progress Bar */}
+                                  <div className="relative mb-8">
+                                    <div className="flex items-center justify-between mb-2">
+                                      <span className={`text-sm font-medium ${getTextColor()}`}>
+                                        Step {currentStep} of {totalSteps}
+                                      </span>
+                                      <span className={`text-sm font-medium ${getTextColor()}`}>
+                                        {progressPercentage}% Complete
+                                      </span>
+                                    </div>
+                                    <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3">
+                                      <div 
+                                        className="bg-gradient-to-r from-amber-400 to-amber-600 h-3 rounded-full transition-all duration-500"
+                                        style={{ width: `${progressPercentage}%` }}
+                                      ></div>
+                                    </div>
+                                  </div>
 
-                              {/* Stats Overview */}
-                              {renderStatsOverview()}
+                                  {/* Stats Overview */}
+                                  {renderStatsOverview()}
 
-                              {/* Horizontal Progress Steps */}
-                              <div className="relative">
-                                <div className="absolute left-0 right-0 top-4 h-0.5 bg-gray-300 dark:bg-gray-700 -z-10"></div>
-                                
-                                <div className="flex justify-between">
-                                  {progressSteps.slice(0, 4).map((step, index) => {
-                                    const isCompleted = index < currentStep;
-                                    const isCurrent = index === currentStep - 1;
+                                  {/* Horizontal Progress Steps */}
+                                  <div className="relative">
+                                    <div className="absolute left-0 right-0 top-4 h-0.5 bg-gray-300 dark:bg-gray-700 -z-10"></div>
                                     
-                                    return (
-                                      <div key={step.id} className="flex flex-col items-center w-24">
-                                        <div className={`relative mb-3 ${isCompleted ? 'scale-110' : ''}`}>
-                                          <div className={`w-10 h-10 rounded-full flex items-center justify-center border-2 ${
-                                            isCompleted 
-                                              ? 'bg-gradient-to-br from-green-500 to-green-600 border-green-600' 
-                                              : isCurrent 
-                                              ? 'bg-gradient-to-br from-amber-500 to-amber-600 border-amber-600 animate-pulse'
-                                              : 'bg-gray-100 dark:bg-gray-800 border-gray-300 dark:border-gray-600'
-                                          }`}>
-                                            {isCompleted ? (
-                                              <step.activeIcon className="w-5 h-5 text-white" />
-                                            ) : (
-                                              <step.icon className={`w-5 h-5 ${
-                                                isCurrent 
-                                                  ? 'text-white' 
-                                                  : 'text-gray-500 dark:text-gray-400'
-                                              }`} />
-                                            )}
-                                          </div>
-                                          {isCompleted && (
-                                            <div className="absolute -top-1 -right-1 w-4 h-4 bg-green-500 rounded-full flex items-center justify-center">
-                                              <CheckCircle className="w-3 h-3 text-white" />
+                                    <div className="flex justify-between">
+                                      {progressSteps.slice(0, 4).map((step, index) => {
+                                        const isCompleted = index < currentStep;
+                                        const isCurrent = index === currentStep - 1;
+                                        
+                                        return (
+                                          <div key={step.id} className="flex flex-col items-center w-24">
+                                            <div className={`relative mb-3 ${isCompleted ? 'scale-110' : ''}`}>
+                                              <div className={`w-10 h-10 rounded-full flex items-center justify-center border-2 ${
+                                                isCompleted 
+                                                  ? 'bg-gradient-to-br from-green-500 to-green-600 border-green-600' 
+                                                  : isCurrent 
+                                                  ? 'bg-gradient-to-br from-amber-500 to-amber-600 border-amber-600 animate-pulse'
+                                                  : 'bg-gray-100 dark:bg-gray-800 border-gray-300 dark:border-gray-600'
+                                              }`}>
+                                                {isCompleted ? (
+                                                  <step.activeIcon className="w-5 h-5 text-white" />
+                                                ) : (
+                                                  <step.icon className={`w-5 h-5 ${
+                                                    isCurrent 
+                                                      ? 'text-white' 
+                                                      : 'text-gray-500 dark:text-gray-400'
+                                                  }`} />
+                                                )}
+                                              </div>
+                                              {isCompleted && (
+                                                <div className="absolute -top-1 -right-1 w-4 h-4 bg-green-500 rounded-full flex items-center justify-center">
+                                                  <CheckCircle className="w-3 h-3 text-white" />
+                                                </div>
+                                              )}
                                             </div>
-                                          )}
-                                        </div>
-                                        <div className="text-center">
-                                          <p className={`text-xs font-semibold mb-1 ${
-                                            isCompleted || isCurrent 
-                                              ? getTextColor() 
-                                              : getSecondaryTextColor()
-                                          }`}>
-                                            {step.name}
-                                          </p>
-                                          <p className={`text-xs ${getMutedTextColor()}`}>
-                                            {step.description}
-                                          </p>
-                                        </div>
-                                      </div>
-                                    );
-                                  })}
-                                </div>
-                              </div>
-                            </>
+                                            <div className="text-center">
+                                              <p className={`text-xs font-semibold mb-1 ${
+                                                isCompleted || isCurrent 
+                                                  ? getTextColor() 
+                                                  : getSecondaryTextColor()
+                                              }`}>
+                                                {step.name}
+                                              </p>
+                                              <p className={`text-xs ${getMutedTextColor()}`}>
+                                                {step.description}
+                                              </p>
+                                            </div>
+                                          </div>
+                                        );
+                                      })}
+                                    </div>
+                                  </div>
+                                </>
+                              )}
+                            </div>
                           )}
-                        </div>
-                      )}
 
-                      {/* Stats Overview for Non-Consumers */}
-                      {!showProgress && (
-                        <div className="mb-8">
-                          {renderStatsOverview()}
-                        </div>
-                      )}
+                          {/* Stats Overview for Non-Consumers */}
+                          {!showProgress && (
+                            <div className="mb-8">
+                              {renderStatsOverview()}
+                            </div>
+                          )}
 
-                      {/* Quick Actions */}
-                      <div className="flex-1 mb-6">
-                        <h4 className={`text-lg font-semibold mb-4 ${getTextColor()}`}>Quick Actions</h4>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                          {quickActions.map((action, index) => (
-                            <button
-                              key={index}
-                              onClick={action.action}
-                              className={`p-4 rounded-xl text-left transition-all duration-200 group hover:scale-[1.02] border ${getCardBackground()} ${getHoverCardBackground()} shadow-sm hover:shadow-md`}
-                            >
-                              <div className="flex items-center gap-3">
-                                <div className={`p-2 rounded-lg transition-colors ${theme === 'dark' ? 'bg-gray-700 group-hover:bg-amber-500 group-hover:text-white' : 'bg-gray-100 group-hover:bg-amber-500 group-hover:text-white'}`}>
-                                  <action.icon className="w-5 h-5" />
-                                </div>
-                                <div className="flex-1">
-                                  <div className={`font-medium ${getTextColor()}`}>{action.label}</div>
-                                  <div className={`text-xs ${getSecondaryTextColor()}`}>{action.description}</div>
-                                </div>
-                                <ChevronRight className={`w-4 h-4 ${getMutedTextColor()} group-hover:text-amber-500 transition-colors`} />
-                              </div>
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-
-                      {/* Footer Actions */}
-                      <div className="pt-6 mt-4 border-t border-gray-200 dark:border-gray-700">
-                        {apiError && (
-                          <div className="mb-4 p-3 rounded-lg bg-red-100 dark:bg-red-900/20 border border-red-200 dark:border-red-800">
-                            <p className="text-sm text-red-600 dark:text-red-400">{apiError}</p>
+                          {/* Quick Actions */}
+                          <div className="flex-1 mb-6">
+                            <h4 className={`text-lg font-semibold mb-4 ${getTextColor()}`}>Quick Actions</h4>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                              {quickActions.map((action, index) => (
+                                <button
+                                  key={index}
+                                  onClick={action.action}
+                                  className={`p-4 rounded-xl text-left transition-all duration-200 group hover:scale-[1.02] border ${getCardBackground()} ${getHoverCardBackground()} shadow-sm hover:shadow-md`}
+                                >
+                                  <div className="flex items-center gap-3">
+                                    <div className={`p-2 rounded-lg transition-colors ${theme === 'dark' ? 'bg-gray-700 group-hover:bg-amber-500 group-hover:text-white' : 'bg-gray-100 group-hover:bg-amber-500 group-hover:text-white'}`}>
+                                      <action.icon className="w-5 h-5" />
+                                    </div>
+                                    <div className="flex-1">
+                                      <div className={`font-medium ${getTextColor()}`}>{action.label}</div>
+                                      <div className={`text-xs ${getSecondaryTextColor()}`}>{action.description}</div>
+                                    </div>
+                                    <ChevronRight className={`w-4 h-4 ${getMutedTextColor()} group-hover:text-amber-500 transition-colors`} />
+                                  </div>
+                                </button>
+                              ))}
+                            </div>
                           </div>
-                        )}
-                        
-                        <div className="flex flex-col sm:flex-row gap-3">
-                          <label className="flex-1 bg-amber-500 text-white py-3 px-4 rounded-xl font-medium hover:bg-amber-600 transition-all duration-200 flex items-center justify-center gap-2 shadow-lg hover:shadow-xl hover:scale-105 cursor-pointer">
-                            <Camera className="w-4 h-4" />
-                            Upload Photo
-                            <input
-                              type="file"
-                              accept="image/*"
-                              onChange={handleProfilePictureUpload}
-                              className="hidden"
-                            />
-                          </label>
+                        </div>
+
+                        {/* Footer Actions - Fixed at Bottom */}
+                        <div className="pt-6 mt-4 border-t border-gray-200 dark:border-gray-700 flex-shrink-0">
+                          {apiError && (
+                            <div className="mb-4 p-3 rounded-lg bg-red-100 dark:bg-red-900/20 border border-red-200 dark:border-red-800">
+                              <p className="text-sm text-red-600 dark:text-red-400">{apiError}</p>
+                            </div>
+                          )}
                           
-                          <button onClick={handleLogout} disabled={isLoggingOut} className={`flex-1 py-3 px-4 rounded-xl font-medium transition-all duration-200 flex items-center justify-center gap-2 border shadow-lg hover:shadow-xl hover:scale-105 ${isLoggingOut ? 'bg-gray-400 text-gray-200 cursor-not-allowed border-gray-400' : theme === 'dark' ? 'bg-red-600 hover:bg-red-700 text-white border-red-700' : 'bg-red-500 hover:bg-red-600 text-white border-red-600'}`}>
-                            {isLoggingOut ? (
-                              <>
-                                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                                <span>Logging out...</span>
-                              </>
-                            ) : (
-                              <>
-                                <LogOut className="w-4 h-4" />
-                                <span>Logout</span>
-                              </>
-                            )}
-                          </button>
+                          <div className="flex flex-col sm:flex-row gap-3">
+                            <button 
+                              onClick={() => setShowProfilePictureModal(true)}
+                              className="flex-1 bg-amber-500 text-white py-3 px-4 rounded-xl font-medium hover:bg-amber-600 transition-all duration-200 flex items-center justify-center gap-2 shadow-lg hover:shadow-xl hover:scale-105 cursor-pointer"
+                            >
+                              <Camera className="w-4 h-4" />
+                              Upload Photo
+                            </button>
+                            
+                            <button onClick={handleLogout} disabled={isLoggingOut} className={`flex-1 py-3 px-4 rounded-xl font-medium transition-all duration-200 flex items-center justify-center gap-2 border shadow-lg hover:shadow-xl hover:scale-105 ${isLoggingOut ? 'bg-gray-400 text-gray-200 cursor-not-allowed border-gray-400' : theme === 'dark' ? 'bg-red-600 hover:bg-red-700 text-white border-red-700' : 'bg-red-500 hover:bg-red-600 text-white border-red-600'}`}>
+                              {isLoggingOut ? (
+                                <>
+                                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                                  <span>Logging out...</span>
+                                </>
+                              ) : (
+                                <>
+                                  <LogOut className="w-4 h-4" />
+                                  <span>Logout</span>
+                                </>
+                              )}
+                            </button>
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -1132,6 +1139,19 @@ const ProfileAvatar = ({
           </div>
         </Portal>
       )}
+
+      {/* Profile Picture Modal */}
+      <ProfilePictureModal
+        isOpen={showProfilePictureModal}
+        onClose={() => setShowProfilePictureModal(false)}
+        userProfilePicture={userProfilePicture}
+        theme={theme}
+        firstName={firstName}
+        lastName={lastName}
+        role={role}
+        onUploadComplete={handleProfilePictureUploadComplete}
+        user={JSON.parse(localStorage.getItem('user') || '{}')}
+      />
     </div>
   );
 };

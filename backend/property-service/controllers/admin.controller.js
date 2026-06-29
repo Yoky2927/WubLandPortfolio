@@ -1,6 +1,6 @@
 // controllers/admin.controller.js
-import pool from '../config/database.js';
-import { successResponse, errorResponse } from '../utils/responseHandler.js';
+import pool from "../config/database.js";
+import { successResponse, errorResponse } from "../utils/responseHandler.js";
 
 class AdminController {
   async getAllPropertiesAdmin(req, res) {
@@ -11,33 +11,35 @@ class AdminController {
         status,
         broker_id,
         search,
-        include_deleted = false
+        include_deleted = false,
       } = req.query;
 
-      let whereClauses = ['1=1'];
+      let whereClauses = ["1=1"];
       const values = [];
 
-      if (!include_deleted || include_deleted === 'false') {
-        whereClauses.push('p.deleted_at IS NULL');
+      if (!include_deleted || include_deleted === "false") {
+        whereClauses.push("p.deleted_at IS NULL");
       }
 
       if (status) {
-        whereClauses.push('p.property_status = ?');
+        whereClauses.push("p.property_status = ?");
         values.push(status);
       }
 
       if (broker_id) {
-        whereClauses.push('p.assigned_broker_id = ?');
+        whereClauses.push("p.assigned_broker_id = ?");
         values.push(parseInt(broker_id));
       }
 
       if (search) {
-        whereClauses.push('(p.title LIKE ? OR p.address LIKE ? OR p.city LIKE ?)');
+        whereClauses.push(
+          "(p.title LIKE ? OR p.address LIKE ? OR p.city LIKE ?)"
+        );
         const searchValue = `%${search}%`;
         values.push(searchValue, searchValue, searchValue);
       }
 
-      const where = whereClauses.join(' AND ');
+      const where = whereClauses.join(" AND ");
 
       // Count total
       const countQuery = `
@@ -64,7 +66,11 @@ class AdminController {
         LIMIT ? OFFSET ?
       `;
 
-      const [properties] = await pool.execute(query, [...values, parseInt(limit), offset]);
+      const [properties] = await pool.execute(query, [
+        ...values,
+        parseInt(limit),
+        offset,
+      ]);
 
       successResponse(res, 200, "Admin properties retrieved successfully", {
         properties,
@@ -72,8 +78,8 @@ class AdminController {
           page: parseInt(page),
           limit: parseInt(limit),
           total,
-          pages: Math.ceil(total / limit)
-        }
+          pages: Math.ceil(total / limit),
+        },
       });
     } catch (error) {
       errorResponse(res, 500, error.message);
@@ -84,58 +90,128 @@ class AdminController {
     try {
       const { id } = req.params;
       const { status, reason } = req.body;
+      const adminId = req.user.id;
+      const adminRole = req.user.role;
 
-      const validStatuses = ['draft', 'active', 'pending', 'sold', 'rented', 'inactive', 'rejected'];
+      // Only allow these status changes from admin
+      const validStatuses = ["active", "rejected"];
+
       if (!validStatuses.includes(status)) {
-        return errorResponse(res, 400, 'Invalid status');
+        return errorResponse(
+          res,
+          400,
+          `Invalid status. Must be one of: ${validStatuses.join(", ")}`
+        );
       }
 
       // Get property
-      const [properties] = await pool.execute('SELECT * FROM properties WHERE id = ?', [id]);
+      const [properties] = await pool.execute(
+        "SELECT * FROM properties WHERE id = ?",
+        [id]
+      );
+
       if (properties.length === 0) {
-        return errorResponse(res, 404, 'Property not found');
+        return errorResponse(res, 404, "Property not found");
       }
+
       const property = properties[0];
 
-      // Parse status history
-      let statusHistory = [];
-      try {
-        statusHistory = property.status_history ? JSON.parse(property.status_history) : [];
-      } catch (e) {
-        console.warn('Error parsing status history:', e.message);
+      // Check if admin can perform this action
+      if (
+        status === "active" &&
+        property.property_status !== "pending_admin_approval"
+      ) {
+        return errorResponse(
+          res,
+          400,
+          `Property must be in 'pending_admin_approval' status to be activated. Current: ${property.property_status}`
+        );
       }
 
-      statusHistory.push({
-        from: property.property_status,
-        to: status,
-        changed_at: new Date().toISOString(),
-        changed_by: req.user.id,
-        changed_by_role: req.user.role,
-        reason: reason || 'Admin action'
-      });
-
-      // Update property
-      const updateQuery = `
-        UPDATE properties 
-        SET property_status = ?, 
-            status_history = ?,
-            last_modified_by_user_id = ?,
-            updated_at = NOW()
-        WHERE id = ?
-      `;
-
-      await pool.execute(updateQuery, [
+      // Use PropertyModel for workflow status update
+      const PropertyModel = (await import("../models/property.model.js"))
+        .default;
+      const updatedProperty = await PropertyModel.updateStatusWithWorkflow(
+        id,
         status,
-        JSON.stringify(statusHistory),
-        req.user.id,
-        id
-      ]);
+        adminId,
+        adminRole,
+        reason ||
+          `Admin review: ${status === "active" ? "approved" : "rejected"}`
+      );
 
-      // Get updated property
-      const [updatedProperties] = await pool.execute('SELECT * FROM properties WHERE id = ?', [id]);
-      const updatedProperty = updatedProperties[0];
+      // Send notifications
+      if (status === "active") {
+        // Notify owner
+        await this.sendNotification(
+          property.owner_user_id,
+          "listing_approved",
+          "Your property listing has been approved and is now live!",
+          {
+            propertyId: id,
+            propertyTitle: property.title,
+            isPremium: updatedProperty.is_premium === 1,
+            message:
+              updatedProperty.is_premium === 1
+                ? "Your premium listing is now featured on the homepage!"
+                : "Your listing is now live on the platform.",
+          }
+        );
 
-      successResponse(res, 200, 'Property status updated successfully', updatedProperty);
+        // Notify broker
+        if (property.assigned_broker_id) {
+          await this.sendNotification(
+            property.assigned_broker_id,
+            "listing_published",
+            `Your client's property listing "${property.title}" has been published.`,
+            {
+              propertyId: id,
+              clientId: property.owner_user_id,
+              isPremium: updatedProperty.is_premium === 1,
+            }
+          );
+        }
+
+        successResponse(
+          res,
+          200,
+          `Property approved and published${
+            updatedProperty.is_premium === 1 ? " as premium listing" : ""
+          }`,
+          updatedProperty
+        );
+      } else if (status === "rejected") {
+        // Notify owner and broker
+        await this.sendNotification(
+          property.owner_user_id,
+          "listing_rejected",
+          `Your property listing has been rejected. Reason: ${
+            reason || "Admin review"
+          }`,
+          {
+            propertyId: id,
+            reason: reason || "Admin review",
+            contactSupport: true,
+          }
+        );
+
+        if (property.assigned_broker_id) {
+          await this.sendNotification(
+            property.assigned_broker_id,
+            "listing_rejected",
+            `Client property listing has been rejected. Reason: ${
+              reason || "Admin review"
+            }`,
+            {
+              propertyId: id,
+              clientId: property.owner_user_id,
+              reason: reason || "Admin review",
+            }
+          );
+        }
+
+        successResponse(res, 200, "Property rejected", updatedProperty);
+      }
     } catch (error) {
       errorResponse(res, 500, error.message);
     }
@@ -156,7 +232,12 @@ class AdminController {
 
       const [result] = await pool.execute(query);
 
-      successResponse(res, 200, "Admin statistics retrieved successfully", result[0]);
+      successResponse(
+        res,
+        200,
+        "Admin statistics retrieved successfully",
+        result[0]
+      );
     } catch (error) {
       errorResponse(res, 500, error.message);
     }
@@ -164,35 +245,29 @@ class AdminController {
 
   async getAdminAllProperties(req, res) {
     try {
-      const {
-        page = 1,
-        limit = 50,
-        status,
-        broker_id,
-        search
-      } = req.query;
+      const { page = 1, limit = 50, status, broker_id, search } = req.query;
 
       // We'll reuse the same logic as getAllPropertiesAdmin
-      let whereClauses = ['1=1'];
+      let whereClauses = ["1=1"];
       const values = [];
 
       if (status) {
-        whereClauses.push('property_status = ?');
+        whereClauses.push("property_status = ?");
         values.push(status);
       }
 
       if (broker_id) {
-        whereClauses.push('assigned_broker_id = ?');
+        whereClauses.push("assigned_broker_id = ?");
         values.push(parseInt(broker_id));
       }
 
       if (search) {
-        whereClauses.push('(title LIKE ? OR address LIKE ? OR city LIKE ?)');
+        whereClauses.push("(title LIKE ? OR address LIKE ? OR city LIKE ?)");
         const searchValue = `%${search}%`;
         values.push(searchValue, searchValue, searchValue);
       }
 
-      const where = whereClauses.join(' AND ');
+      const where = whereClauses.join(" AND ");
 
       // Count total
       const countQuery = `SELECT COUNT(*) as total FROM properties WHERE ${where}`;
@@ -208,7 +283,11 @@ class AdminController {
         LIMIT ? OFFSET ?
       `;
 
-      const [properties] = await pool.execute(query, [...values, parseInt(limit), offset]);
+      const [properties] = await pool.execute(query, [
+        ...values,
+        parseInt(limit),
+        offset,
+      ]);
 
       successResponse(res, 200, "All properties retrieved successfully", {
         properties,
@@ -216,8 +295,8 @@ class AdminController {
           page: parseInt(page),
           limit: parseInt(limit),
           total,
-          pages: Math.ceil(total / limit)
-        }
+          pages: Math.ceil(total / limit),
+        },
       });
     } catch (error) {
       errorResponse(res, 500, error.message);
@@ -231,21 +310,28 @@ class AdminController {
 
       if (permanent) {
         // Permanent delete
-        const [result] = await pool.execute('DELETE FROM properties WHERE id = ?', [id]);
-        if (result.affectedRows === 0) {
-          return errorResponse(res, 404, 'Property not found');
-        }
-        successResponse(res, 200, 'Property permanently deleted');
-      } else {
-        // Soft delete
         const [result] = await pool.execute(
-          'UPDATE properties SET deleted_at = NOW(), updated_at = NOW() WHERE id = ? AND deleted_at IS NULL',
+          "DELETE FROM properties WHERE id = ?",
           [id]
         );
         if (result.affectedRows === 0) {
-          return errorResponse(res, 404, 'Property not found or already deleted');
+          return errorResponse(res, 404, "Property not found");
         }
-        successResponse(res, 200, 'Property soft deleted successfully');
+        successResponse(res, 200, "Property permanently deleted");
+      } else {
+        // Soft delete
+        const [result] = await pool.execute(
+          "UPDATE properties SET deleted_at = NOW(), updated_at = NOW() WHERE id = ? AND deleted_at IS NULL",
+          [id]
+        );
+        if (result.affectedRows === 0) {
+          return errorResponse(
+            res,
+            404,
+            "Property not found or already deleted"
+          );
+        }
+        successResponse(res, 200, "Property soft deleted successfully");
       }
     } catch (error) {
       errorResponse(res, 500, error.message);
@@ -257,15 +343,15 @@ class AdminController {
       const { id } = req.params;
 
       const [result] = await pool.execute(
-        'UPDATE properties SET deleted_at = NULL, updated_at = NOW() WHERE id = ? AND deleted_at IS NOT NULL',
+        "UPDATE properties SET deleted_at = NULL, updated_at = NOW() WHERE id = ? AND deleted_at IS NOT NULL",
         [id]
       );
 
       if (result.affectedRows === 0) {
-        return errorResponse(res, 404, 'Property not found or not deleted');
+        return errorResponse(res, 404, "Property not found or not deleted");
       }
 
-      successResponse(res, 200, 'Property restored successfully');
+      successResponse(res, 200, "Property restored successfully");
     } catch (error) {
       errorResponse(res, 500, error.message);
     }
@@ -317,7 +403,7 @@ class AdminController {
 
       // Transform status results
       const statusSummary = {};
-      statusResults.forEach(row => {
+      statusResults.forEach((row) => {
         statusSummary[row.property_status] = row.count;
       });
 
@@ -325,10 +411,10 @@ class AdminController {
         status: statusSummary,
         recent_activity: activityResults || [],
         broker_performance: brokerResults || [],
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
       });
     } catch (error) {
-      console.error('Stats summary error:', error);
+      console.error("Stats summary error:", error);
       errorResponse(res, 500, `Failed to retrieve stats: ${error.message}`);
     }
   }

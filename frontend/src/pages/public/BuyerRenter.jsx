@@ -1,7 +1,69 @@
-import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import React, {
+  useState,
+  useEffect,
+  useRef,
+  useCallback,
+  useMemo,
+} from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useTheme } from "../../contexts/ThemeContext";
 import { apiCall } from "../../utils/api.endpoints";
+import { toast } from "react-hot-toast";
+import {
+  ChevronDown,
+  ChevronRight,
+  ArrowRight,
+  ArrowLeft,
+  CheckCircle,
+  Home,
+  Building,
+  Users,
+  FileText,
+  Calendar,
+  MapPin,
+  DollarSign,
+  Heart,
+  ShieldCheck,
+  Star,
+  Phone,
+  Mail,
+  Award,
+  Clock,
+  Eye,
+  MessageCircle,
+  ExternalLink,
+  Image,
+  X,
+  Upload,
+  Camera,
+  Target,
+  BarChart3,
+  Bed,
+  Bath,
+  Square,
+  Key,
+  Bookmark,
+  Search,
+  Filter,
+  Map,
+  Compass,
+  Navigation,
+  AlertCircle,
+  AlertTriangle,
+  RefreshCw,
+  Loader as LoaderIcon,
+  Lock,
+  TrendingUp,
+  Shield,
+  Sparkles,
+  FileCheck,
+  Handshake,
+  Check,
+  HelpCircle,
+  CreditCard,
+} from "lucide-react";
+
+// Components
 import ThemeToggle from "../../components/ThemeToggle";
 import NotificationToggle from "../../components/NotificationToggle";
 import Loader from "../../components/Loader";
@@ -18,39 +80,119 @@ import HeroTypingText from "../../components/HeroTypingText";
 import PropertyCard from "../../components/PropertyCard";
 import PaymentHistory from "../../components/PaymentHistory";
 import PaymentModal from "../../components/PaymentModal";
-import AnnouncementBanner from '../../components/AnnouncementBanner';
+import AnnouncementBanner from "../../components/AnnouncementBanner";
 
-import { toast } from "react-hot-toast";
-import {
-  ChevronDown, ChevronRight, ArrowRight, ArrowLeft, CheckCircle,
-  Home, Building, Users, FileText, Calendar, MapPin, DollarSign,
-  Heart, ShieldCheck, Star, Phone, Mail, Award, Clock, Eye,
-  MessageCircle, ExternalLink, Image, X, Upload, Camera, Target,
-  BarChart3, Bed, Bath, Square, Key, Bookmark, Search, Filter,
-  Map, Compass, Navigation, AlertCircle, AlertTriangle, RefreshCw,
-  Loader as LoaderIcon, Lock, TrendingUp, Shield, Sparkles, FileCheck,
-  Handshake, Check, HelpCircle, CreditCard
-} from "lucide-react";
+// Custom hook for localStorage persistence
+const usePersistedState = (key, defaultValue) => {
+  const [state, setState] = useState(() => {
+    try {
+      const item = localStorage.getItem(key);
+      return item ? JSON.parse(item) : defaultValue;
+    } catch (error) {
+      console.error(`Error loading ${key} from localStorage:`, error);
+      return defaultValue;
+    }
+  });
+
+  const setPersistedState = useCallback(
+    (value) => {
+      try {
+        const valueToStore = value instanceof Function ? value(state) : value;
+        setState(valueToStore);
+        localStorage.setItem(key, JSON.stringify(valueToStore));
+      } catch (error) {
+        console.error(`Error saving ${key} to localStorage:`, error);
+      }
+    },
+    [key, state],
+  );
+
+  return [state, setPersistedState];
+};
+
+// Constants for localStorage keys
+const STORAGE_KEYS = {
+  ACTIVE_STEP: "buyerRenter_activeStep",
+  USER_TYPE: "buyerRenter_userType",
+  HAS_SUBMITTED_DOCS: "buyerRenter_hasSubmittedDocuments",
+  HAS_APPLIED: "buyerRenter_hasAppliedForProperty",
+  PROPERTIES: "buyerRenter_properties",
+  SAVED_PROPERTIES: "buyerRenter_savedProperties",
+  APPLICATIONS: "buyerRenter_applications",
+  BROKERS: "buyerRenter_brokers",
+  VERIFICATION_IN_PROGRESS: "buyerRenter_isVerificationInProgress",
+  RECOMMENDED_PROPERTIES: "buyerRenter_recommendedProperties",
+  BOOKINGS: "buyerRenter_bookings",
+  LAST_VERIFICATION_CHECK: "buyerRenter_lastVerificationCheck",
+  COMPLETED_STEPS: "completed_steps",
+  HAS_SELECTED_BROKER: "buyerRenter_hasSelectedBroker",
+  HAS_BROKER_CONFIRMED: "buyerRenter_hasBrokerConfirmed",
+};
 
 const BuyerRenter = () => {
   const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
 
-  // State Management
-  const [activeStep, setActiveStep] = useState(1);
-  const [userType, setUserType] = useState("buyer");
-  const [isLoading, setIsLoading] = useState(false);
-  const [user, setUser] = useState(null);
-  const [isVerified, setIsVerified] = useState(false);
-  const [hasSubmittedDocuments, setHasSubmittedDocuments] = useState(false);
-  const [hasSelectedBroker, setHasSelectedBroker] = useState(false);
-  const [hasBrokerConfirmed, setHasBrokerConfirmed] = useState(false);
-  const [hasAppliedForProperty, setHasAppliedForProperty] = useState(false);
-  const [isApplicationPending, setIsApplicationPending] = useState(false);
-  const [hasPreferences, setHasPreferences] = useState(false);
-  const [resubmissionDocument, setResubmissionDocument] = useState(null);
-  const [showResubmissionModal, setShowResubmissionModal] = useState(false);
+  // Add these refs
+  const progressSectionRef = useRef(null);
+  const isInitializedRef = useRef(false);
+
+  // Add this state variable
   const [canChangeUserType, setCanChangeUserType] = useState(true);
+
+  const [activeStep, setActiveStep] = usePersistedState(
+    STORAGE_KEYS.ACTIVE_STEP,
+    1,
+  );
+  const [userType, setUserType] = usePersistedState(
+    STORAGE_KEYS.USER_TYPE,
+    "buyer",
+  );
+  const [hasSubmittedDocuments, setHasSubmittedDocuments] = usePersistedState(
+    STORAGE_KEYS.HAS_SUBMITTED_DOCS,
+    false,
+  );
+  const [hasAppliedForProperty, setHasAppliedForProperty] = usePersistedState(
+    STORAGE_KEYS.HAS_APPLIED,
+    false,
+  );
+  const [properties, setProperties] = usePersistedState(
+    STORAGE_KEYS.PROPERTIES,
+    [],
+  );
+  const [savedProperties, setSavedProperties] = usePersistedState(
+    STORAGE_KEYS.SAVED_PROPERTIES,
+    [],
+  );
+  const [applications, setApplications] = usePersistedState(
+    STORAGE_KEYS.APPLICATIONS,
+    [],
+  );
+  const [brokers, setBrokers] = usePersistedState(STORAGE_KEYS.BROKERS, []);
+  const [isVerificationInProgress, setIsVerificationInProgress] =
+    usePersistedState(STORAGE_KEYS.VERIFICATION_IN_PROGRESS, false);
+  const [recommendedProperties, setRecommendedProperties] = usePersistedState(
+    STORAGE_KEYS.RECOMMENDED_PROPERTIES,
+    [],
+  );
+  const [bookings, setBookings] = usePersistedState(STORAGE_KEYS.BOOKINGS, []);
+  const [hasSelectedBroker, setHasSelectedBroker] = usePersistedState(
+    STORAGE_KEYS.HAS_SELECTED_BROKER,
+    false,
+  );
+  const [hasBrokerConfirmed, setHasBrokerConfirmed] = usePersistedState(
+    STORAGE_KEYS.HAS_BROKER_CONFIRMED,
+    false,
+  );
+
+  // Dynamic states (depend on user)
+  const [user, setUser] = useState(null);
+  const [verificationStatus, setVerificationStatus] = useState(null);
+  const [lastVerificationCheck, setLastVerificationCheck] = useState(() => {
+    const saved = localStorage.getItem(STORAGE_KEYS.LAST_VERIFICATION_CHECK);
+    return saved ? JSON.parse(saved) : null;
+  });
+  const [userDocuments, setUserDocuments] = useState([]);
 
   // Modal states
   const [showProfileSetup, setShowProfileSetup] = useState(false);
@@ -60,57 +202,128 @@ const BuyerRenter = () => {
   const [showPropertyDetails, setShowPropertyDetails] = useState(false);
   const [showApplicationModal, setShowApplicationModal] = useState(false);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
-  const [showScheduleViewingModal, setShowScheduleViewingModal] = useState(false);
+  const [showScheduleViewingModal, setShowScheduleViewingModal] =
+    useState(false);
   const [showChat, setShowChat] = useState(false);
-  const [showVerificationRestriction, setShowVerificationRestriction] = useState(false);
+  const [showVerificationRestriction, setShowVerificationRestriction] =
+    useState(false);
+    const [hasPreferences, setHasPreferences] = useState(false);
 
-  // Data States
-  const [properties, setProperties] = useState([]);
-  const [savedProperties, setSavedProperties] = useState([]);
-  const [applications, setApplications] = useState([]);
-  const [brokers, setBrokers] = useState([]);
-  const [bookings, setBookings] = useState([]);
-
-  // Interactive state
+  // UI states
   const [activeInfoCard, setActiveInfoCard] = useState(0);
   const [hoveredCard, setHoveredCard] = useState(null);
   const [scrolledProgress, setScrolledProgress] = useState(0);
-  const [isVerificationInProgress, setIsVerificationInProgress] = useState(false);
-  const [userDocuments, setUserDocuments] = useState([]);
-  const [recommendedProperties, setRecommendedProperties] = useState([]);
   const [savingProperty, setSavingProperty] = useState(null);
-  const [verificationStatus, setVerificationStatus] = useState(null);
-  const [lastVerificationCheck, setLastVerificationCheck] = useState(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [resubmissionDocument, setResubmissionDocument] = useState(null);
+  const [isApplicationPending, setIsApplicationPending] = useState(false);
 
-  // Refs
-  const progressSectionRef = useRef(null);
-  const isInitializedRef = useRef(false);
-
-  // Track completed steps - Initialize as ALL FALSE
-  const [completedSteps, setCompletedSteps] = useState({
-    1: false,
-    2: false,
-    3: false,
-    4: false,
-    5: false,
-    6: false
+  // Completed steps
+  const [completedSteps, setCompletedSteps] = useState(() => {
+    const saved = localStorage.getItem(STORAGE_KEYS.COMPLETED_STEPS);
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        return {
+          1: parsed[1] || false,
+          2: parsed[2] || false,
+          3: parsed[3] || false,
+          4: parsed[4] || false,
+          5: parsed[5] || false,
+          6: parsed[6] || false,
+        };
+      } catch (error) {
+        console.error("Error parsing completed steps:", error);
+      }
+    }
+    return { 1: false, 2: false, 3: false, 4: false, 5: false, 6: false };
   });
 
-  // ========== HELPER FUNCTIONS ==========
+  // Also add the missing user type toggle handler effect
+  useEffect(() => {
+    if (verificationStatus?.status === "verified" || completedSteps[2]) {
+      setCanChangeUserType(false);
+    }
+  }, [verificationStatus?.status, completedSteps[2]]);
+
+  // Auto-save all persistent states
+  const saveAllStates = useCallback(() => {
+    try {
+      const statesToSave = Object.entries({
+        [STORAGE_KEYS.ACTIVE_STEP]: activeStep,
+        [STORAGE_KEYS.USER_TYPE]: userType,
+        [STORAGE_KEYS.HAS_SUBMITTED_DOCS]: hasSubmittedDocuments,
+        [STORAGE_KEYS.HAS_APPLIED]: hasAppliedForProperty,
+        [STORAGE_KEYS.PROPERTIES]: properties,
+        [STORAGE_KEYS.SAVED_PROPERTIES]: savedProperties,
+        [STORAGE_KEYS.APPLICATIONS]: applications,
+        [STORAGE_KEYS.BROKERS]: brokers,
+        [STORAGE_KEYS.VERIFICATION_IN_PROGRESS]: isVerificationInProgress,
+        [STORAGE_KEYS.RECOMMENDED_PROPERTIES]: recommendedProperties,
+        [STORAGE_KEYS.HAS_SELECTED_BROKER]: hasSelectedBroker,
+        [STORAGE_KEYS.HAS_BROKER_CONFIRMED]: hasBrokerConfirmed,
+        [STORAGE_KEYS.COMPLETED_STEPS]: completedSteps,
+      });
+
+      statesToSave.forEach(([key, value]) =>
+        localStorage.setItem(key, JSON.stringify(value)),
+      );
+
+      console.log("💾 All states saved to localStorage");
+    } catch (error) {
+      console.error("Error saving states:", error);
+    }
+  }, [
+    activeStep,
+    userType,
+    hasSubmittedDocuments,
+    hasAppliedForProperty,
+    properties,
+    savedProperties,
+    applications,
+    brokers,
+    isVerificationInProgress,
+    recommendedProperties,
+    hasSelectedBroker,
+    hasBrokerConfirmed,
+    completedSteps,
+  ]);
+
+  // Debounced auto-save
+  useEffect(() => {
+    const timer = setTimeout(saveAllStates, 500);
+    return () => clearTimeout(timer);
+  }, [saveAllStates]);
+  // Helper function for completed steps persistence
+  const setCompletedStepsWithPersistence = useCallback((updater) => {
+    setCompletedSteps((prev) => {
+      const newSteps = typeof updater === "function" ? updater(prev) : updater;
+      localStorage.setItem(
+        STORAGE_KEYS.COMPLETED_STEPS,
+        JSON.stringify(newSteps),
+      );
+      return newSteps;
+    });
+  }, []);
+
+  // ========== VERIFICATION HELPERS ==========
 
   const getVerificationStepTitle = () => {
     if (!verificationStatus) {
-      return hasSubmittedDocuments ? "Verification in Progress" : "Verify Identity";
+      return hasSubmittedDocuments
+        ? "Verification in Progress"
+        : "Verify Identity";
     }
 
-    switch (verificationStatus.status) {
-      case 'verified': return 'Verified';
-      case 'needs_resubmission': return 'Resubmission Required';
-      case 'reviewing': return 'Under Review';
-      case 'submitted': return 'Submitted';
-      case 'rejected': return 'Verification Rejected';
-      default: return 'Verify Identity';
-    }
+    const statusTitles = {
+      verified: "Verified",
+      needs_resubmission: "Resubmission Required",
+      reviewing: "Under Review",
+      submitted: "Submitted",
+      rejected: "Verification Rejected",
+    };
+
+    return statusTitles[verificationStatus.status] || "Verify Identity";
   };
 
   const getVerificationStepDescription = () => {
@@ -122,58 +335,58 @@ const BuyerRenter = () => {
         : "Upload required documents";
     }
 
-    switch (verificationStatus.status) {
-      case 'verified': return 'Identity verified successfully';
-      case 'needs_resubmission': return verificationStatus.feedback || 'Please resubmit documents';
-      case 'reviewing': return 'Your documents are being reviewed';
-      case 'submitted': return 'Documents submitted - awaiting review';
-      case 'rejected': return verificationStatus.feedback || 'Verification was not approved';
-      default: return 'Upload required documents';
-    }
+    const statusDescriptions = {
+      verified: "Identity verified successfully",
+      needs_resubmission:
+        verificationStatus.feedback || "Please resubmit documents",
+      reviewing: "Your documents are being reviewed",
+      submitted: "Documents submitted - awaiting review",
+      rejected: verificationStatus.feedback || "Verification was not approved",
+    };
+
+    return (
+      statusDescriptions[verificationStatus.status] ||
+      "Upload required documents"
+    );
   };
 
   const getVerificationStepIcon = () => {
-    if (!verificationStatus) {
-      return hasSubmittedDocuments ? Clock : ShieldCheck;
-    }
+    if (!verificationStatus) return hasSubmittedDocuments ? Clock : ShieldCheck;
 
-    switch (verificationStatus.status) {
-      case 'verified': return CheckCircle;
-      case 'needs_resubmission': return AlertCircle;
-      case 'reviewing': return Clock;
-      case 'submitted': return FileCheck;
-      case 'rejected': return AlertTriangle;
-      default: return ShieldCheck;
-    }
+    const statusIcons = {
+      verified: CheckCircle,
+      needs_resubmission: AlertCircle,
+      reviewing: Clock,
+      submitted: FileCheck,
+      rejected: AlertTriangle,
+    };
+
+    return statusIcons[verificationStatus.status] || ShieldCheck;
   };
 
   const getVerificationStepAction = () => {
     return () => {
-      if (verificationStatus?.status === 'needs_resubmission') {
-        const needsResubmission = userDocuments.filter(doc =>
-          doc.status === 'needs_resubmission'
+      if (verificationStatus?.status === "needs_resubmission") {
+        const needsResubmission = userDocuments.filter(
+          (doc) => doc.status === "needs_resubmission",
         );
-
         if (needsResubmission.length === 1) {
-          setResubmissionDocument(needsResubmission[0].type);
-          setShowDocumentUpload(true);
-
-          if (needsResubmission[0].feedback) {
-            toast(`Please resubmit: ${needsResubmission[0].feedback}`, {
-              duration: 6000,
-              icon: '📄'
-            });
-          }
+          toast(`Please resubmit: ${needsResubmission[0].feedback}`, {
+            duration: 6000,
+            icon: "📄",
+          });
         } else {
-          setShowDocumentUpload(true);
-          toast('Multiple documents need resubmission', {
+          toast("Multiple documents need resubmission", {
             duration: 5000,
-            icon: '📄'
+            icon: "📄",
           });
         }
+        setShowDocumentUpload(true);
       } else if (hasSubmittedDocuments && isVerificationInProgress) {
         setShowVerificationRestriction(true);
-        toast.error("Please wait for verification to complete before uploading new documents");
+        toast.error(
+          "Please wait for verification to complete before uploading new documents",
+        );
       } else {
         setShowDocumentUpload(true);
       }
@@ -182,38 +395,43 @@ const BuyerRenter = () => {
 
   const getVerificationStepColor = () => {
     if (!verificationStatus) {
-      return hasSubmittedDocuments ? "from-amber-800 to-amber-500" : "from-amber-800 to-amber-500";
+      return hasSubmittedDocuments
+        ? "from-amber-800 to-amber-500"
+        : "from-amber-800 to-amber-500";
     }
 
-    switch (verificationStatus.status) {
-      case 'verified': return "from-green-500 to-green-600";
-      case 'needs_resubmission': return "from-amber-500 to-amber-600";
-      case 'reviewing': return "from-blue-500 to-blue-600";
-      case 'submitted': return "from-purple-500 to-purple-600";
-      case 'rejected': return "from-red-500 to-red-600";
-      default: return "from-amber-800 to-amber-500";
-    }
+    const statusColors = {
+      verified: "from-green-500 to-green-600",
+      needs_resubmission: "from-amber-500 to-amber-600",
+      reviewing: "from-blue-500 to-blue-600",
+      submitted: "from-purple-500 to-purple-600",
+      rejected: "from-red-500 to-red-600",
+    };
+
+    return (
+      statusColors[verificationStatus.status] || "from-amber-800 to-amber-500"
+    );
   };
 
   const getVerificationStepIconColor = () => {
-    if (!verificationStatus) {
+    if (!verificationStatus)
       return hasSubmittedDocuments ? "text-amber-400" : "text-amber-500";
-    }
 
-    switch (verificationStatus.status) {
-      case 'verified': return "text-green-500";
-      case 'needs_resubmission': return "text-amber-500";
-      case 'reviewing': return "text-blue-500";
-      case 'submitted': return "text-purple-500";
-      case 'rejected': return "text-red-500";
-      default: return "text-amber-500";
-    }
+    const statusIconColors = {
+      verified: "text-green-500",
+      needs_resubmission: "text-amber-500",
+      reviewing: "text-blue-500",
+      submitted: "text-purple-500",
+      rejected: "text-red-500",
+    };
+
+    return statusIconColors[verificationStatus.status] || "text-amber-500";
   };
-
 
   // ========== VERIFICATION FUNCTIONS ==========
 
-  const checkVerificationStatus = useCallback(async (forceCheck = false) => {
+  const checkVerificationStatus = useCallback(
+  async (forceCheck = false) => {
     if (!user?.id) return null;
 
     try {
@@ -221,25 +439,53 @@ const BuyerRenter = () => {
       const lastCheck = lastVerificationCheck || 0;
       const timeSinceLastCheck = now - lastCheck;
 
-      if (!forceCheck && timeSinceLastCheck < 10000) {
+      // Increase cache time to 30 seconds
+      if (!forceCheck && timeSinceLastCheck < 30000) {
+        console.log(`📦 Using cached verification status (${Math.floor(timeSinceLastCheck / 1000)}s ago)`);
         return verificationStatus;
       }
 
-      if (verificationStatus?.status === 'verified') {
+      // Add rate limiting check per user
+      const lastStatusCheck = localStorage.getItem(`last_status_check_${user.id}`);
+      if (lastStatusCheck && !forceCheck) {
+        const timeSinceLastStatus = now - parseInt(lastStatusCheck);
+        if (timeSinceLastStatus < 5000) { // Don't check more than once every 5 seconds
+          console.log(`⏱️ Rate limited: last check was ${Math.floor(timeSinceLastStatus / 1000)}s ago`);
+          return verificationStatus;
+        }
+      }
+      
+      // Store last check time
+      localStorage.setItem(`last_status_check_${user.id}`, now.toString());
+
+      // If already verified, don't keep checking
+      if (verificationStatus?.status === "verified") {
+        console.log("✅ Already verified, skipping check");
         return verificationStatus;
       }
 
-      const response = await apiCall('GET_VERIFICATION_STATUS', {}, { method: 'GET' });
+      console.log(`🔍 Checking verification status${forceCheck ? ' (forced)' : ''}...`);
+      
+      const response = await apiCall(
+        "GET_VERIFICATION_STATUS",
+        {},
+        { method: "GET" },
+      );
 
       // Handle undefined or null response
       if (!response) {
-        console.log('❌ Verification status check returned no response');
+        console.log("❌ Verification status check returned no response");
         return verificationStatus;
       }
 
       // Handle error responses
       if (!response.success) {
-        console.log('❌ Verification status check failed:', response.message);
+        // If rate limited, don't update state
+        if (response.message?.includes("Too many requests")) {
+          console.log("⚠️ Rate limited, skipping status update");
+          return verificationStatus;
+        }
+        console.log("❌ Verification status check failed:", response.message);
         return verificationStatus;
       }
 
@@ -247,78 +493,106 @@ const BuyerRenter = () => {
 
       // Handle case where userData might be undefined
       if (!userData) {
-        console.log('❌ No user data in verification response');
+        console.log("❌ No user data in verification response");
         return verificationStatus;
       }
 
       const updatedUser = {
         ...user,
-        verification_status: userData.verification_status || userData.verificationStepStatus || null,
-        verification_step_status: userData.verification_step_status || userData.verificationStepStatus || 'not_started',
+        verification_status:
+          userData.verification_status ||
+          userData.verificationStepStatus ||
+          null,
+        verification_step_status:
+          userData.verification_step_status ||
+          userData.verificationStepStatus ||
+          "not_started",
         verification_feedback: userData.verification_feedback || null,
-        documents_need_resubmission: userData.documents_need_resubmission || false,
+        documents_need_resubmission:
+          userData.documents_need_resubmission || false,
         has_submitted_documents: userData.has_submitted_documents || false,
         documents_submitted_at: userData.documents_submitted_at || null,
-        last_verification_review_at: userData.last_verification_review_at || null
+        last_verification_review_at:
+          userData.last_verification_review_at || null,
       };
 
       setUser(updatedUser);
-      localStorage.setItem('user', JSON.stringify(updatedUser));
+      localStorage.setItem("user", JSON.stringify(updatedUser));
 
       if (documents && Array.isArray(documents)) {
         setUserDocuments(documents);
-        localStorage.setItem(`user_documents_${user.id}`, JSON.stringify(documents));
+        localStorage.setItem(
+          `user_documents_${user.id}`,
+          JSON.stringify(documents),
+        );
       }
 
       const hasSubmitted =
-        userData.verification_status === 'pending' ||
-        userData.verification_status === 'submitted' ||
-        userData.verification_status === 'reviewing' ||
+        userData.verification_status === "pending" ||
+        userData.verification_status === "submitted" ||
+        userData.verification_status === "reviewing" ||
         userData.has_submitted_documents === true;
 
       const isPending =
-        userData.verification_step_status === 'pending' ||
-        userData.verification_step_status === 'submitted' ||
-        userData.verification_step_status === 'reviewing' ||
-        userData.verification_step_status === 'needs_resubmission';
+        userData.verification_step_status === "pending" ||
+        userData.verification_step_status === "submitted" ||
+        userData.verification_step_status === "reviewing" ||
+        userData.verification_step_status === "needs_resubmission";
 
       setHasSubmittedDocuments(hasSubmitted);
       setIsVerificationInProgress(isPending);
 
       // Update step 2 completion based on actual verification status
-      const isStep2Completed = userData.verification_step_status === 'verified';
+      const isStep2Completed =
+        userData.verification_step_status === "verified";
       if (isStep2Completed !== completedSteps[2]) {
-        setCompletedSteps(prev => {
+        setCompletedSteps((prev) => {
           const updated = { ...prev, 2: isStep2Completed };
-          localStorage.setItem('completed_steps', JSON.stringify(updated));
+          localStorage.setItem("completed_steps", JSON.stringify(updated));
           return updated;
         });
       }
 
       const statusData = {
-        status: userData.verification_step_status || 'not_started',
+        status: userData.verification_step_status || "not_started",
         feedback: userData.verification_feedback || null,
         needsResubmission: userData.documents_need_resubmission || false,
         lastReviewed: userData.last_verification_review_at || null,
         stepInfo: verificationStep,
         hasSubmitted: hasSubmitted,
         isInProgress: isPending,
-        lastChecked: now
+        lastChecked: now,
       };
 
       setVerificationStatus(statusData);
       setLastVerificationCheck(now);
 
-      localStorage.setItem(`verification_status_${user.id}`, JSON.stringify(statusData));
+      localStorage.setItem(
+        `verification_status_${user.id}`,
+        JSON.stringify(statusData),
+      );
 
       const previousStatus = verificationStatus?.status;
-      if (previousStatus && previousStatus !== userData.verification_step_status) {
-        handleVerificationStatusChange(previousStatus, userData.verification_step_status, userData.verification_feedback);
+      if (
+        previousStatus &&
+        previousStatus !== userData.verification_step_status
+      ) {
+        handleVerificationStatusChange(
+          previousStatus,
+          userData.verification_step_status,
+          userData.verification_feedback,
+        );
       }
 
       return statusData;
     } catch (error) {
-      console.error('Error checking verification status:', error);
+      console.error("Error checking verification status:", error);
+      
+      // Don't retry on rate limit errors
+      if (error.message?.includes("Too many requests")) {
+        console.log("⚠️ Rate limit hit, waiting before next attempt");
+        return verificationStatus;
+      }
 
       // Return existing status if available
       if (verificationStatus) {
@@ -327,43 +601,46 @@ const BuyerRenter = () => {
 
       // Return default status if no existing status
       return {
-        status: 'not_started',
+        status: "not_started",
         feedback: null,
         needsResubmission: false,
         lastReviewed: null,
         hasSubmitted: false,
         isInProgress: false,
-        lastChecked: Date.now()
+        lastChecked: Date.now(),
       };
     }
-  }, [user, verificationStatus, lastVerificationCheck, completedSteps]);
+  },
+  [user, verificationStatus, lastVerificationCheck, completedSteps],
+);
 
   const validateAndUpdateSteps = useCallback(async () => {
     if (!user) return;
 
-    console.log('🔍 Validating and updating steps...');
+    console.log("🔍 Validating and updating steps...");
 
     // Step 1: Check if profile is complete
-    const isProfileComplete = user.first_name &&
-      user.last_name &&
-      user.phone_number;
+    const isProfileComplete =
+      user.first_name && user.last_name && user.phone_number;
 
     if (isProfileComplete !== completedSteps[1]) {
-      console.log(`🔄 Step 1: ${isProfileComplete ? 'Complete' : 'Incomplete'}`);
-      setCompletedSteps(prev => {
+      console.log(
+        `🔄 Step 1: ${isProfileComplete ? "Complete" : "Incomplete"}`,
+      );
+      setCompletedSteps((prev) => {
         const updated = { ...prev, 1: isProfileComplete };
-        localStorage.setItem('completed_steps', JSON.stringify(updated));
+        localStorage.setItem("completed_steps", JSON.stringify(updated));
         return updated;
       });
     }
 
     // Step 2: Check verification status
-    const isVerified = verificationStatus?.status === 'verified';
+    const isVerified = verificationStatus?.status === "verified";
     if (isVerified !== completedSteps[2]) {
-      console.log(`🔄 Step 2: ${isVerified ? 'Complete' : 'Incomplete'}`);
-      setCompletedSteps(prev => {
+      console.log(`🔄 Step 2: ${isVerified ? "Complete" : "Incomplete"}`);
+      setCompletedSteps((prev) => {
         const updated = { ...prev, 2: isVerified };
-        localStorage.setItem('completed_steps', JSON.stringify(updated));
+        localStorage.setItem("completed_steps", JSON.stringify(updated));
         return updated;
       });
     }
@@ -371,57 +648,108 @@ const BuyerRenter = () => {
     // Step 3: Check if user has saved properties
     const hasSavedProperties = savedProperties.length > 0;
     if (hasSavedProperties !== completedSteps[3]) {
-      console.log(`🔄 Step 3: ${hasSavedProperties ? 'Complete' : 'Incomplete'}`);
-      setCompletedSteps(prev => {
+      console.log(
+        `🔄 Step 3: ${hasSavedProperties ? "Complete" : "Incomplete"}`,
+      );
+      setCompletedSteps((prev) => {
         const updated = { ...prev, 3: hasSavedProperties };
-        localStorage.setItem('completed_steps', JSON.stringify(updated));
+        localStorage.setItem("completed_steps", JSON.stringify(updated));
         return updated;
       });
     }
 
-    // Step 4: Check if user has scheduled a viewing
-    // For new users, this should ALWAYS be false initially
-    // Only set to true when user actually schedules a viewing
-    if (completedSteps[4] && !hasSavedProperties) {
-      console.log('🔄 Resetting step 4 (no saved properties to schedule viewings for)');
-      setCompletedSteps(prev => {
-        const updated = { ...prev, 4: false };
-        localStorage.setItem('completed_steps', JSON.stringify(updated));
-        return updated;
-      });
+    // Step 4: Check if user has scheduled any appointment
+    // Try to fetch existing appointments
+    try {
+      const appointmentsResponse = await apiCall("GET_APPOINTMENTS");
+      const hasAppointments =
+        appointmentsResponse?.data?.length > 0 ||
+        appointmentsResponse?.appointments?.length > 0 ||
+        (Array.isArray(appointmentsResponse) &&
+          appointmentsResponse.length > 0);
+
+      if (hasAppointments !== completedSteps[4]) {
+        console.log(
+          `🔄 Step 4: ${hasAppointments ? "Complete" : "Incomplete"}`,
+        );
+        setCompletedSteps((prev) => {
+          const updated = { ...prev, 4: hasAppointments };
+          localStorage.setItem("completed_steps", JSON.stringify(updated));
+          return updated;
+        });
+      }
+    } catch (error) {
+      console.log("Could not check appointments for step 4 validation:", error);
     }
 
-    console.log('✅ Step validation complete:', completedSteps);
+    console.log("✅ Step validation complete:", completedSteps);
   }, [user, verificationStatus, savedProperties, completedSteps]);
+
+  useEffect(() => {
+    const checkExistingAppointments = async () => {
+      if (user && !completedSteps[4]) {
+        try {
+          // Check if user already has appointments
+          const response = await apiCall("GET_APPOINTMENTS");
+
+          const hasAppointments =
+            response?.data?.length > 0 ||
+            response?.appointments?.length > 0 ||
+            (Array.isArray(response) && response.length > 0);
+
+          if (hasAppointments) {
+            console.log(
+              "✅ Found existing appointments, marking step 4 as complete",
+            );
+            setCompletedSteps((prev) => {
+              const updated = { ...prev, 4: true };
+              localStorage.setItem("completed_steps", JSON.stringify(updated));
+              return updated;
+            });
+          }
+        } catch (error) {
+          console.log("Could not check existing appointments:", error);
+        }
+      }
+    };
+
+    checkExistingAppointments();
+  }, [user, completedSteps[4]]);
+
   const handleVerificationStatusChange = (oldStatus, newStatus, feedback) => {
     switch (newStatus) {
-      case 'verified':
-        toast.success('🎉 Verification Complete! Your identity has been verified successfully.', {
-          duration: 5000,
-          icon: '✅'
-        });
+      case "verified":
+        toast.success(
+          "🎉 Verification Complete! Your identity has been verified successfully.",
+          {
+            duration: 5000,
+            icon: "✅",
+          },
+        );
         break;
 
-      case 'needs_resubmission':
+      case "needs_resubmission":
         toast.error(`🔄 Verification Needs Resubmission`, {
           duration: 6000,
-          description: feedback || 'Please resubmit your documents with corrections',
-          icon: '📄'
+          description:
+            feedback || "Please resubmit your documents with corrections",
+          icon: "📄",
         });
         break;
 
-      case 'rejected':
-        toast.error('❌ Verification Rejected', {
+      case "rejected":
+        toast.error("❌ Verification Rejected", {
           duration: 6000,
-          description: feedback || 'Please contact support for more information',
-          icon: '❌'
+          description:
+            feedback || "Please contact support for more information",
+          icon: "❌",
         });
         break;
 
-      case 'reviewing':
-        toast('🔍 Your documents are now being reviewed by our team', {
+      case "reviewing":
+        toast("🔍 Your documents are now being reviewed by our team", {
           duration: 4000,
-          icon: '👀'
+          icon: "👀",
         });
         break;
     }
@@ -432,15 +760,15 @@ const BuyerRenter = () => {
   const getStepConfig = useCallback(() => {
     const getStep4Description = () => {
       // Force step 4 description to show "Save properties" if no properties are saved
+      if (completedSteps[4]) {
+        return "Viewing scheduled - Check your appointments";
+      }
+
       if (savedProperties.length === 0) {
         return "Save properties to schedule viewings";
       }
 
-      return completedSteps[4]
-        ? "Viewing scheduled"
-        : (savedProperties.length > 0
-          ? `${savedProperties.length} saved - Book viewing`
-          : "Save properties to schedule viewings");
+      return `${savedProperties.length} saved - Book viewing`;
     };
 
     const handleBuyerStep4Action = () => {
@@ -457,7 +785,9 @@ const BuyerRenter = () => {
         // The step should only be marked complete when viewing is actually scheduled
         // The completion should happen in handleScheduleViewing function
       } else if (properties.length > 0) {
-        toast("Save a property first to schedule viewing. Click the heart icon on any property to save it.");
+        toast(
+          "Save a property first to schedule viewing. Click the heart icon on any property to save it.",
+        );
         setActiveStep(3);
       } else {
         toast("No properties available. Please check back later.");
@@ -491,12 +821,16 @@ const BuyerRenter = () => {
       {
         number: 1,
         title: "Create Profile",
-        description: completedSteps[1] ? "Profile setup completed" : "Complete your personal profile",
+        description: completedSteps[1]
+          ? "Profile setup completed"
+          : "Complete your personal profile",
         icon: Users,
         action: () => setShowProfileSetup(true),
         completed: completedSteps[1],
-        color: completedSteps[1] ? "from-green-500 to-green-600" : "from-amber-800 to-amber-500",
-        iconColor: completedSteps[1] ? "text-green-500" : "text-amber-500"
+        color: completedSteps[1]
+          ? "from-green-500 to-green-600"
+          : "from-amber-800 to-amber-500",
+        iconColor: completedSteps[1] ? "text-green-500" : "text-amber-500",
       },
       {
         number: 2,
@@ -504,20 +838,28 @@ const BuyerRenter = () => {
         description: getVerificationStepDescription(),
         icon: getVerificationStepIcon(),
         action: getVerificationStepAction(),
-        completed: verificationStatus?.status === 'verified' || completedSteps[2],
+        completed:
+          verificationStatus?.status === "verified" || completedSteps[2],
         color: getVerificationStepColor(),
-        iconColor: getVerificationStepIconColor()
+        iconColor: getVerificationStepIconColor(),
       },
       {
         number: 3,
-        title: userType === 'buyer' ? "Explore Properties" : "Find Homes",
+        title: userType === "buyer" ? "Explore Properties" : "Find Homes",
         description: completedSteps[3]
-          ? `Saved ${savedProperties.length} ${savedProperties.length === 1 ? 'property' : 'properties'}`
-          : (userType === 'buyer' ? "Browse dream properties" : "Search perfect rentals"),
-        icon: userType === 'buyer' ? Search : Home,
+          ? `Saved ${savedProperties.length} ${savedProperties.length === 1 ? "property" : "properties"}`
+          : userType === "buyer"
+            ? "Browse dream properties"
+            : "Search perfect rentals",
+        icon: userType === "buyer" ? Search : Home,
         action: () => {
-          if (isVerificationInProgress && verificationStatus?.status !== 'verified') {
-            toast.error("Please wait for verification to complete before exploring properties");
+          if (
+            isVerificationInProgress &&
+            verificationStatus?.status !== "verified"
+          ) {
+            toast.error(
+              "Please wait for verification to complete before exploring properties",
+            );
             setShowVerificationRestriction(true);
             return;
           }
@@ -525,9 +867,11 @@ const BuyerRenter = () => {
           navigate("/properties");
         },
         completed: completedSteps[3],
-        color: completedSteps[3] ? "from-green-500 to-green-600" : "from-amber-800 to-amber-500",
-        iconColor: completedSteps[3] ? "text-green-500" : "text-amber-500"
-      }
+        color: completedSteps[3]
+          ? "from-green-500 to-green-600"
+          : "from-amber-800 to-amber-500",
+        iconColor: completedSteps[3] ? "text-green-500" : "text-amber-500",
+      },
     ];
 
     const buyerSpecificSteps = [
@@ -539,27 +883,55 @@ const BuyerRenter = () => {
         action: handleBuyerStep4Action,
         // Step 4 is only complete when viewing is actually scheduled
         completed: completedSteps[4],
-        color: completedSteps[4] ? "from-green-500 to-green-600" : "from-amber-800 to-amber-500",
-        iconColor: completedSteps[4] ? "text-green-500" : (savedProperties.length > 0 ? "text-amber-500" : "text-amber-500")
+        color: completedSteps[4]
+          ? "from-green-500 to-green-600"
+          : "from-amber-800 to-amber-500",
+        iconColor: completedSteps[4]
+          ? "text-green-500"
+          : savedProperties.length > 0
+            ? "text-amber-500"
+            : "text-amber-500",
       },
       {
         number: 5,
-        title: completedSteps[5] ? "Application Submitted" : (hasAppliedForProperty ? "Application Pending" : "Make Offer"),
-        description: completedSteps[5] ? "Application submitted" : (hasAppliedForProperty
-          ? "Under review by property owner"
-          : "Submit purchase application"),
-        icon: completedSteps[5] ? CheckCircle : (hasAppliedForProperty ? Clock : FileText),
+        title: completedSteps[5]
+          ? "Application Submitted"
+          : hasAppliedForProperty
+            ? "Application Pending"
+            : "Make Offer",
+        description: completedSteps[5]
+          ? "Application submitted"
+          : hasAppliedForProperty
+            ? "Under review by property owner"
+            : "Submit purchase application",
+        icon: completedSteps[5]
+          ? CheckCircle
+          : hasAppliedForProperty
+            ? Clock
+            : FileText,
         action: () => {
-          if (savedProperties.length > 0 && !hasAppliedForProperty && !completedSteps[5]) {
+          if (
+            savedProperties.length > 0 &&
+            !hasAppliedForProperty &&
+            !completedSteps[5]
+          ) {
             setSelectedProperty(savedProperties[0]);
             setShowApplicationModal(true);
           } else if (completedSteps[5]) {
-            toast("Your application has already been submitted and is under review.");
+            toast(
+              "Your application has already been submitted and is under review.",
+            );
           }
         },
         completed: completedSteps[5] || hasAppliedForProperty,
-        color: completedSteps[5] ? "from-green-500 to-green-600" : "from-amber-800 to-amber-500",
-        iconColor: completedSteps[5] ? "text-green-500" : (hasAppliedForProperty ? "text-amber-400" : "text-amber-500")
+        color: completedSteps[5]
+          ? "from-green-500 to-green-600"
+          : "from-amber-800 to-amber-500",
+        iconColor: completedSteps[5]
+          ? "text-green-500"
+          : hasAppliedForProperty
+            ? "text-amber-400"
+            : "text-amber-500",
       },
       {
         number: 6,
@@ -570,9 +942,11 @@ const BuyerRenter = () => {
           setShowPaymentModal(true);
         },
         completed: completedSteps[6],
-        color: completedSteps[6] ? "from-green-500 to-green-600" : "from-amber-800 to-amber-500",
-        iconColor: completedSteps[6] ? "text-green-500" : "text-amber-500"
-      }
+        color: completedSteps[6]
+          ? "from-green-500 to-green-600"
+          : "from-amber-800 to-amber-500",
+        iconColor: completedSteps[6] ? "text-green-500" : "text-amber-500",
+      },
     ];
 
     const renterSpecificSteps = [
@@ -584,27 +958,51 @@ const BuyerRenter = () => {
         action: handleRenterStep4Action,
         // Step 4 is only complete when viewing is actually scheduled
         completed: completedSteps[4],
-        color: completedSteps[4] ? "from-green-500 to-green-600" : "from-amber-800 to-amber-500",
-        iconColor: completedSteps[4] ? "text-green-500" : "text-amber-500"
+        color: completedSteps[4]
+          ? "from-green-500 to-green-600"
+          : "from-amber-800 to-amber-500",
+        iconColor: completedSteps[4] ? "text-green-500" : "text-amber-500",
       },
       {
         number: 5,
-        title: completedSteps[5] ? "Application Submitted" : (hasAppliedForProperty ? "Application Pending" : "Apply Now"),
-        description: completedSteps[5] ? "Application submitted" : (hasAppliedForProperty
-          ? "Under review by landlord"
-          : "Submit rental application"),
-        icon: completedSteps[5] ? CheckCircle : (hasAppliedForProperty ? Clock : FileText),
+        title: completedSteps[5]
+          ? "Application Submitted"
+          : hasAppliedForProperty
+            ? "Application Pending"
+            : "Apply Now",
+        description: completedSteps[5]
+          ? "Application submitted"
+          : hasAppliedForProperty
+            ? "Under review by landlord"
+            : "Submit rental application",
+        icon: completedSteps[5]
+          ? CheckCircle
+          : hasAppliedForProperty
+            ? Clock
+            : FileText,
         action: () => {
-          if (savedProperties.length > 0 && !hasAppliedForProperty && !completedSteps[5]) {
+          if (
+            savedProperties.length > 0 &&
+            !hasAppliedForProperty &&
+            !completedSteps[5]
+          ) {
             setSelectedProperty(savedProperties[0]);
             setShowApplicationModal(true);
           } else if (completedSteps[5]) {
-            toast("Your rental application has already been submitted and is under review.");
+            toast(
+              "Your rental application has already been submitted and is under review.",
+            );
           }
         },
         completed: completedSteps[5] || hasAppliedForProperty,
-        color: completedSteps[5] ? "from-green-500 to-green-600" : "from-amber-800 to-amber-500",
-        iconColor: completedSteps[5] ? "text-green-500" : (hasAppliedForProperty ? "text-amber-400" : "text-amber-500")
+        color: completedSteps[5]
+          ? "from-green-500 to-green-600"
+          : "from-amber-800 to-amber-500",
+        iconColor: completedSteps[5]
+          ? "text-green-500"
+          : hasAppliedForProperty
+            ? "text-amber-400"
+            : "text-amber-500",
       },
       {
         number: 6,
@@ -615,12 +1013,14 @@ const BuyerRenter = () => {
           setShowPaymentModal(true);
         },
         completed: completedSteps[6],
-        color: completedSteps[6] ? "from-green-500 to-green-600" : "from-amber-800 to-amber-500",
-        iconColor: completedSteps[6] ? "text-green-500" : "text-amber-500"
-      }
+        color: completedSteps[6]
+          ? "from-green-500 to-green-600"
+          : "from-amber-800 to-amber-500",
+        iconColor: completedSteps[6] ? "text-green-500" : "text-amber-500",
+      },
     ];
 
-    if (userType === 'buyer') {
+    if (userType === "buyer") {
       return [...sharedSteps, ...buyerSpecificSteps];
     } else {
       return [...sharedSteps, ...renterSpecificSteps];
@@ -637,7 +1037,7 @@ const BuyerRenter = () => {
     completedSteps,
     navigate,
     hasSubmittedDocuments,
-    userDocuments
+    userDocuments,
   ]);
 
   const currentSteps = getStepConfig();
@@ -645,50 +1045,76 @@ const BuyerRenter = () => {
   // ========== EFFECTS ==========
 
   useEffect(() => {
-    if (verificationStatus?.status === 'verified' || completedSteps[2]) {
+    if (verificationStatus?.status === "verified" || completedSteps[2]) {
       setCanChangeUserType(false);
     }
   }, [verificationStatus?.status, completedSteps[2]]);
 
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
-    const resubmit = urlParams.get('resubmit');
-    const docType = urlParams.get('documentType');
+    const resubmit = urlParams.get("resubmit");
+    const docType = urlParams.get("documentType");
 
-    if (resubmit === 'true' && docType) {
+    if (resubmit === "true" && docType) {
       setResubmissionDocument(docType);
       setActiveStep(2);
       setShowDocumentUpload(true);
 
       toast(`Please resubmit your ${docType}`, {
         duration: 5000,
-        icon: '📄'
+        icon: "📄",
       });
     }
   }, []);
 
   useEffect(() => {
-    let intervalId;
+  let intervalId;
+  let retryCount = 0;
+  const MAX_RETRIES = 3;
+  const BASE_DELAY = 30000; // 30 seconds
 
-    if (user && isVerificationInProgress) {
-      checkVerificationStatus();
-
-      intervalId = setInterval(() => {
-        checkVerificationStatus();
-      }, 30000);
-
-      const handleFocus = () => {
-        checkVerificationStatus();
-      };
-
-      window.addEventListener('focus', handleFocus);
-
-      return () => {
+  const pollWithBackoff = async () => {
+    try {
+      await checkVerificationStatus();
+      retryCount = 0; // Reset on success
+    } catch (error) {
+      console.error('Polling error:', error);
+      retryCount++;
+      
+      // If too many errors, clear interval
+      if (retryCount >= MAX_RETRIES) {
+        console.log('Too many polling errors, stopping...');
         if (intervalId) clearInterval(intervalId);
-        window.removeEventListener('focus', handleFocus);
-      };
+        return;
+      }
     }
-  }, [user, isVerificationInProgress, checkVerificationStatus]);
+  };
+
+  if (user && isVerificationInProgress) {
+    // Initial check
+    checkVerificationStatus();
+    
+    // Set up polling with longer interval
+    intervalId = setInterval(pollWithBackoff, BASE_DELAY);
+    
+    // Only check on focus if it's been more than 10 seconds
+    let lastFocusCheck = 0;
+    const handleFocus = () => {
+      const now = Date.now();
+      if (now - lastFocusCheck > 10000) { // Max once every 10 seconds
+        lastFocusCheck = now;
+        checkVerificationStatus();
+      }
+    };
+    
+    window.addEventListener("focus", handleFocus);
+    
+    return () => {
+      if (intervalId) clearInterval(intervalId);
+      window.removeEventListener("focus", handleFocus);
+    };
+  }
+}, [user, isVerificationInProgress, checkVerificationStatus]);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -702,187 +1128,231 @@ const BuyerRenter = () => {
       if (progressSectionRef.current) {
         const section = progressSectionRef.current;
         const rect = section.getBoundingClientRect();
-        const viewHeight = Math.max(document.documentElement.clientHeight, window.innerHeight);
+        const viewHeight = Math.max(
+          document.documentElement.clientHeight,
+          window.innerHeight,
+        );
 
         if (rect.top <= viewHeight && rect.bottom >= 0) {
-          const progress = 1 - (rect.bottom / (viewHeight + rect.height));
+          const progress = 1 - rect.bottom / (viewHeight + rect.height);
           setScrolledProgress(progress);
         }
       }
     };
 
-    window.addEventListener('scroll', handleScroll);
-    return () => window.removeEventListener('scroll', handleScroll);
+    window.addEventListener("scroll", handleScroll);
+    return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
-  const transformProperty = useCallback((property, index) => {
-    let images = [];
+  const transformProperty = useCallback(
+    (property, index) => {
+      let images = [];
 
-    if (property.property_image_url) {
-      images = [property.property_image_url];
-    } else if (property.images && Array.isArray(property.images)) {
-      images = property.images.map(img =>
-        typeof img === 'object' ? img.image_url || img.url || img : img
-      );
-    } else if (property.image_url) {
-      images = [property.image_url];
-    } else if (property.photos && Array.isArray(property.photos)) {
-      images = property.photos;
-    }
-
-    const processedImages = images.map(img => {
-      if (!img || img.trim() === '') return null;
-      if (img.startsWith('http')) return img;
-      if (img.startsWith('/uploads/') || img.startsWith('/property-images/')) {
-        return `http://localhost:5002${img}`;
+      if (property.property_image_url) {
+        images = [property.property_image_url];
+      } else if (property.images && Array.isArray(property.images)) {
+        images = property.images.map((img) =>
+          typeof img === "object" ? img.image_url || img.url || img : img,
+        );
+      } else if (property.image_url) {
+        images = [property.image_url];
+      } else if (property.photos && Array.isArray(property.photos)) {
+        images = property.photos;
       }
-      return `http://localhost:5002/uploads/property-images/${img}`;
-    }).filter(Boolean);
 
-    if (processedImages.length === 0) {
-      processedImages.push('https://images.unsplash.com/photo-1568605114967-8130f3a36994?auto=format&fit=crop&w=800&q=80');
-    }
+      const processedImages = images
+        .map((img) => {
+          if (!img || img.trim() === "") return null;
+          if (img.startsWith("http")) return img;
+          if (
+            img.startsWith("/uploads/") ||
+            img.startsWith("/property-images/")
+          ) {
+            return `http://localhost:5002${img}`;
+          }
+          return `http://localhost:5002/uploads/property-images/${img}`;
+        })
+        .filter(Boolean);
 
-    const listing_type = property.listing_type || property.property_status || 'sale';
-    const property_type = property.property_type || 'house';
-    const city = property.city || 'Addis Ababa';
+      if (processedImages.length === 0) {
+        processedImages.push(
+          "https://images.unsplash.com/photo-1568605114967-8130f3a36994?auto=format&fit=crop&w=800&q=80",
+        );
+      }
 
-    const brokerId = property.broker_id ||
-      property.assigned_broker_id ||
-      property.broker?.id ||
-      property.broker?._id;
+      const listing_type =
+        property.listing_type || property.property_status || "sale";
+      const property_type = property.property_type || "house";
+      const city = property.city || "Addis Ababa";
 
-    let brokerData = null;
+      const brokerId =
+        property.broker_id ||
+        property.assigned_broker_id ||
+        property.broker?.id ||
+        property.broker?._id;
 
-    if (property.broker && typeof property.broker === 'object') {
-      brokerData = {
-        id: brokerId || `broker-${index}`,
-        name: property.broker.name ||
-          `${property.broker.first_name || ''} ${property.broker.last_name || ''}`.trim() ||
-          property.broker.username ||
-          "Property Agent",
-        email: property.broker.email,
-        phone_number: property.broker.phone_number,
-        profile_picture: property.broker.profile_picture,
-        brokerage_firm: property.broker.brokerage_firm || property.broker.company || "Independent Broker",
-        experience_years: property.broker.years_experience || property.broker.experience_years || "5+",
-        commission_rate: property.broker.commission_rate || "2.5%",
-        total_completed_deals: property.broker.completed_deals || property.broker.total_completed_deals || 50,
-        average_rating: property.broker.rating || property.broker.average_rating || 4.8,
-        is_verified: property.broker.is_verified || false,
-        is_available: property.broker.is_available !== false
-      };
-    } else if (brokerId) {
-      const foundBroker = brokers.find(b =>
-        b.id === brokerId ||
-        b._id === brokerId ||
-        b.user_id === brokerId
-      );
+      let brokerData = null;
 
-      if (foundBroker) {
+      if (property.broker && typeof property.broker === "object") {
         brokerData = {
-          id: foundBroker.id || foundBroker._id,
-          name: foundBroker.name ||
-            `${foundBroker.first_name || ''} ${foundBroker.last_name || ''}`.trim() ||
-            foundBroker.username ||
+          id: brokerId || `broker-${index}`,
+          name:
+            property.broker.name ||
+            `${property.broker.first_name || ""} ${property.broker.last_name || ""}`.trim() ||
+            property.broker.username ||
             "Property Agent",
-          email: foundBroker.email,
-          phone_number: foundBroker.phone_number,
-          profile_picture: foundBroker.profile_picture,
-          brokerage_firm: foundBroker.brokerage_firm || foundBroker.company || "Independent Broker",
-          experience_years: foundBroker.years_experience || foundBroker.experience_years || "5+",
-          commission_rate: foundBroker.commission_rate || "2.5%",
-          total_completed_deals: foundBroker.completed_deals || foundBroker.total_completed_deals || 50,
-          average_rating: foundBroker.rating || foundBroker.average_rating || 4.8,
-          is_verified: foundBroker.is_verified || false,
-          is_available: foundBroker.is_available !== false
+          email: property.broker.email,
+          phone_number: property.broker.phone_number,
+          profile_picture: property.broker.profile_picture,
+          brokerage_firm:
+            property.broker.brokerage_firm ||
+            property.broker.company ||
+            "Independent Broker",
+          experience_years:
+            property.broker.years_experience ||
+            property.broker.experience_years ||
+            "5+",
+          commission_rate: property.broker.commission_rate || "2.5%",
+          total_completed_deals:
+            property.broker.completed_deals ||
+            property.broker.total_completed_deals ||
+            50,
+          average_rating:
+            property.broker.rating || property.broker.average_rating || 4.8,
+          is_verified: property.broker.is_verified || false,
+          is_available: property.broker.is_available !== false,
+        };
+      } else if (brokerId) {
+        const foundBroker = brokers.find(
+          (b) =>
+            b.id === brokerId || b._id === brokerId || b.user_id === brokerId,
+        );
+
+        if (foundBroker) {
+          brokerData = {
+            id: foundBroker.id || foundBroker._id,
+            name:
+              foundBroker.name ||
+              `${foundBroker.first_name || ""} ${foundBroker.last_name || ""}`.trim() ||
+              foundBroker.username ||
+              "Property Agent",
+            email: foundBroker.email,
+            phone_number: foundBroker.phone_number,
+            profile_picture: foundBroker.profile_picture,
+            brokerage_firm:
+              foundBroker.brokerage_firm ||
+              foundBroker.company ||
+              "Independent Broker",
+            experience_years:
+              foundBroker.years_experience ||
+              foundBroker.experience_years ||
+              "5+",
+            commission_rate: foundBroker.commission_rate || "2.5%",
+            total_completed_deals:
+              foundBroker.completed_deals ||
+              foundBroker.total_completed_deals ||
+              50,
+            average_rating:
+              foundBroker.rating || foundBroker.average_rating || 4.8,
+            is_verified: foundBroker.is_verified || false,
+            is_available: foundBroker.is_available !== false,
+          };
+        }
+      }
+
+      if (!brokerData) {
+        brokerData = {
+          id: `default-broker-${index}`,
+          name: "Property Agent",
+          email: "agent@wubland.com",
+          phone_number: "(xxx) xxx-xxxx",
+          profile_picture: null,
+          brokerage_firm: "WubLand Real Estate",
+          experience_years: "5+",
+          commission_rate: "2.5%",
+          total_completed_deals: 50,
+          average_rating: 4.8,
+          is_verified: false,
+          is_available: true,
         };
       }
-    }
 
-    if (!brokerData) {
-      brokerData = {
-        id: `default-broker-${index}`,
-        name: "Property Agent",
-        email: "agent@wubland.com",
-        phone_number: "(xxx) xxx-xxxx",
-        profile_picture: null,
-        brokerage_firm: "WubLand Real Estate",
-        experience_years: "5+",
-        commission_rate: "2.5%",
-        total_completed_deals: 50,
-        average_rating: 4.8,
-        is_verified: false,
-        is_available: true
+      return {
+        id: property.id || property._id || `property-${index}`,
+        title:
+          property.title ||
+          property.property_title ||
+          `${property_type} in ${city}`,
+        description: property.description || `${property_type} in ${city}`,
+        property_type: property_type,
+        listing_type: listing_type === "rent" ? "rent" : "sale",
+        price: property.price || 0,
+        location: property.address || property.full_address || city,
+        city: city,
+        region: property.region || "",
+        beds: property.beds || property.bedrooms || 0,
+        baths: property.baths || property.bathrooms || 0,
+        sqft: parseFloat(property.sqft) || parseFloat(property.area) || 0,
+        images: processedImages,
+        is_featured: property.is_featured || false,
+        main_image: processedImages[0] || "",
+        features: property.features || [],
+        amenities: property.amenities || [],
+        garage: property.garage || 0,
+        created_at: property.created_at || new Date().toISOString(),
+        views: property.views || 0,
+        saves: property.saves || 0,
+        broker: brokerData,
+        broker_id: brokerId || brokerData.id,
+        assigned_broker_id: brokerId,
+        currency: property.currency || "ETB",
+        property_status: property.property_status,
+        is_negotiable: property.is_negotiable,
+        is_exclusive: property.is_exclusive,
+        is_premium: property.is_premium,
+        year_built: property.year_built,
+        lot_size: property.lot_size,
+        isSaved: false,
       };
-    }
-
-    return {
-      id: property.id || property._id || `property-${index}`,
-      title: property.title || property.property_title || `${property_type} in ${city}`,
-      description: property.description || `${property_type} in ${city}`,
-      property_type: property_type,
-      listing_type: listing_type === 'rent' ? 'rent' : 'sale',
-      price: property.price || 0,
-      location: property.address || property.full_address || city,
-      city: city,
-      region: property.region || '',
-      beds: property.beds || property.bedrooms || 0,
-      baths: property.baths || property.bathrooms || 0,
-      sqft: parseFloat(property.sqft) || parseFloat(property.area) || 0,
-      images: processedImages,
-      is_featured: property.is_featured || false,
-      main_image: processedImages[0] || '',
-      features: property.features || [],
-      amenities: property.amenities || [],
-      garage: property.garage || 0,
-      created_at: property.created_at || new Date().toISOString(),
-      views: property.views || 0,
-      saves: property.saves || 0,
-      broker: brokerData,
-      broker_id: brokerId || brokerData.id,
-      assigned_broker_id: brokerId,
-      currency: property.currency || 'ETB',
-      property_status: property.property_status,
-      is_negotiable: property.is_negotiable,
-      is_exclusive: property.is_exclusive,
-      is_premium: property.is_premium,
-      year_built: property.year_built,
-      lot_size: property.lot_size,
-      isSaved: false
-    };
-  }, [brokers]);
+    },
+    [brokers],
+  );
 
   const fetchSavedProperties = useCallback(async () => {
     if (!user) {
-      console.log('⚠️ No user, skipping saved properties fetch');
+      console.log("⚠️ No user, skipping saved properties fetch");
       return;
     }
 
     try {
-      console.log('📚 Fetching saved properties for user:', user.id);
-      const response = await apiCall('GET_SAVED_PROPERTIES');
+      console.log("📚 Fetching saved properties for user:", user.id);
+      const response = await apiCall("GET_SAVED_PROPERTIES");
 
       if (response && response.success && response.data) {
         console.log(`✅ Found ${response.data.length || 0} saved properties`);
 
-        const savedProps = response.data.map(property => ({
+        const savedProps = response.data.map((property) => ({
           ...transformProperty(property),
-          isSaved: true
+          isSaved: true,
         }));
 
-        const savedIds = savedProps.map(property => property.id);
+        const savedIds = savedProps.map((property) => property.id);
         setSavedProperties(savedProps);
 
-        localStorage.setItem(`saved_properties_${user.id}`, JSON.stringify(savedProps));
+        localStorage.setItem(
+          `saved_properties_${user.id}`,
+          JSON.stringify(savedProps),
+        );
 
         // Update step 3 based on actual saved properties
         const hasSavedProperties = savedProps.length > 0;
         if (hasSavedProperties !== completedSteps[3]) {
-          console.log(`🔄 Updating step 3: ${hasSavedProperties ? 'Complete' : 'Incomplete'}`);
-          setCompletedSteps(prev => {
+          console.log(
+            `🔄 Updating step 3: ${hasSavedProperties ? "Complete" : "Incomplete"}`,
+          );
+          setCompletedSteps((prev) => {
             const updated = { ...prev, 3: hasSavedProperties };
-            localStorage.setItem('completed_steps', JSON.stringify(updated));
+            localStorage.setItem("completed_steps", JSON.stringify(updated));
             if (hasSavedProperties && !prev[3]) {
               toast.success("Step 3 completed! You've saved properties.");
             }
@@ -891,42 +1361,46 @@ const BuyerRenter = () => {
         }
 
         // Update properties with saved status
-        setProperties(prev => prev.map(property => ({
-          ...property,
-          isSaved: savedIds.includes(property.id)
-        })));
+        setProperties((prev) =>
+          prev.map((property) => ({
+            ...property,
+            isSaved: savedIds.includes(property.id),
+          })),
+        );
 
-        setRecommendedProperties(prev => prev.map(property => ({
-          ...property,
-          isSaved: savedIds.includes(property.id)
-        })));
+        setRecommendedProperties((prev) =>
+          prev.map((property) => ({
+            ...property,
+            isSaved: savedIds.includes(property.id),
+          })),
+        );
 
         return savedProps;
       } else {
-        console.log('📭 No saved properties found for user');
+        console.log("📭 No saved properties found for user");
         // If no saved properties, ensure step 3 is false
         if (completedSteps[3]) {
-          setCompletedSteps(prev => {
+          setCompletedSteps((prev) => {
             const updated = { ...prev, 3: false };
-            localStorage.setItem('completed_steps', JSON.stringify(updated));
+            localStorage.setItem("completed_steps", JSON.stringify(updated));
             return updated;
           });
         }
       }
     } catch (error) {
-      console.log('❌ Could not fetch saved properties:', error.message);
+      console.log("❌ Could not fetch saved properties:", error.message);
       // Don't mark step as complete if there's an error
       if (completedSteps[3]) {
-        setCompletedSteps(prev => ({ ...prev, 3: false }));
+        setCompletedSteps((prev) => ({ ...prev, 3: false }));
       }
     }
   }, [user, transformProperty, completedSteps]);
 
   const fetchBrokers = useCallback(async () => {
     try {
-      console.log('Fetching brokers...');
-      const response = await apiCall('GET_BROKERS');
-      console.log('Brokers API response:', response);
+      console.log("Fetching brokers...");
+      const response = await apiCall("GET_BROKERS");
+      console.log("Brokers API response:", response);
 
       let brokersData = [];
 
@@ -934,26 +1408,30 @@ const BuyerRenter = () => {
         brokersData = response;
       } else if (response && response.data && Array.isArray(response.data)) {
         brokersData = response.data;
-      } else if (response && response.success && Array.isArray(response.brokers)) {
+      } else if (
+        response &&
+        response.success &&
+        Array.isArray(response.brokers)
+      ) {
         brokersData = response.brokers;
       }
 
-      console.log('Processed brokers:', brokersData);
+      console.log("Processed brokers:", brokersData);
       setBrokers(brokersData);
 
-      localStorage.setItem('cached_brokers', JSON.stringify(brokersData));
+      localStorage.setItem("cached_brokers", JSON.stringify(brokersData));
 
       return brokersData;
     } catch (error) {
-      console.error('Could not fetch brokers:', error);
-      const cachedBrokers = localStorage.getItem('cached_brokers');
+      console.error("Could not fetch brokers:", error);
+      const cachedBrokers = localStorage.getItem("cached_brokers");
       if (cachedBrokers) {
         try {
           const parsed = JSON.parse(cachedBrokers);
           setBrokers(parsed);
           return parsed;
         } catch (e) {
-          console.error('Error parsing cached brokers:', e);
+          console.error("Error parsing cached brokers:", e);
         }
       }
       return [];
@@ -967,27 +1445,30 @@ const BuyerRenter = () => {
       const updatedProperties = await Promise.all(
         properties.map(async (property) => {
           try {
-            const response = await apiCall('CHECK_SAVED_STATUS', {
-              propertyId: property.id.toString()
+            const response = await apiCall("CHECK_SAVED_STATUS", {
+              propertyId: property.id.toString(),
             });
 
             if (response && response.success) {
               return {
                 ...property,
-                isSaved: response.data?.isSaved || false
+                isSaved: response.data?.isSaved || false,
               };
             }
             return property;
           } catch (error) {
-            console.error(`Error checking saved status for property ${property.id}:`, error);
+            console.error(
+              `Error checking saved status for property ${property.id}:`,
+              error,
+            );
             return property;
           }
-        })
+        }),
       );
 
       setProperties(updatedProperties);
     } catch (error) {
-      console.error('Error checking saved status:', error);
+      console.error("Error checking saved status:", error);
     }
   }, [user, properties]);
 
@@ -998,18 +1479,18 @@ const BuyerRenter = () => {
       setIsLoading(true);
 
       if (brokers.length === 0) {
-        console.log('📞 Fetching brokers before loading properties...');
+        console.log("📞 Fetching brokers before loading properties...");
         await fetchBrokers();
       }
 
       let propertiesResponse;
       try {
-        console.log('🏠 Fetching properties...');
-        propertiesResponse = await apiCall('GET_PROPERTIES');
+        console.log("🏠 Fetching properties...");
+        propertiesResponse = await apiCall("GET_PROPERTIES");
       } catch (error) {
-        if (error.message.includes('429')) {
+        if (error.message.includes("429")) {
           toast.error("Too many requests. Please wait a moment.");
-          const cachedProps = localStorage.getItem('cached_properties');
+          const cachedProps = localStorage.getItem("cached_properties");
           if (cachedProps) {
             propertiesResponse = JSON.parse(cachedProps);
           } else {
@@ -1021,70 +1502,107 @@ const BuyerRenter = () => {
       }
 
       if (propertiesResponse) {
-        console.log('✅ Properties API response received');
-        localStorage.setItem('cached_properties', JSON.stringify(propertiesResponse));
+        console.log("✅ Properties API response received");
+        localStorage.setItem(
+          "cached_properties",
+          JSON.stringify(propertiesResponse),
+        );
       }
 
       let propertiesData = [];
 
       if (propertiesResponse) {
-        if (propertiesResponse.success && propertiesResponse.data && Array.isArray(propertiesResponse.data.properties)) {
+        if (
+          propertiesResponse.success &&
+          propertiesResponse.data &&
+          Array.isArray(propertiesResponse.data.properties)
+        ) {
           propertiesData = propertiesResponse.data.properties;
-        } else if (propertiesResponse.success && Array.isArray(propertiesResponse.data)) {
+        } else if (
+          propertiesResponse.success &&
+          Array.isArray(propertiesResponse.data)
+        ) {
           propertiesData = propertiesResponse.data;
         } else if (Array.isArray(propertiesResponse)) {
           propertiesData = propertiesResponse;
-        } else if (propertiesResponse.data && Array.isArray(propertiesResponse.data)) {
+        } else if (
+          propertiesResponse.data &&
+          Array.isArray(propertiesResponse.data)
+        ) {
           propertiesData = propertiesResponse.data;
         }
       }
+
       await checkSavedStatusForProperties();
-      console.log(`📊 Processing ${propertiesData.length} properties with ${brokers.length} available brokers`);
+      console.log(
+        `📊 Processing ${propertiesData.length} properties with ${brokers.length} available brokers`,
+      );
 
-      const transformedProperties = propertiesData.map((property, index) => {
-        try {
-          return transformProperty(property, index);
-        } catch (error) {
-          console.error(`Error transforming property ${property.id || index}:`, error);
-          return null;
-        }
-      }).filter(Boolean);
+      const transformedProperties = propertiesData
+        .map((property, index) => {
+          try {
+            return transformProperty(property, index);
+          } catch (error) {
+            console.error(
+              `Error transforming property ${property.id || index}:`,
+              error,
+            );
+            return null;
+          }
+        })
+        .filter(Boolean);
 
-      console.log('✅ Transformed properties:', transformedProperties.map(p => ({
-        id: p.id,
-        title: p.title,
-        hasBroker: !!p.broker,
-        brokerName: p.broker?.name
-      })));
+      console.log(
+        "✅ Transformed properties:",
+        transformedProperties.map((p) => ({
+          id: p.id,
+          title: p.title,
+          hasBroker: !!p.broker,
+          brokerName: p.broker?.name,
+        })),
+      );
 
       let filteredProperties = transformedProperties;
 
-      if (user.role === 'buyer' || userType === 'buyer') {
-        filteredProperties = transformedProperties.filter(p =>
-          p.listing_type === 'sale' || p.listing_type === 'For Sale'
+      if (user.role === "buyer" || userType === "buyer") {
+        filteredProperties = transformedProperties.filter(
+          (p) => p.listing_type === "sale" || p.listing_type === "For Sale",
         );
-      } else if (user.role === 'renter' || userType === 'renter') {
-        filteredProperties = transformedProperties.filter(p =>
-          p.listing_type === 'rent' || p.listing_type === 'For Rent'
+      } else if (user.role === "renter" || userType === "renter") {
+        filteredProperties = transformedProperties.filter(
+          (p) => p.listing_type === "rent" || p.listing_type === "For Rent",
         );
       }
 
-      const userPreferences = JSON.parse(localStorage.getItem(`user_preferences_${user.id}`)) || user.preferences || {};
-      const hasPreferences = Object.keys(userPreferences).length > 0;
+      const userPreferences =
+        JSON.parse(localStorage.getItem(`user_preferences_${user.id}`)) ||
+        user.preferences ||
+        {};
+
+      // Set the hasPreferences state
+      const preferencesExist = Object.keys(userPreferences).length > 0;
+      setHasPreferences(preferencesExist);
+
       let recommendedProperties = [];
       let otherProperties = [];
 
-      if (hasPreferences) {
-        recommendedProperties = filteredProperties.filter(p => {
+      if (preferencesExist) {
+        recommendedProperties = filteredProperties.filter((p) => {
           let matches = true;
 
-          if (userPreferences.property_type && p.property_type !== userPreferences.property_type) {
+          if (
+            userPreferences.property_type &&
+            p.property_type !== userPreferences.property_type
+          ) {
             matches = false;
           }
           if (userPreferences.city && p.city !== userPreferences.city) {
             matches = false;
           }
-          if (userPreferences.max_price && p.price > userPreferences.max_price) {
+          if (
+            userPreferences.max_price &&
+            p.price > userPreferences.max_price
+          ) {
             matches = false;
           }
           if (userPreferences.min_beds && p.beds < userPreferences.min_beds) {
@@ -1095,13 +1613,14 @@ const BuyerRenter = () => {
         });
 
         if (recommendedProperties.length === 0) {
-          recommendedProperties = filteredProperties.filter(p => {
+          recommendedProperties = filteredProperties.filter((p) => {
             let matchCount = 0;
             let totalCriteria = 0;
 
             if (userPreferences.property_type) {
               totalCriteria++;
-              if (p.property_type === userPreferences.property_type) matchCount++;
+              if (p.property_type === userPreferences.property_type)
+                matchCount++;
             }
             if (userPreferences.city) {
               totalCriteria++;
@@ -1116,7 +1635,8 @@ const BuyerRenter = () => {
               if (p.beds >= userPreferences.min_beds) matchCount++;
             }
 
-            const matches = totalCriteria > 0 && matchCount >= Math.ceil(totalCriteria / 2);
+            const matches =
+              totalCriteria > 0 && matchCount >= Math.ceil(totalCriteria / 2);
             return matches;
           });
         }
@@ -1125,25 +1645,26 @@ const BuyerRenter = () => {
           recommendedProperties = filteredProperties.slice(0, 4);
         }
 
-        otherProperties = filteredProperties.filter(p =>
-          !recommendedProperties.some(rp => rp.id === p.id)
-        ).slice(0, 6);
-
+        otherProperties = filteredProperties
+          .filter((p) => !recommendedProperties.some((rp) => rp.id === p.id))
+          .slice(0, 6);
       } else {
         recommendedProperties = filteredProperties.slice(0, 3);
         otherProperties = filteredProperties.slice(3, 9);
       }
 
-      console.log('🔍 Broker information in properties:');
+      console.log("🔍 Broker information in properties:");
       recommendedProperties.forEach((p, i) => {
         console.log(`Recommended ${i + 1}:`, {
           id: p.id,
           title: p.title,
-          broker: p.broker ? {
-            id: p.broker.id,
-            name: p.broker.name,
-            firm: p.broker.brokerage_firm
-          } : 'No broker'
+          broker: p.broker
+            ? {
+                id: p.broker.id,
+                name: p.broker.name,
+                firm: p.broker.brokerage_firm,
+              }
+            : "No broker",
         });
       });
 
@@ -1152,17 +1673,23 @@ const BuyerRenter = () => {
 
       await fetchSavedProperties();
 
-      console.log('🎉 Properties loaded successfully!');
-
+      console.log("🎉 Properties loaded successfully!");
     } catch (error) {
-      console.error('Error loading properties:', error);
+      console.error("Error loading properties:", error);
       toast.error("Failed to load properties");
       setProperties([]);
       setRecommendedProperties([]);
     } finally {
       setIsLoading(false);
     }
-  }, [user, userType, transformProperty, brokers.length, fetchBrokers, fetchSavedProperties]);
+  }, [
+    user,
+    userType,
+    transformProperty,
+    brokers.length,
+    fetchBrokers,
+    fetchSavedProperties,
+  ]);
 
   useEffect(() => {
     const step4Handler = async () => {
@@ -1174,13 +1701,19 @@ const BuyerRenter = () => {
 
           await fetchSavedProperties();
         } catch (error) {
-          console.error('Error loading Step 4 data:', error);
+          console.error("Error loading Step 4 data:", error);
         }
       }
     };
 
     step4Handler();
-  }, [activeStep, user, loadActualProperties, fetchSavedProperties, properties.length]);
+  }, [
+    activeStep,
+    user,
+    loadActualProperties,
+    fetchSavedProperties,
+    properties.length,
+  ]);
 
   useEffect(() => {
     const initializeDashboard = async () => {
@@ -1188,22 +1721,22 @@ const BuyerRenter = () => {
 
       try {
         setIsLoading(true);
-        const token = localStorage.getItem('token');
-        const userData = JSON.parse(localStorage.getItem('user') || '{}');
+        const token = localStorage.getItem("token");
+        const userData = JSON.parse(localStorage.getItem("user") || "{}");
 
-        console.log('🚀 Initializing dashboard...', {
+        console.log("🚀 Initializing dashboard...", {
           hasToken: !!token,
           userId: userData?.id,
-          userName: userData?.first_name || userData?.username
+          userName: userData?.first_name || userData?.username,
         });
 
         if (!token || !userData.id) {
-          console.log('❌ No token or user data, redirecting to login');
+          console.log("❌ No token or user data, redirecting to login");
           navigate("/login-register", {
             state: {
               returnUrl: "/buyer-renter",
-              message: "Please login to access your dashboard"
-            }
+              message: "Please login to access your dashboard",
+            },
           });
           return;
         }
@@ -1211,7 +1744,7 @@ const BuyerRenter = () => {
         setUser(userData);
 
         // Set user type based on role
-        if (userData.role === 'buyer' || userData.role === 'renter') {
+        if (userData.role === "buyer" || userData.role === "renter") {
           setUserType(userData.role);
           console.log(`👤 User type set to: ${userData.role}`);
         }
@@ -1223,90 +1756,120 @@ const BuyerRenter = () => {
           3: false,
           4: false,
           5: false,
-          6: false
+          6: false,
         };
 
         // Load saved steps from localStorage
-        const savedCompletedSteps = localStorage.getItem('completed_steps');
+        const savedCompletedSteps = localStorage.getItem("completed_steps");
         if (savedCompletedSteps) {
           try {
             const parsedSteps = JSON.parse(savedCompletedSteps);
 
             // Force reset steps for new users or if steps are corrupted
-            const isNewUser = !parsedSteps || Object.keys(parsedSteps).length === 0;
+            const isNewUser =
+              !parsedSteps || Object.keys(parsedSteps).length === 0;
 
             if (isNewUser) {
-              console.log('👤 New user detected - initializing fresh steps');
-              localStorage.removeItem('completed_steps');
+              console.log("👤 New user detected - initializing fresh steps");
+              localStorage.removeItem("completed_steps");
               setCompletedSteps(initialSteps);
             } else {
               // Validate each step
               const validatedSteps = { ...initialSteps, ...parsedSteps };
 
               // Force step 4 to false if no saved properties exist
-              const cachedSavedProps = localStorage.getItem(`saved_properties_${userData.id}`);
-              if (!cachedSavedProps || JSON.parse(cachedSavedProps).length === 0) {
-                console.log('🔄 No saved properties - resetting step 4 to false');
+              const cachedSavedProps = localStorage.getItem(
+                `saved_properties_${userData.id}`,
+              );
+              if (
+                !cachedSavedProps ||
+                JSON.parse(cachedSavedProps).length === 0
+              ) {
+                console.log(
+                  "🔄 No saved properties - resetting step 4 to false",
+                );
                 validatedSteps[4] = false;
               }
 
               setCompletedSteps(validatedSteps);
-              console.log('📋 Loaded and validated saved steps:', validatedSteps);
+              console.log(
+                "📋 Loaded and validated saved steps:",
+                validatedSteps,
+              );
             }
           } catch (error) {
-            console.error('❌ Error loading completed steps:', error);
-            console.log('🔄 Starting with fresh steps due to error');
-            localStorage.removeItem('completed_steps');
+            console.error("❌ Error loading completed steps:", error);
+            console.log("🔄 Starting with fresh steps due to error");
+            localStorage.removeItem("completed_steps");
             setCompletedSteps(initialSteps);
           }
         } else {
           // First time user - all steps are incomplete
-          console.log('📋 No saved steps found - starting fresh');
+          console.log("📋 No saved steps found - starting fresh");
           setCompletedSteps(initialSteps);
         }
 
         // Load cached data
-        const cachedDocs = localStorage.getItem(`user_documents_${userData.id}`);
-        const cachedProperties = localStorage.getItem('cached_properties');
-        const cachedBrokers = localStorage.getItem('cached_brokers');
-        const cachedVerification = localStorage.getItem(`verification_status_${userData.id}`);
-        const cachedSavedProperties = localStorage.getItem(`saved_properties_${userData.id}`);
+        const cachedDocs = localStorage.getItem(
+          `user_documents_${userData.id}`,
+        );
+        const cachedProperties = localStorage.getItem("cached_properties");
+        const cachedBrokers = localStorage.getItem("cached_brokers");
+        const cachedVerification = localStorage.getItem(
+          `verification_status_${userData.id}`,
+        );
+        const cachedSavedProperties = localStorage.getItem(
+          `saved_properties_${userData.id}`,
+        );
 
         if (cachedDocs) {
           try {
             const docs = JSON.parse(cachedDocs);
             if (Array.isArray(docs)) {
               setUserDocuments(docs);
-              console.log('📄 Loaded cached documents:', docs.length);
+              console.log("📄 Loaded cached documents:", docs.length);
             }
           } catch (e) {
-            console.error('❌ Error parsing cached documents:', e);
+            console.error("❌ Error parsing cached documents:", e);
           }
         }
 
         if (cachedVerification) {
           try {
             const verificationData = JSON.parse(cachedVerification);
-            if (verificationData && typeof verificationData === 'object') {
+            if (verificationData && typeof verificationData === "object") {
               setVerificationStatus(verificationData);
               setHasSubmittedDocuments(verificationData.hasSubmitted || false);
-              setIsVerificationInProgress(verificationData.isInProgress || false);
+              setIsVerificationInProgress(
+                verificationData.isInProgress || false,
+              );
               setLastVerificationCheck(verificationData.lastChecked || null);
 
-              console.log('✅ Loaded cached verification status:', verificationData.status);
+              console.log(
+                "✅ Loaded cached verification status:",
+                verificationData.status,
+              );
 
               // Update step 2 based on cached verification
-              if (verificationData.status === 'verified' && !completedSteps[2]) {
-                setCompletedSteps(prev => {
+              if (
+                verificationData.status === "verified" &&
+                !completedSteps[2]
+              ) {
+                setCompletedSteps((prev) => {
                   const updated = { ...prev, 2: true };
-                  localStorage.setItem('completed_steps', JSON.stringify(updated));
-                  console.log('✅ Step 2 marked as complete (cached verification)');
+                  localStorage.setItem(
+                    "completed_steps",
+                    JSON.stringify(updated),
+                  );
+                  console.log(
+                    "✅ Step 2 marked as complete (cached verification)",
+                  );
                   return updated;
                 });
               }
             }
           } catch (e) {
-            console.error('❌ Error parsing cached verification:', e);
+            console.error("❌ Error parsing cached verification:", e);
           }
         }
 
@@ -1315,10 +1878,13 @@ const BuyerRenter = () => {
             const propertiesData = JSON.parse(cachedProperties);
             if (Array.isArray(propertiesData)) {
               setProperties(propertiesData);
-              console.log('🏠 Loaded cached properties:', propertiesData.length);
+              console.log(
+                "🏠 Loaded cached properties:",
+                propertiesData.length,
+              );
             }
           } catch (e) {
-            console.error('❌ Error parsing cached properties:', e);
+            console.error("❌ Error parsing cached properties:", e);
           }
         }
 
@@ -1327,10 +1893,10 @@ const BuyerRenter = () => {
             const brokersData = JSON.parse(cachedBrokers);
             if (Array.isArray(brokersData)) {
               setBrokers(brokersData);
-              console.log('🤝 Loaded cached brokers:', brokersData.length);
+              console.log("🤝 Loaded cached brokers:", brokersData.length);
             }
           } catch (e) {
-            console.error('❌ Error parsing cached brokers:', e);
+            console.error("❌ Error parsing cached brokers:", e);
           }
         }
 
@@ -1339,105 +1905,124 @@ const BuyerRenter = () => {
             const savedProps = JSON.parse(cachedSavedProperties);
             if (Array.isArray(savedProps) && savedProps.length > 0) {
               setSavedProperties(savedProps);
-              console.log('💾 Loaded cached saved properties:', savedProps.length);
+              console.log(
+                "💾 Loaded cached saved properties:",
+                savedProps.length,
+              );
 
               // Update step 3 based on saved properties
               if (!completedSteps[3]) {
-                setCompletedSteps(prev => {
+                setCompletedSteps((prev) => {
                   const updated = { ...prev, 3: true };
-                  localStorage.setItem('completed_steps', JSON.stringify(updated));
-                  console.log('✅ Step 3 marked as complete (cached saved properties)');
+                  localStorage.setItem(
+                    "completed_steps",
+                    JSON.stringify(updated),
+                  );
+                  console.log(
+                    "✅ Step 3 marked as complete (cached saved properties)",
+                  );
                   return updated;
                 });
               }
             } else {
-              console.log('📭 No cached saved properties found');
+              console.log("📭 No cached saved properties found");
             }
           } catch (error) {
-            console.error('❌ Error parsing saved properties cache:', error);
+            console.error("❌ Error parsing saved properties cache:", error);
           }
         }
 
         // Check profile completion for step 1
-        const isProfileComplete = userData.first_name &&
-          userData.last_name &&
-          userData.phone_number;
+        const isProfileComplete =
+          userData.first_name && userData.last_name && userData.phone_number;
 
-        console.log('👤 Profile completion check:', {
+        console.log("👤 Profile completion check:", {
           first_name: !!userData.first_name,
           last_name: !!userData.last_name,
           phone_number: !!userData.phone_number,
-          isComplete: isProfileComplete
+          isComplete: isProfileComplete,
         });
 
         if (isProfileComplete && !completedSteps[1]) {
-          setCompletedSteps(prev => {
+          setCompletedSteps((prev) => {
             const updated = { ...prev, 1: true };
-            localStorage.setItem('completed_steps', JSON.stringify(updated));
-            console.log('✅ Step 1 marked as complete (profile complete)');
+            localStorage.setItem("completed_steps", JSON.stringify(updated));
+            console.log("✅ Step 1 marked as complete (profile complete)");
             return updated;
           });
         }
 
         // Fetch fresh data but don't fail if some endpoints fail
-        console.log('🔄 Fetching fresh data...');
+        console.log("🔄 Fetching fresh data...");
         const results = await Promise.allSettled([
-          fetchBrokers().catch(err => console.error('❌ Error fetching brokers:', err)),
-          loadActualProperties().catch(err => console.error('❌ Error loading properties:', err)),
-          checkVerificationStatus(true).catch(err => console.error('❌ Error checking verification:', err))
+          fetchBrokers().catch((err) =>
+            console.error("❌ Error fetching brokers:", err),
+          ),
+          loadActualProperties().catch((err) =>
+            console.error("❌ Error loading properties:", err),
+          ),
+          checkVerificationStatus(true).catch((err) =>
+            console.error("❌ Error checking verification:", err),
+          ),
         ]);
 
         // After loading all data, do a final validation of steps
-        console.log('🔍 Final step validation...');
+        console.log("🔍 Final step validation...");
 
         // Step 1: Profile completion
         if (isProfileComplete && !completedSteps[1]) {
-          setCompletedSteps(prev => ({ ...prev, 1: true }));
+          setCompletedSteps((prev) => ({ ...prev, 1: true }));
         }
 
         // Step 2: Verification status
-        const isVerified = verificationStatus?.status === 'verified';
+        const isVerified = verificationStatus?.status === "verified";
         if (isVerified !== completedSteps[2]) {
-          setCompletedSteps(prev => ({ ...prev, 2: isVerified }));
+          setCompletedSteps((prev) => ({ ...prev, 2: isVerified }));
         }
 
         // Step 3: Saved properties
         const hasSavedProperties = savedProperties.length > 0;
         if (hasSavedProperties !== completedSteps[3]) {
-          setCompletedSteps(prev => ({ ...prev, 3: hasSavedProperties }));
+          setCompletedSteps((prev) => ({ ...prev, 3: hasSavedProperties }));
         }
 
         // Step 4: Force false for new users without saved properties
         if (savedProperties.length === 0 && completedSteps[4]) {
-          console.log('🔄 Resetting step 4 - no saved properties');
-          setCompletedSteps(prev => ({ ...prev, 4: false }));
+          console.log("🔄 Resetting step 4 - no saved properties");
+          setCompletedSteps((prev) => ({ ...prev, 4: false }));
         }
 
         // Save validated steps
-        localStorage.setItem('completed_steps', JSON.stringify(completedSteps));
+        localStorage.setItem("completed_steps", JSON.stringify(completedSteps));
 
-        console.log('✅ Dashboard initialization complete');
-        console.log('📊 Final step status:', completedSteps);
-
+        console.log("✅ Dashboard initialization complete");
+        console.log("📊 Final step status:", completedSteps);
       } catch (error) {
         console.error("❌ Initialization error:", error);
 
         // Handle specific errors
-        if (error.message?.includes('Authentication') || error.message?.includes('401')) {
-          console.log('🔒 Authentication error, redirecting to login');
-          localStorage.removeItem('token');
-          localStorage.removeItem('user');
-          toast.error('Please log in to access your dashboard');
-          navigate('/login-register');
-        } else if (error.message?.includes('Network')) {
-          toast.error("Network error. Please check your connection and try again.");
+        if (
+          error.message?.includes("Authentication") ||
+          error.message?.includes("401")
+        ) {
+          console.log("🔒 Authentication error, redirecting to login");
+          localStorage.removeItem("token");
+          localStorage.removeItem("user");
+          toast.error("Please log in to access your dashboard");
+          navigate("/login-register");
+        } else if (error.message?.includes("Network")) {
+          toast.error(
+            "Network error. Please check your connection and try again.",
+          );
         } else {
-          toast.error("Failed to load dashboard. Please try refreshing the page.");
+          toast.error(
+            "Failed to load dashboard. Please try refreshing the page.",
+          );
         }
       } finally {
         setIsLoading(false);
         isInitializedRef.current = true;
-        console.log('🏁 Dashboard initialization finished');
+        console.log("🏁 Dashboard initialization finished");
       }
     };
 
@@ -1454,8 +2039,11 @@ const BuyerRenter = () => {
     try {
       const formData = new FormData();
       formData.append("profilePicture", file);
-      const response = await apiCall('UPLOAD_PROFILE', {}, { data: formData });
-      const updatedUser = { ...user, profile_picture: response.profilePictureUrl };
+      const response = await apiCall("UPLOAD_PROFILE", {}, { data: formData });
+      const updatedUser = {
+        ...user,
+        profile_picture: response.profilePictureUrl,
+      };
       setUser(updatedUser);
       localStorage.setItem("user", JSON.stringify(updatedUser));
       toast.success("Profile picture updated!");
@@ -1467,14 +2055,17 @@ const BuyerRenter = () => {
 
   const handleEditProfile = async (updates) => {
     try {
-      const response = await apiCall('UPDATE_PROFILE', {}, { data: updates });
+      const response = await apiCall("UPDATE_PROFILE", {}, { data: updates });
       if (response.success) {
         const updatedUser = { ...user, ...updates };
         setUser(updatedUser);
         localStorage.setItem("user", JSON.stringify(updatedUser));
 
         if (updates.preferences) {
-          localStorage.setItem(`user_preferences_${user.id}`, JSON.stringify(updates.preferences));
+          localStorage.setItem(
+            `user_preferences_${user.id}`,
+            JSON.stringify(updates.preferences),
+          );
         }
 
         toast.success("Profile updated!");
@@ -1493,9 +2084,9 @@ const BuyerRenter = () => {
 
       if (success) {
         // Mark step 1 as completed
-        setCompletedSteps(prev => {
+        setCompletedSteps((prev) => {
           const updated = { ...prev, 1: true };
-          localStorage.setItem('completed_steps', JSON.stringify(updated));
+          localStorage.setItem("completed_steps", JSON.stringify(updated));
           return updated;
         });
 
@@ -1515,7 +2106,9 @@ const BuyerRenter = () => {
   const handleDocumentUploadComplete = async (uploadData) => {
     try {
       if (isVerificationInProgress && !uploadData.isResubmission) {
-        toast.error("Verification is already in progress. Please wait for it to complete.");
+        toast.error(
+          "Verification is already in progress. Please wait for it to complete.",
+        );
         return;
       }
 
@@ -1524,36 +2117,41 @@ const BuyerRenter = () => {
 
       if (uploadData.url instanceof File) {
         const formData = new FormData();
-        formData.append('document', uploadData.url);
-        formData.append('documentType', uploadData.type);
-        formData.append('isResubmission', uploadData.isResubmission || false);
-        formData.append('filename', uploadData.filename || uploadData.url.name);
+        formData.append("document", uploadData.url);
+        formData.append("documentType", uploadData.type);
+        formData.append("isResubmission", uploadData.isResubmission || false);
+        formData.append("filename", uploadData.filename || uploadData.url.name);
 
         data = formData;
         isFormData = true;
-
-      } else if (typeof uploadData.url === 'string' && uploadData.url.startsWith('data:')) {
+      } else if (
+        typeof uploadData.url === "string" &&
+        uploadData.url.startsWith("data:")
+      ) {
         data = {
           documentType: uploadData.type,
           documentUrl: uploadData.url,
-          filename: uploadData.filename || 'document.jpg',
-          isResubmission: uploadData.isResubmission || false
+          filename: uploadData.filename || "document.jpg",
+          isResubmission: uploadData.isResubmission || false,
         };
-
       } else {
         data = {
           documentType: uploadData.type,
           documentUrl: uploadData.url,
-          filename: uploadData.filename || 'document',
-          isResubmission: uploadData.isResubmission || false
+          filename: uploadData.filename || "document",
+          isResubmission: uploadData.isResubmission || false,
         };
       }
 
-      const response = await apiCall('UPLOAD_VERIFICATION_DOCUMENT', {}, {
-        method: 'POST',
-        data: data,
-        headers: isFormData ? {} : { 'Content-Type': 'application/json' }
-      });
+      const response = await apiCall(
+        "UPLOAD_VERIFICATION_DOCUMENT",
+        {},
+        {
+          method: "POST",
+          data: data,
+          headers: isFormData ? {} : { "Content-Type": "application/json" },
+        },
+      );
 
       if (response.success) {
         setHasSubmittedDocuments(true);
@@ -1561,10 +2159,14 @@ const BuyerRenter = () => {
 
         await checkVerificationStatus(true);
 
-        toast.success(response.message || "Documents submitted for verification! Our team will review them within 24-48 hours.", {
-          duration: 5000,
-          icon: '⏳'
-        });
+        toast.success(
+          response.message ||
+            "Documents submitted for verification! Our team will review them within 24-48 hours.",
+          {
+            duration: 5000,
+            icon: "⏳",
+          },
+        );
 
         setShowDocumentUpload(false);
         setActiveStep(2);
@@ -1572,7 +2174,7 @@ const BuyerRenter = () => {
         toast.error(response.message || "Failed to upload document");
       }
     } catch (error) {
-      console.error('Error uploading document:', error);
+      console.error("Error uploading document:", error);
       toast.error(error.message || "Failed to submit documents");
     }
   };
@@ -1586,18 +2188,23 @@ const BuyerRenter = () => {
   };
 
   const handleSaveProperty = async (propertyId, isCurrentlySaved) => {
-    console.log('💾 handleSaveProperty called:', {
+    console.log("💾 handleSaveProperty called:", {
       propertyId,
       isCurrentlySaved,
       userId: user?.id,
-      currentSavedCount: savedProperties.length
+      currentSavedCount: savedProperties.length,
     });
 
     if (!user) {
-      const shouldLogin = window.confirm("Please login to save properties. Would you like to login now?");
+      const shouldLogin = window.confirm(
+        "Please login to save properties. Would you like to login now?",
+      );
       if (shouldLogin) {
         navigate("/login-register", {
-          state: { returnUrl: "/buyer-renter", message: "Please login to save properties" }
+          state: {
+            returnUrl: "/buyer-renter",
+            message: "Please login to save properties",
+          },
         });
       }
       return isCurrentlySaved;
@@ -1608,14 +2215,16 @@ const BuyerRenter = () => {
       let endpointKey;
 
       if (isCurrentlySaved) {
-        endpointKey = 'UNSAVE_PROPERTY';
+        endpointKey = "UNSAVE_PROPERTY";
         console.log(`🗑️  Unsaving property ${propertyId}...`);
       } else {
-        endpointKey = 'SAVE_PROPERTY';
+        endpointKey = "SAVE_PROPERTY";
         console.log(`💾 Saving property ${propertyId}...`);
       }
 
-      const response = await apiCall(endpointKey, { propertyId: propertyId.toString() });
+      const response = await apiCall(endpointKey, {
+        propertyId: propertyId.toString(),
+      });
 
       if (response && response.success) {
         const isNowSaved = !isCurrentlySaved;
@@ -1623,38 +2232,49 @@ const BuyerRenter = () => {
 
         if (isNowSaved) {
           // Add to saved properties
-          const property = properties.find(p => p.id === propertyId) ||
-            recommendedProperties.find(p => p.id === propertyId) ||
-            savedProperties.find(p => p.id === propertyId);
+          const property =
+            properties.find((p) => p.id === propertyId) ||
+            recommendedProperties.find((p) => p.id === propertyId) ||
+            savedProperties.find((p) => p.id === propertyId);
 
           if (property) {
-            newSavedProperties = [...savedProperties, { ...property, isSaved: true }];
+            newSavedProperties = [
+              ...savedProperties,
+              { ...property, isSaved: true },
+            ];
             setSavedProperties(newSavedProperties);
             toast.success("Property saved!");
 
             // Check if this completes step 3 (first property saved)
             if (savedProperties.length === 0 && !completedSteps[3]) {
-              console.log('🎉 First property saved! Completing step 3');
-              setCompletedSteps(prev => {
+              console.log("🎉 First property saved! Completing step 3");
+              setCompletedSteps((prev) => {
                 const updated = { ...prev, 3: true };
-                localStorage.setItem('completed_steps', JSON.stringify(updated));
-                toast.success("Step 3 completed! You've saved your first property.");
+                localStorage.setItem(
+                  "completed_steps",
+                  JSON.stringify(updated),
+                );
+                toast.success(
+                  "Step 3 completed! You've saved your first property.",
+                );
                 return updated;
               });
             }
           }
         } else {
           // Remove from saved properties
-          newSavedProperties = savedProperties.filter(p => p.id !== propertyId);
+          newSavedProperties = savedProperties.filter(
+            (p) => p.id !== propertyId,
+          );
           setSavedProperties(newSavedProperties);
           toast.success("Property removed from saved list");
 
           // If no more saved properties, reset step 3
           if (newSavedProperties.length === 0 && completedSteps[3]) {
-            console.log('🔄 No saved properties left, resetting step 3');
-            setCompletedSteps(prev => {
+            console.log("🔄 No saved properties left, resetting step 3");
+            setCompletedSteps((prev) => {
               const updated = { ...prev, 3: false };
-              localStorage.setItem('completed_steps', JSON.stringify(updated));
+              localStorage.setItem("completed_steps", JSON.stringify(updated));
               return updated;
             });
           }
@@ -1662,26 +2282,29 @@ const BuyerRenter = () => {
 
         // Update all property lists
         const updatePropertyList = (list) =>
-          list.map(p => {
+          list.map((p) => {
             if (p.id === propertyId) {
               return {
                 ...p,
-                isSaved: isNowSaved
+                isSaved: isNowSaved,
               };
             }
             return p;
           });
 
-        setProperties(prev => updatePropertyList(prev));
-        setRecommendedProperties(prev => updatePropertyList(prev));
+        setProperties((prev) => updatePropertyList(prev));
+        setRecommendedProperties((prev) => updatePropertyList(prev));
 
         // Update localStorage
-        localStorage.setItem(`saved_properties_${user.id}`, JSON.stringify(newSavedProperties));
+        localStorage.setItem(
+          `saved_properties_${user.id}`,
+          JSON.stringify(newSavedProperties),
+        );
 
         return isNowSaved;
       }
     } catch (error) {
-      console.error('Error saving property:', error);
+      console.error("Error saving property:", error);
       toast.error(error.message || "Failed to save property");
       return isCurrentlySaved;
     } finally {
@@ -1695,13 +2318,15 @@ const BuyerRenter = () => {
       setHasAppliedForProperty(true);
       setIsApplicationPending(true);
 
-      setCompletedSteps(prev => {
+      setCompletedSteps((prev) => {
         const updated = { ...prev, 5: true };
-        localStorage.setItem('completed_steps', JSON.stringify(updated));
+        localStorage.setItem("completed_steps", JSON.stringify(updated));
         return updated;
       });
 
-      toast.success(`${userType === 'buyer' ? 'Purchase' : 'Rental'} application submitted successfully!`);
+      toast.success(
+        `${userType === "buyer" ? "Purchase" : "Rental"} application submitted successfully!`,
+      );
       setShowApplicationModal(false);
       setActiveStep(6);
     } catch (error) {
@@ -1726,10 +2351,16 @@ const BuyerRenter = () => {
   };
 
   const handleStepClick = async (stepNumber) => {
-    const step = currentSteps.find(s => s.number === stepNumber);
+    const step = currentSteps.find((s) => s.number === stepNumber);
 
-    if (stepNumber === 3 && isVerificationInProgress && verificationStatus?.status !== 'verified') {
-      toast.error("Please wait for verification to complete before exploring properties");
+    if (
+      stepNumber === 3 &&
+      isVerificationInProgress &&
+      verificationStatus?.status !== "verified"
+    ) {
+      toast.error(
+        "Please wait for verification to complete before exploring properties",
+      );
       setShowVerificationRestriction(true);
       return;
     }
@@ -1740,8 +2371,14 @@ const BuyerRenter = () => {
 
   const handleContinueStep = async () => {
     if (activeStep < currentSteps.length) {
-      if (activeStep === 2 && isVerificationInProgress && verificationStatus?.status !== 'verified') {
-        toast.error("Please wait for verification to complete before exploring properties");
+      if (
+        activeStep === 2 &&
+        isVerificationInProgress &&
+        verificationStatus?.status !== "verified"
+      ) {
+        toast.error(
+          "Please wait for verification to complete before exploring properties",
+        );
         setShowVerificationRestriction(true);
         return;
       }
@@ -1750,98 +2387,257 @@ const BuyerRenter = () => {
   };
 
   const handlePaymentSubmit = async (paymentData) => {
-    try {
-      setIsLoading(true);
+  try {
+    setIsLoading(true);
 
-      const invoiceId = 1; // This should come from your application/offer flow
+    // Don't use hardcoded invoice ID anymore
+    const invoiceResponse = await apiCall(
+      "CREATE_INVOICE_FOR_PROPERTY",
+      {},
+      {
+        method: "POST",
+        data: {
+          property_id: selectedProperty?.id,
+          amount: paymentData.amount,
+          invoice_type: userType === "renter" ? "rent" : "sale",
+          description: paymentData.description || `Payment for ${selectedProperty?.title}`,
+          metadata: {
+            user_type: userType,
+            payment_for: userType === "buyer" ? "property_purchase" : "rental_deposit"
+          }
+        }
+      }
+    );
 
-      const response = await directApi.initializePayment(invoiceId, {
+    if (invoiceResponse.success && invoiceResponse.data?.id) {
+      const paymentResponse = await directApi.initializePayment(invoiceResponse.data.id, {
         amount: paymentData.amount,
         description: paymentData.description,
         userType: userType,
         property_id: selectedProperty?.id,
-        property_title: selectedProperty?.title
+        property_title: selectedProperty?.title,
       });
 
-      if (response.success && response.data.checkoutUrl) {
-        window.location.href = response.data.checkoutUrl;
-
-        setCompletedSteps(prev => {
-          const updated = { ...prev, 6: true };
-          localStorage.setItem('completed_steps', JSON.stringify(updated));
-          return updated;
-        });
-
+      if (paymentResponse.success && paymentResponse.data.checkoutUrl) {
+        // Store for return
+        localStorage.setItem('lastPageBeforePayment', window.location.pathname);
+        localStorage.setItem('lastTransactionRef', paymentResponse.data.transactionRef);
+        
+        // Redirect to payment
+        window.location.href = paymentResponse.data.checkoutUrl;
+        
         toast.success("Redirecting to secure payment gateway...");
-        setShowPaymentModal(false);
       } else {
-        toast.error(response.message || "Failed to initialize payment");
+        throw new Error(paymentResponse.message || "Failed to initialize payment");
       }
-
-    } catch (error) {
-      console.error("Payment error:", error);
-      toast.error(error.message || "Payment failed. Please try again.");
-    } finally {
-      setIsLoading(false);
+    } else {
+      throw new Error(invoiceResponse.message || "Failed to create invoice");
     }
-  };
+  } catch (error) {
+    console.error("Payment error:", error);
+    toast.error(error.message || "Payment failed. Please try again.");
+  } finally {
+    setIsLoading(false);
+  }
+};
 
   const handleScheduleViewing = async (viewingData) => {
     try {
       setIsLoading(true);
+      console.log("📅 Scheduling viewing with data:", viewingData);
 
       // Make the API call to schedule viewing
-      const response = await apiCall('CREATE_APPOINTMENT', {}, {
-        data: viewingData
-      });
+      const response = await apiCall(
+        "CREATE_APPOINTMENT",
+        {},
+        {
+          method: "POST",
+          data: viewingData,
+        },
+      );
 
-      if (response.success) {
+      console.log("📥 Appointment creation response:", response);
+
+      if (response?.success || response?.appointmentId) {
         // MARK STEP 4 AS COMPLETE HERE - AFTER SUCCESSFUL SCHEDULING
-        setCompletedSteps(prev => {
+        setCompletedSteps((prev) => {
           const updated = { ...prev, 4: true };
-          localStorage.setItem('completed_steps', JSON.stringify(updated));
+          localStorage.setItem("completed_steps", JSON.stringify(updated));
+          console.log("✅ Step 4 marked as complete");
           return updated;
         });
 
-        toast.success("Viewing scheduled successfully! The broker will contact you shortly.");
+        // Refresh appointments
+        await fetchSavedProperties();
+
+        // Show success message
+        toast.success(
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center gap-2">
+              <CheckCircle className="w-5 h-5 text-green-500" />
+              <span className="font-semibold">
+                Viewing Scheduled Successfully!
+              </span>
+            </div>
+            <div className="text-sm opacity-80">
+              The broker will contact you shortly to confirm details.
+            </div>
+          </div>,
+          {
+            duration: 8000,
+            icon: "✅",
+            style: {
+              background: "#10B981",
+              color: "white",
+              padding: "16px",
+              borderRadius: "12px",
+            },
+          },
+        );
+
+        // Close the modal
         setShowScheduleViewingModal(false);
+
+        // Move to next step
+        setActiveStep(5);
+
+        return true;
       } else {
-        toast.error(response.message || "Failed to schedule viewing");
+        // Handle partial success (appointment created but with warnings)
+        if (response?.warning || response?.success === "partial") {
+          // Still mark step as complete since appointment was created
+          setCompletedSteps((prev) => {
+            const updated = { ...prev, 4: true };
+            localStorage.setItem("completed_steps", JSON.stringify(updated));
+            console.log("✅ Step 4 marked as complete (partial success)");
+            return updated;
+          });
+
+          toast.success(
+            <div className="flex flex-col gap-2">
+              <div className="flex items-center gap-2">
+                <AlertCircle className="w-5 h-5 text-amber-500" />
+                <span className="font-semibold">
+                  Viewing Scheduled with Notes
+                </span>
+              </div>
+              <div className="text-sm opacity-80">
+                Appointment created.{" "}
+                {response.message ||
+                  "Some notifications may not have been sent."}
+              </div>
+            </div>,
+            {
+              duration: 8000,
+              style: {
+                background: "#F59E0B",
+                color: "white",
+                padding: "16px",
+                borderRadius: "12px",
+              },
+            },
+          );
+
+          setShowScheduleViewingModal(false);
+          setActiveStep(5);
+          return true;
+        }
+
+        // Handle specific error messages
+        let errorMessage = "Failed to schedule viewing";
+        if (response?.message) {
+          errorMessage = response.message;
+        }
+
+        toast.error(
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="w-5 h-5 text-red-500" />
+              <span className="font-semibold">Scheduling Failed</span>
+            </div>
+            <div className="text-sm opacity-80">{errorMessage}</div>
+          </div>,
+          {
+            duration: 8000,
+            style: {
+              background: "#EF4444",
+              color: "white",
+              padding: "16px",
+              borderRadius: "12px",
+            },
+          },
+        );
+        return false;
       }
     } catch (error) {
-      console.error("Error scheduling viewing:", error);
-      toast.error("Failed to schedule viewing");
+      console.error("❌ Error scheduling viewing:", error);
+
+      let errorMessage = "Failed to schedule viewing";
+
+      if (error.message.includes("409") || error.message.includes("conflict")) {
+        errorMessage =
+          "This time slot is already booked. Please select another time.";
+      } else if (error.message.includes("network")) {
+        errorMessage =
+          "Network error. Please check your connection and try again.";
+      } else if (error.message.includes("401")) {
+        errorMessage = "Please log in to schedule a viewing.";
+      }
+
+      toast.error(
+        <div className="flex flex-col gap-2">
+          <div className="flex items-center gap-2">
+            <AlertTriangle className="w-5 h-5 text-red-500" />
+            <span className="font-semibold">Scheduling Error</span>
+          </div>
+          <div className="text-sm opacity-80">{errorMessage}</div>
+        </div>,
+        {
+          duration: 8000,
+          style: {
+            background: "#EF4444",
+            color: "white",
+            padding: "16px",
+            borderRadius: "12px",
+          },
+        },
+      );
+      return false;
     } finally {
       setIsLoading(false);
     }
   };
 
+  // Update the handleScheduleSubmit function to use the new handler
   const handleScheduleSubmit = async (viewingData) => {
-    await handleScheduleViewing(viewingData);
+    return await handleScheduleViewing(viewingData);
   };
-
   const handleManualVerificationCheck = async () => {
     try {
       setIsLoading(true);
-      toast.loading('Checking verification status...', { id: 'verification-check' });
+      toast.loading("Checking verification status...", {
+        id: "verification-check",
+      });
 
       const result = await checkVerificationStatus(true);
 
       if (result) {
-        toast.success('Status checked!', { id: 'verification-check' });
+        toast.success("Status checked!", { id: "verification-check" });
 
-        if (result.status === 'verified') {
-          toast.success('✅ Verification complete! You can now explore properties.');
-        } else if (result.status === 'needs_resubmission') {
-          toast.error('🔄 Please resubmit your documents', {
+        if (result.status === "verified") {
+          toast.success(
+            "✅ Verification complete! You can now explore properties.",
+          );
+        } else if (result.status === "needs_resubmission") {
+          toast.error("🔄 Please resubmit your documents", {
             description: result.feedback,
-            duration: 6000
+            duration: 6000,
           });
         }
       }
     } catch (error) {
-      toast.error('Error checking status', { id: 'verification-check' });
-      console.error('Manual check error:', error);
+      toast.error("Error checking status", { id: "verification-check" });
+      console.error("Manual check error:", error);
     } finally {
       setIsLoading(false);
     }
@@ -1854,118 +2650,154 @@ const BuyerRenter = () => {
           id: 0,
           icon: TrendingUp,
           title: "Smart Investment",
-          description: "Capitalize on Ethiopia's growing real estate market with properties showing 12-18% annual appreciation.",
+          description:
+            "Capitalize on Ethiopia's growing real estate market with properties showing 12-18% annual appreciation.",
           highlight: "High Returns",
           action: () => {
-            if (isVerificationInProgress && verificationStatus?.status !== 'verified') {
-              toast.error("Please wait for verification to complete before exploring properties");
+            if (
+              isVerificationInProgress &&
+              verificationStatus?.status !== "verified"
+            ) {
+              toast.error(
+                "Please wait for verification to complete before exploring properties",
+              );
               return;
             }
             navigate("/properties?type=investment");
-          }
+          },
         },
         {
           id: 1,
           icon: ShieldCheck,
           title: "Secure Transactions",
-          description: "End-to-end verification process ensuring legal compliance and ownership security.",
+          description:
+            "End-to-end verification process ensuring legal compliance and ownership security.",
           highlight: "Risk-Free",
           action: () => {
             if (hasSubmittedDocuments && isVerificationInProgress) {
               setShowVerificationRestriction(true);
-              toast.error("Please wait for verification to complete before uploading new documents");
+              toast.error(
+                "Please wait for verification to complete before uploading new documents",
+              );
             } else {
               setShowDocumentUpload(true);
             }
-          }
+          },
         },
         {
           id: 2,
           icon: BarChart3,
           title: "Market Intelligence",
-          description: "Access exclusive data analytics, neighborhood insights, and investment projections.",
+          description:
+            "Access exclusive data analytics, neighborhood insights, and investment projections.",
           highlight: "Data-Driven",
           action: () => {
-            if (isVerificationInProgress && verificationStatus?.status !== 'verified') {
-              toast.error("Please wait for verification to complete before exploring market insights");
+            if (
+              isVerificationInProgress &&
+              verificationStatus?.status !== "verified"
+            ) {
+              toast.error(
+                "Please wait for verification to complete before exploring market insights",
+              );
               return;
             }
             navigate("/market-insights");
-          }
+          },
         },
         {
           id: 3,
           icon: Handshake,
           title: "Expert Guidance",
-          description: "Connect with certified Ethiopian brokers offering local expertise and market knowledge.",
+          description:
+            "Connect with certified Ethiopian brokers offering local expertise and market knowledge.",
           highlight: "Local Partners",
-          action: () => brokers.length > 0 && handleOpenChatWithBroker(brokers[0])
-        }
+          action: () =>
+            brokers.length > 0 && handleOpenChatWithBroker(brokers[0]),
+        },
       ],
       renter: [
         {
           id: 0,
           icon: Shield,
           title: "Safe & Secure",
-          description: "Verified properties with secure payments and legally binding rental agreements.",
+          description:
+            "Verified properties with secure payments and legally binding rental agreements.",
           highlight: "Peace of Mind",
           action: () => {
-            if (isVerificationInProgress && verificationStatus?.status !== 'verified') {
-              toast.error("Please wait for verification to complete before exploring properties");
+            if (
+              isVerificationInProgress &&
+              verificationStatus?.status !== "verified"
+            ) {
+              toast.error(
+                "Please wait for verification to complete before exploring properties",
+              );
               return;
             }
             navigate("/properties?type=rental");
-          }
+          },
         },
         {
           id: 1,
           icon: Key,
           title: "Quick Move-In",
-          description: "Ready-to-occupy properties with all amenities included for immediate settlement.",
+          description:
+            "Ready-to-occupy properties with all amenities included for immediate settlement.",
           highlight: "Instant Access",
           action: () => {
-            if (isVerificationInProgress && verificationStatus?.status !== 'verified') {
-              toast.error("Please wait for verification to complete before exploring properties");
+            if (
+              isVerificationInProgress &&
+              verificationStatus?.status !== "verified"
+            ) {
+              toast.error(
+                "Please wait for verification to complete before exploring properties",
+              );
               return;
             }
             navigate("/properties?status=available");
-          }
+          },
         },
         {
           id: 2,
           icon: Users,
           title: "Community Focus",
-          description: "Properties located in vibrant communities with amenities and social spaces.",
+          description:
+            "Properties located in vibrant communities with amenities and social spaces.",
           highlight: "Quality Living",
           action: () => {
-            if (isVerificationInProgress && verificationStatus?.status !== 'verified') {
-              toast.error("Please wait for verification to complete before exploring properties");
+            if (
+              isVerificationInProgress &&
+              verificationStatus?.status !== "verified"
+            ) {
+              toast.error(
+                "Please wait for verification to complete before exploring properties",
+              );
               return;
             }
             navigate("/properties?amenities=premium");
-          }
+          },
         },
         {
           id: 3,
           icon: FileCheck,
           title: "Digital Process",
-          description: "Streamlined digital documentation and contract management for hassle-free renting.",
+          description:
+            "Streamlined digital documentation and contract management for hassle-free renting.",
           highlight: "Paperless",
           action: () => {
             if (hasSubmittedDocuments && isVerificationInProgress) {
               setShowVerificationRestriction(true);
-              toast.error("Please wait for verification to complete before uploading new documents");
+              toast.error(
+                "Please wait for verification to complete before uploading new documents",
+              );
             } else {
               setShowDocumentUpload(true);
             }
-          }
-        }
-      ]
+          },
+        },
+      ],
     };
     return baseCards[userType];
   };
-
-
 
   const getJourneySteps = () => {
     const baseJourneys = {
@@ -1973,62 +2805,67 @@ const BuyerRenter = () => {
         {
           step: 1,
           title: "Define Goals",
-          description: "Tell us your investment objectives and preferred property types.",
+          description:
+            "Tell us your investment objectives and preferred property types.",
           icon: Target,
-          time: "Instant"
+          time: "Instant",
         },
         {
           step: 2,
           title: "Browse Properties",
-          description: "Explore verified listings with detailed analytics and virtual tours.",
+          description:
+            "Explore verified listings with detailed analytics and virtual tours.",
           icon: Search,
-          time: "1-3 Days"
+          time: "1-3 Days",
         },
         {
           step: 3,
           title: "Consult Experts",
-          description: "Get personalized advice from local real estate specialists.",
+          description:
+            "Get personalized advice from local real estate specialists.",
           icon: Users,
-          time: "1-2 Days"
+          time: "1-2 Days",
         },
         {
           step: 4,
           title: "Schedule Viewing",
-          description: "Book property tours with certified brokers for inspection.",
+          description:
+            "Book property tours with certified brokers for inspection.",
           icon: Calendar,
-          time: "2-5 Days"
-        }
+          time: "2-5 Days",
+        },
       ],
       renter: [
         {
           step: 1,
           title: "Set Preferences",
-          description: "Define your ideal location, budget, and rental requirements.",
+          description:
+            "Define your ideal location, budget, and rental requirements.",
           icon: Map,
-          time: "Instant"
+          time: "Instant",
         },
         {
           step: 2,
           title: "Find Homes",
           description: "Discover available rentals matching your criteria.",
           icon: Home,
-          time: "1-2 Days"
+          time: "1-2 Days",
         },
         {
           step: 3,
           title: "Tour & Inspect",
           description: "Schedule viewings and property inspections.",
           icon: Eye,
-          time: "2-4 Days"
+          time: "2-4 Days",
         },
         {
           step: 4,
           title: "Move In",
           description: "Sign digital lease and settle into your new home.",
           icon: Key,
-          time: "1-3 Days"
-        }
-      ]
+          time: "1-3 Days",
+        },
+      ],
     };
     return baseJourneys[userType];
   };
@@ -2046,37 +2883,53 @@ const BuyerRenter = () => {
   const ProgressCircle = ({ step, isActive, isCompleted, onClick }) => {
     const IconComponent = step.icon;
     return (
-      <div className="relative flex flex-col items-center cursor-pointer transition-all duration-500 group" onClick={() => onClick(step.number)}>
-
+      <div
+        className="relative flex flex-col items-center cursor-pointer transition-all duration-500 group"
+        onClick={() => onClick(step.number)}
+      >
         {step.number > 1 && (
-          <div className={`absolute -left-16 top-6 w-16 h-0.5 transition-all duration-500 ${isCompleted || isActive
-            ? `bg-gradient-to-r ${step.color}`
-            : "bg-gradient-to-r from-gray-300 to-gray-400 dark:from-gray-600 dark:to-gray-700 group-hover:from-amber-400 group-hover:to-amber-500"
-            }`} />
+          <div
+            className={`absolute -left-16 top-6 w-16 h-0.5 transition-all duration-500 ${
+              isCompleted || isActive
+                ? `bg-gradient-to-r ${step.color}`
+                : "bg-gradient-to-r from-gray-300 to-gray-400 dark:from-gray-600 dark:to-gray-700 group-hover:from-amber-400 group-hover:to-amber-500"
+            }`}
+          />
         )}
-        <div className={`w-20 h-20 rounded-full flex items-center justify-center border-4 transition-all duration-500 group-hover:scale-110 group-hover:shadow-xl ${isCompleted
-          ? `bg-gradient-to-r ${step.color} border-transparent text-white shadow-lg`
-          : isActive
-            ? `border-transparent bg-gradient-to-r ${step.color} text-white shadow-lg`
-            : "border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 group-hover:border-amber-400"
-          }`}>
+        <div
+          className={`w-20 h-20 rounded-full flex items-center justify-center border-4 transition-all duration-500 group-hover:scale-110 group-hover:shadow-xl ${
+            isCompleted
+              ? `bg-gradient-to-r ${step.color} border-transparent text-white shadow-lg`
+              : isActive
+                ? `border-transparent bg-gradient-to-r ${step.color} text-white shadow-lg`
+                : "border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 group-hover:border-amber-400"
+          }`}
+        >
           {isCompleted ? (
             <CheckCircle className="w-10 h-10 text-white" />
           ) : (
-            <IconComponent className={`w-10 h-10 ${isActive ? 'text-white' : step.iconColor} group-hover:text-amber-500`} />
+            <IconComponent
+              className={`w-10 h-10 ${isActive ? "text-white" : step.iconColor} group-hover:text-amber-500`}
+            />
           )}
         </div>
-        <div className={`absolute -top-3 -right-3 w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold transition-all duration-500 shadow-lg ${isCompleted || isActive
-          ? `bg-gradient-to-r ${step.color} text-white`
-          : "bg-gradient-to-r from-gray-300 to-gray-400 dark:from-gray-600 dark:to-gray-700 text-gray-600 dark:text-gray-300 group-hover:bg-gradient-to-r group-hover:from-amber-500 group-hover:to-amber-600 group-hover:text-white"
-          }`}>
+        <div
+          className={`absolute -top-3 -right-3 w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold transition-all duration-500 shadow-lg ${
+            isCompleted || isActive
+              ? `bg-gradient-to-r ${step.color} text-white`
+              : "bg-gradient-to-r from-gray-300 to-gray-400 dark:from-gray-600 dark:to-gray-700 text-gray-600 dark:text-gray-300 group-hover:bg-gradient-to-r group-hover:from-amber-500 group-hover:to-amber-600 group-hover:text-white"
+          }`}
+        >
           {step.number}
         </div>
         <div className="mt-6 text-center max-w-[140px]">
-          <h3 className={`text-sm font-semibold mb-2 transition-colors duration-300 ${isActive || isCompleted
-            ? `bg-gradient-to-r ${step.color} bg-clip-text text-transparent`
-            : "text-gray-600 dark:text-gray-400 group-hover:text-amber-500"
-            }`}>
+          <h3
+            className={`text-sm font-semibold mb-2 transition-colors duration-300 ${
+              isActive || isCompleted
+                ? `bg-gradient-to-r ${step.color} bg-clip-text text-transparent`
+                : "text-gray-600 dark:text-gray-400 group-hover:text-amber-500"
+            }`}
+          >
             {step.title}
           </h3>
           <p className="text-xs text-gray-500 dark:text-gray-400 group-hover:text-gray-600 dark:group-hover:text-gray-300 transition-colors">
@@ -2088,121 +2941,146 @@ const BuyerRenter = () => {
   };
 
   const VerificationStatus = () => {
-    const isUploadDisabled = hasSubmittedDocuments && isVerificationInProgress && verificationStatus?.status !== 'needs_resubmission';
+    const isUploadDisabled =
+      hasSubmittedDocuments &&
+      isVerificationInProgress &&
+      verificationStatus?.status !== "needs_resubmission";
 
     // Helper functions moved inside the component
     const getVerificationGradient = () => {
-      if (verificationStatus?.status === 'needs_resubmission') {
-        return 'bg-gradient-to-r from-amber-500 to-amber-800';
+      if (verificationStatus?.status === "needs_resubmission") {
+        return "bg-gradient-to-r from-amber-500 to-amber-800";
       } else if (isUploadDisabled) {
-        return 'bg-gradient-to-r from-gray-500 to-gray-700';
+        return "bg-gradient-to-r from-gray-500 to-gray-700";
       } else {
-        return 'bg-gradient-to-r from-amber-500 to-amber-800';
+        return "bg-gradient-to-r from-amber-500 to-amber-800";
       }
     };
 
     const getVerificationIcon = () => {
-      if (verificationStatus?.status === 'needs_resubmission') {
-        return <AlertCircle className={`w-16 h-16 ${theme === "dark" ? "text-amber-200" : "text-amber-500"}`} />;
+      if (verificationStatus?.status === "needs_resubmission") {
+        return (
+          <AlertCircle
+            className={`w-16 h-16 ${theme === "dark" ? "text-amber-200" : "text-amber-500"}`}
+          />
+        );
       } else if (isUploadDisabled) {
-        return <Lock className={`w-16 h-16 ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`} />;
+        return (
+          <Lock
+            className={`w-16 h-16 ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`}
+          />
+        );
       } else {
-        return <ShieldCheck className={`w-16 h-16 ${theme === "dark" ? "text-amber-200" : "text-amber-500"}`} />;
+        return (
+          <ShieldCheck
+            className={`w-16 h-16 ${theme === "dark" ? "text-amber-200" : "text-amber-500"}`}
+          />
+        );
       }
     };
 
     const getVerificationTitle = () => {
-      if (verificationStatus?.status === 'needs_resubmission') {
-        return 'Resubmission Required';
+      if (verificationStatus?.status === "needs_resubmission") {
+        return "Resubmission Required";
       } else if (isUploadDisabled) {
-        return 'Verification In Progress';
+        return "Verification In Progress";
       } else {
-        return hasSubmittedDocuments ? 'Complete Your Verification' : 'Verify Your Identity';
+        return hasSubmittedDocuments
+          ? "Complete Your Verification"
+          : "Verify Your Identity";
       }
     };
 
     const getVerificationDescription = () => {
-      if (verificationStatus?.status === 'needs_resubmission') {
-        return 'Your documents need corrections. Please review the feedback and upload the corrected versions.';
+      if (verificationStatus?.status === "needs_resubmission") {
+        return "Your documents need corrections. Please review the feedback and upload the corrected versions.";
       } else if (isUploadDisabled) {
-        return 'Your documents are currently being reviewed. Please wait for the verification process to complete before uploading new documents.';
+        return "Your documents are currently being reviewed. Please wait for the verification process to complete before uploading new documents.";
       } else {
         return hasSubmittedDocuments
-          ? 'Upload additional documents or check your verification status to complete the process.'
-          : 'Upload required documents to verify your identity and unlock full access to property listings.';
+          ? "Upload additional documents or check your verification status to complete the process."
+          : "Upload required documents to verify your identity and unlock full access to property listings.";
       }
     };
 
     const getVerificationSteps = () => {
-      if (verificationStatus?.status === 'needs_resubmission') {
+      if (verificationStatus?.status === "needs_resubmission") {
         return [
           {
             icon: <FileText className="w-8 h-8 mx-auto mb-2 text-amber-500" />,
-            title: 'Review Feedback'
+            title: "Review Feedback",
           },
           {
             icon: <Upload className="w-8 h-8 mx-auto mb-2 text-amber-500" />,
-            title: 'Upload Corrections'
+            title: "Upload Corrections",
           },
           {
-            icon: <ShieldCheck className="w-8 h-8 mx-auto mb-2 text-amber-500" />,
-            title: 'Complete Verification'
-          }
+            icon: (
+              <ShieldCheck className="w-8 h-8 mx-auto mb-2 text-amber-500" />
+            ),
+            title: "Complete Verification",
+          },
         ];
       } else if (isUploadDisabled) {
         return [
           {
             icon: <Clock className="w-8 h-8 mx-auto mb-2 text-gray-500" />,
-            title: 'Under Review',
-            bgColorDark: 'bg-gray-800/50 border border-gray-700',
-            bgColorLight: 'bg-gray-100 border border-gray-300'
+            title: "Under Review",
+            bgColorDark: "bg-gray-800/50 border border-gray-700",
+            bgColorLight: "bg-gray-100 border border-gray-300",
           },
           {
             icon: <FileCheck className="w-8 h-8 mx-auto mb-2 text-gray-500" />,
-            title: 'Processing',
-            bgColorDark: 'bg-gray-800/50 border border-gray-700',
-            bgColorLight: 'bg-gray-100 border border-gray-300'
+            title: "Processing",
+            bgColorDark: "bg-gray-800/50 border border-gray-700",
+            bgColorLight: "bg-gray-100 border border-gray-300",
           },
           {
-            icon: <ShieldCheck className="w-8 h-8 mx-auto mb-2 text-gray-500" />,
-            title: 'Pending Approval',
-            bgColorDark: 'bg-gray-800/50 border border-gray-700',
-            bgColorLight: 'bg-gray-100 border border-gray-300'
-          }
+            icon: (
+              <ShieldCheck className="w-8 h-8 mx-auto mb-2 text-gray-500" />
+            ),
+            title: "Pending Approval",
+            bgColorDark: "bg-gray-800/50 border border-gray-700",
+            bgColorLight: "bg-gray-100 border border-gray-300",
+          },
         ];
       } else {
         return [
           {
             icon: <FileText className="w-8 h-8 mx-auto mb-2 text-amber-500" />,
-            title: 'Upload Documents'
+            title: "Upload Documents",
           },
           {
             icon: <Shield className="w-8 h-8 mx-auto mb-2 text-amber-500" />,
-            title: 'Secure Processing'
+            title: "Secure Processing",
           },
           {
-            icon: <CheckCircle className="w-8 h-8 mx-auto mb-2 text-amber-500" />,
-            title: 'Get Verified'
-          }
+            icon: (
+              <CheckCircle className="w-8 h-8 mx-auto mb-2 text-amber-500" />
+            ),
+            title: "Get Verified",
+          },
         ];
       }
     };
 
     const getVerificationButtonStyles = () => {
-      if (verificationStatus?.status === 'needs_resubmission') {
-        return 'bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white hover:text-white';
+      if (verificationStatus?.status === "needs_resubmission") {
+        return "bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white hover:text-white";
       } else if (isUploadDisabled) {
-        return 'bg-gradient-to-r from-gray-500 to-gray-600 text-white';
+        return "bg-gradient-to-r from-gray-500 to-gray-600 text-white";
       } else {
-        return 'bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white hover:text-white';
+        return "bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white hover:text-white";
       }
     };
 
     const getVerificationMainAction = () => {
-      if (verificationStatus?.status === 'needs_resubmission') {
+      if (verificationStatus?.status === "needs_resubmission") {
         return () => {
           setShowDocumentUpload(true);
-          toast('Please upload corrected documents as requested', { icon: '📄' });
+          toast("Please upload corrected documents as requested", {
+            icon: "📄",
+          });
         };
       } else if (isUploadDisabled) {
         return () => {
@@ -2215,7 +3093,7 @@ const BuyerRenter = () => {
     };
 
     const getVerificationMainButtonContent = () => {
-      if (verificationStatus?.status === 'needs_resubmission') {
+      if (verificationStatus?.status === "needs_resubmission") {
         return (
           <>
             <Upload className="inline w-5 h-5 mr-2" />
@@ -2233,7 +3111,9 @@ const BuyerRenter = () => {
         return (
           <>
             <Upload className="inline w-5 h-5 mr-2" />
-            {hasSubmittedDocuments ? 'Upload Additional Documents' : 'Upload Required Documents'}
+            {hasSubmittedDocuments
+              ? "Upload Additional Documents"
+              : "Upload Required Documents"}
           </>
         );
       }
@@ -2242,48 +3122,70 @@ const BuyerRenter = () => {
     return (
       <div className="text-center py-8">
         <div className="relative mx-auto w-36 h-36 mb-8">
-          <div className={`absolute inset-0 ${getVerificationGradient()} rounded-full ${verificationStatus?.status === 'needs_resubmission' ? 'animate-pulse' : ''}`}></div>
-          <div className={`absolute inset-4 ${theme === "dark" ? "bg-gray-800" : "bg-white"} rounded-full flex items-center justify-center`}>
+          <div
+            className={`absolute inset-0 ${getVerificationGradient()} rounded-full ${verificationStatus?.status === "needs_resubmission" ? "animate-pulse" : ""}`}
+          ></div>
+          <div
+            className={`absolute inset-4 ${theme === "dark" ? "bg-gray-800" : "bg-white"} rounded-full flex items-center justify-center`}
+          >
             {getVerificationIcon()}
           </div>
         </div>
 
-        <h4 className={`text-2xl font-bold mb-6 ${theme === "dark" ? "text-white" : "text-gray-800"}`}>
+        <h4
+          className={`text-2xl font-bold mb-6 ${theme === "dark" ? "text-white" : "text-gray-800"}`}
+        >
           {getVerificationTitle()}
         </h4>
 
         <div className="max-w-2xl mx-auto mb-10">
-          <p className={`text-lg mb-6 ${theme === "dark" ? "text-gray-300" : "text-gray-600"}`}>
+          <p
+            className={`text-lg mb-6 ${theme === "dark" ? "text-gray-300" : "text-gray-600"}`}
+          >
             {getVerificationDescription()}
           </p>
 
-          <div className={`p-6 rounded-xl mb-6 ${theme === "dark"
-            ? "bg-gradient-to-r from-amber-900/30 to-orange-900/30 border border-amber-700/30"
-            : "bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200"}`}>
+          <div
+            className={`p-6 rounded-xl mb-6 ${
+              theme === "dark"
+                ? "bg-gradient-to-r from-amber-900/30 to-orange-900/30 border border-amber-700/30"
+                : "bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200"
+            }`}
+          >
             <div className="flex items-start gap-4">
-              <div className={`p-3 rounded-lg ${verificationStatus?.status === 'verified' ? 'bg-gradient-to-r from-green-500 to-green-600' :
-                verificationStatus?.status === 'needs_resubmission' ? 'bg-gradient-to-r from-amber-500 to-amber-600' :
-                  'bg-gradient-to-r from-amber-500 to-amber-600'
-                }`}>
-                {verificationStatus?.status === 'verified' ? (
+              <div
+                className={`p-3 rounded-lg ${
+                  verificationStatus?.status === "verified"
+                    ? "bg-gradient-to-r from-green-500 to-green-600"
+                    : verificationStatus?.status === "needs_resubmission"
+                      ? "bg-gradient-to-r from-amber-500 to-amber-600"
+                      : "bg-gradient-to-r from-amber-500 to-amber-600"
+                }`}
+              >
+                {verificationStatus?.status === "verified" ? (
                   <CheckCircle className="w-6 h-6 text-white" />
-                ) : verificationStatus?.status === 'needs_resubmission' ? (
+                ) : verificationStatus?.status === "needs_resubmission" ? (
                   <AlertCircle className="w-6 h-6 text-white" />
                 ) : (
                   <ShieldCheck className="w-6 h-6 text-white" />
                 )}
               </div>
               <div>
-                <h5 className={`font-semibold text-lg mb-2 ${theme === "dark" ? "text-amber-300" : "text-amber-700"}`}>
+                <h5
+                  className={`font-semibold text-lg mb-2 ${theme === "dark" ? "text-amber-300" : "text-amber-700"}`}
+                >
                   {getVerificationStepTitle()}
                 </h5>
-                <p className={`text-sm ${theme === "dark" ? "text-amber-400/80" : "text-amber-600/80"}`}>
+                <p
+                  className={`text-sm ${theme === "dark" ? "text-amber-400/80" : "text-amber-600/80"}`}
+                >
                   {getVerificationStepDescription()}
                 </p>
                 {verificationStatus?.feedback && (
                   <div className="mt-3 p-3 rounded-lg bg-gray-100 dark:bg-gray-800">
                     <p className="text-sm text-gray-700 dark:text-gray-300">
-                      <span className="font-medium">Admin Feedback:</span> {verificationStatus.feedback}
+                      <span className="font-medium">Admin Feedback:</span>{" "}
+                      {verificationStatus.feedback}
                     </p>
                   </div>
                 )}
@@ -2295,10 +3197,12 @@ const BuyerRenter = () => {
             {getVerificationSteps().map((step, index) => (
               <div
                 key={index}
-                className={`p-4 rounded-xl text-center ${theme === "dark"
-                  ? step.bgColorDark || "bg-gray-800/50 border border-gray-700"
-                  : step.bgColorLight || "bg-amber-50 border border-amber-200"
-                  }`}
+                className={`p-4 rounded-xl text-center ${
+                  theme === "dark"
+                    ? step.bgColorDark ||
+                      "bg-gray-800/50 border border-gray-700"
+                    : step.bgColorLight || "bg-amber-50 border border-amber-200"
+                }`}
               >
                 {step.icon}
                 <p className="font-medium">{step.title}</p>
@@ -2307,15 +3211,21 @@ const BuyerRenter = () => {
           </div>
 
           {isVerificationInProgress && (
-            <div className={`p-6 rounded-xl mb-6 ${theme === "dark"
-              ? "bg-gradient-to-r from-blue-900/20 to-cyan-900/20 border border-blue-800/30"
-              : "bg-gradient-to-r from-blue-50 to-cyan-50/50 border border-blue-200"}`}>
+            <div
+              className={`p-6 rounded-xl mb-6 ${
+                theme === "dark"
+                  ? "bg-gradient-to-r from-blue-900/20 to-cyan-900/20 border border-blue-800/30"
+                  : "bg-gradient-to-r from-blue-50 to-cyan-50/50 border border-blue-200"
+              }`}
+            >
               <div className="flex items-start gap-4">
                 <div className="p-3 rounded-lg bg-gradient-to-r from-blue-500 to-cyan-600">
                   <Clock className="w-6 h-6 text-white" />
                 </div>
                 <div>
-                  <h5 className={`font-semibold text-lg mb-3 ${theme === "dark" ? "text-blue-300" : "text-blue-700"}`}>
+                  <h5
+                    className={`font-semibold text-lg mb-3 ${theme === "dark" ? "text-blue-300" : "text-blue-700"}`}
+                  >
                     Verification Status
                   </h5>
                   <ul className="space-y-3 text-left">
@@ -2323,24 +3233,35 @@ const BuyerRenter = () => {
                       <div className="w-6 h-6 rounded-full bg-gradient-to-r from-blue-100 to-cyan-100 dark:from-blue-900/30 dark:to-cyan-900/30 flex items-center justify-center">
                         <span className="text-xs font-bold">1</span>
                       </div>
-                      <span className={`text-sm ${theme === "dark" ? "text-blue-400" : "text-blue-600"}`}>
-                        Status: {verificationStatus?.status || 'Pending'}
+                      <span
+                        className={`text-sm ${theme === "dark" ? "text-blue-400" : "text-blue-600"}`}
+                      >
+                        Status: {verificationStatus?.status || "Pending"}
                       </span>
                     </li>
                     <li className="flex items-start gap-2">
                       <div className="w-6 h-6 rounded-full bg-gradient-to-r from-blue-100 to-cyan-100 dark:from-blue-900/30 dark:to-cyan-900/30 flex items-center justify-center">
                         <span className="text-xs font-bold">2</span>
                       </div>
-                      <span className={`text-sm ${theme === "dark" ? "text-blue-400" : "text-blue-600"}`}>
-                        Last checked: {lastVerificationCheck ? new Date(lastVerificationCheck).toLocaleTimeString() : 'Never'}
+                      <span
+                        className={`text-sm ${theme === "dark" ? "text-blue-400" : "text-blue-600"}`}
+                      >
+                        Last checked:{" "}
+                        {lastVerificationCheck
+                          ? new Date(lastVerificationCheck).toLocaleTimeString()
+                          : "Never"}
                       </span>
                     </li>
                     <li className="flex items-start gap-2">
                       <div className="w-6 h-6 rounded-full bg-gradient-to-r from-blue-100 to-cyan-100 dark:from-blue-900/30 dark:to-cyan-900/30 flex items-center justify-center">
                         <span className="text-xs font-bold">3</span>
                       </div>
-                      <span className={`text-sm ${theme === "dark" ? "text-blue-400" : "text-blue-600"}`}>
-                        {isUploadDisabled ? 'Uploads disabled during review' : 'You can upload documents'}
+                      <span
+                        className={`text-sm ${theme === "dark" ? "text-blue-400" : "text-blue-600"}`}
+                      >
+                        {isUploadDisabled
+                          ? "Uploads disabled during review"
+                          : "You can upload documents"}
                       </span>
                     </li>
                   </ul>
@@ -2350,13 +3271,20 @@ const BuyerRenter = () => {
           )}
 
           {isUploadDisabled && (
-            <div className={`p-4 rounded-lg ${theme === "dark"
-              ? "bg-gradient-to-r from-amber-900/20 to-orange-900/20 border border-amber-800/30"
-              : "bg-gradient-to-r from-amber-50 to-orange-50/50 border border-amber-200"}`}>
+            <div
+              className={`p-4 rounded-lg ${
+                theme === "dark"
+                  ? "bg-gradient-to-r from-amber-900/20 to-orange-900/20 border border-amber-800/30"
+                  : "bg-gradient-to-r from-amber-50 to-orange-50/50 border border-amber-200"
+              }`}
+            >
               <div className="flex items-center gap-3">
                 <Lock className="w-5 h-5 text-amber-500 flex-shrink-0" />
-                <p className={`text-sm ${theme === "dark" ? "text-amber-400" : "text-amber-600"}`}>
-                  <span className="font-medium">Security Feature:</span> {getVerificationStepDescription()}
+                <p
+                  className={`text-sm ${theme === "dark" ? "text-amber-400" : "text-amber-600"}`}
+                >
+                  <span className="font-medium">Security Feature:</span>{" "}
+                  {getVerificationStepDescription()}
                 </p>
               </div>
             </div>
@@ -2367,7 +3295,7 @@ const BuyerRenter = () => {
           <button
             onClick={getVerificationMainAction()}
             disabled={isUploadDisabled}
-            className={`px-10 py-4 font-semibold Button2 ${getVerificationButtonStyles()} ${isUploadDisabled ? 'cursor-not-allowed opacity-70' : ''}`}
+            className={`px-10 py-4 font-semibold Button2 ${getVerificationButtonStyles()} ${isUploadDisabled ? "cursor-not-allowed opacity-70" : ""}`}
           >
             {getVerificationMainButtonContent()}
           </button>
@@ -2391,27 +3319,39 @@ const BuyerRenter = () => {
           </button>
         </div>
 
-        {isVerificationInProgress && verificationStatus?.status !== 'verified' && (
-          <div className={`text-center mt-4 p-4 rounded-lg ${theme === "dark" ? "bg-amber-900/20 border border-amber-800/30" : "bg-amber-50 border border-amber-200"}`}>
-            <div className="flex items-center justify-center gap-3">
-              <AlertCircle className={`w-5 h-5 ${theme === "dark" ? "text-amber-400" : "text-amber-500"}`} />
-              <p className={`font-medium ${theme === "dark" ? "text-amber-400" : "text-amber-600"}`}>
-                You must wait for verification to complete before proceeding
-              </p>
+        {isVerificationInProgress &&
+          verificationStatus?.status !== "verified" && (
+            <div
+              className={`text-center mt-4 p-4 rounded-lg ${theme === "dark" ? "bg-amber-900/20 border border-amber-800/30" : "bg-amber-50 border border-amber-200"}`}
+            >
+              <div className="flex items-center justify-center gap-3">
+                <AlertCircle
+                  className={`w-5 h-5 ${theme === "dark" ? "text-amber-400" : "text-amber-500"}`}
+                />
+                <p
+                  className={`font-medium ${theme === "dark" ? "text-amber-400" : "text-amber-600"}`}
+                >
+                  You must wait for verification to complete before proceeding
+                </p>
+              </div>
             </div>
-          </div>
-        )}
+          )}
       </div>
     );
   };
 
   const VerificationRestrictionModal = () => {
     return (
-      <div className={`fixed inset-0 z-50 flex items-center justify-center p-4 ${theme === "dark" ? "bg-black/70" : "bg-black/50"}`}>
-        <div className={`relative w-full max-w-2xl rounded-2xl shadow-2xl ${theme === "dark"
-          ? "bg-gradient-to-br from-gray-900 via-gray-800 to-black border border-amber-500/30"
-          : "bg-gradient-to-br from-white via-amber-50 to-white border border-amber-200"
-          }`}>
+      <div
+        className={`fixed inset-0 z-50 flex items-center justify-center p-4 ${theme === "dark" ? "bg-black/70" : "bg-black/50"}`}
+      >
+        <div
+          className={`relative w-full max-w-2xl rounded-2xl shadow-2xl ${
+            theme === "dark"
+              ? "bg-gradient-to-br from-gray-900 via-gray-800 to-black border border-amber-500/30"
+              : "bg-gradient-to-br from-white via-amber-50 to-white border border-amber-200"
+          }`}
+        >
           <div className="p-8">
             <div className="flex items-center justify-center mb-6">
               <div className="p-4 rounded-full bg-gradient-to-r from-amber-500/20 to-orange-500/20">
@@ -2419,23 +3359,32 @@ const BuyerRenter = () => {
               </div>
             </div>
 
-            <h2 className={`text-2xl md:text-3xl font-bold text-center mb-4 ${theme === "dark" ? "text-white" : "text-gray-900"}`}>
+            <h2
+              className={`text-2xl md:text-3xl font-bold text-center mb-4 ${theme === "dark" ? "text-white" : "text-gray-900"}`}
+            >
               Verification in Progress
             </h2>
 
-            <div className={`p-6 rounded-xl mb-6 ${theme === "dark"
-              ? "bg-gradient-to-r from-amber-900/20 to-orange-900/20 border border-amber-700/30"
-              : "bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200"
-              }`}>
+            <div
+              className={`p-6 rounded-xl mb-6 ${
+                theme === "dark"
+                  ? "bg-gradient-to-r from-amber-900/20 to-orange-900/20 border border-amber-700/30"
+                  : "bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200"
+              }`}
+            >
               <div className="flex items-start gap-4">
                 <div className="p-3 rounded-lg bg-gradient-to-r from-amber-500 to-amber-600">
                   <ShieldCheck className="w-6 h-6 text-white" />
                 </div>
                 <div>
-                  <h3 className={`font-semibold text-lg mb-2 ${theme === "dark" ? "text-amber-300" : "text-amber-700"}`}>
+                  <h3
+                    className={`font-semibold text-lg mb-2 ${theme === "dark" ? "text-amber-300" : "text-amber-700"}`}
+                  >
                     {getVerificationStepTitle()}
                   </h3>
-                  <p className={`text-sm ${theme === "dark" ? "text-amber-400/80" : "text-amber-600/80"}`}>
+                  <p
+                    className={`text-sm ${theme === "dark" ? "text-amber-400/80" : "text-amber-600/80"}`}
+                  >
                     {getVerificationStepDescription()}
                   </p>
                 </div>
@@ -2448,11 +3397,16 @@ const BuyerRenter = () => {
                   <span className="text-xs font-bold text-white">1</span>
                 </div>
                 <div>
-                  <h4 className={`font-medium ${theme === "dark" ? "text-blue-300" : "text-blue-700"}`}>
+                  <h4
+                    className={`font-medium ${theme === "dark" ? "text-blue-300" : "text-blue-700"}`}
+                  >
                     Security Check
                   </h4>
-                  <p className={`text-sm mt-1 ${theme === "dark" ? "text-gray-300" : "text-gray-600"}`}>
-                    Our team is verifying your documents to ensure authenticity and prevent fraud.
+                  <p
+                    className={`text-sm mt-1 ${theme === "dark" ? "text-gray-300" : "text-gray-600"}`}
+                  >
+                    Our team is verifying your documents to ensure authenticity
+                    and prevent fraud.
                   </p>
                 </div>
               </div>
@@ -2462,11 +3416,16 @@ const BuyerRenter = () => {
                   <span className="text-xs font-bold text-white">2</span>
                 </div>
                 <div>
-                  <h4 className={`font-medium ${theme === "dark" ? "text-blue-300" : "text-blue-700"}`}>
+                  <h4
+                    className={`font-medium ${theme === "dark" ? "text-blue-300" : "text-blue-700"}`}
+                  >
                     Manual Review Process
                   </h4>
-                  <p className={`text-sm mt-1 ${theme === "dark" ? "text-gray-300" : "text-gray-600"}`}>
-                    Each document is manually reviewed by our Ethiopian verification specialists.
+                  <p
+                    className={`text-sm mt-1 ${theme === "dark" ? "text-gray-300" : "text-gray-600"}`}
+                  >
+                    Each document is manually reviewed by our Ethiopian
+                    verification specialists.
                   </p>
                 </div>
               </div>
@@ -2476,13 +3435,19 @@ const BuyerRenter = () => {
                   <span className="text-xs font-bold text-white">3</span>
                 </div>
                 <div>
-                  <h4 className={`font-medium ${theme === "dark" ? "text-blue-300" : "text-blue-700"}`}>
-                    {verificationStatus?.status === 'needs_resubmission' ? 'Resubmission Required' : 'No New Uploads Allowed'}
+                  <h4
+                    className={`font-medium ${theme === "dark" ? "text-blue-300" : "text-blue-700"}`}
+                  >
+                    {verificationStatus?.status === "needs_resubmission"
+                      ? "Resubmission Required"
+                      : "No New Uploads Allowed"}
                   </h4>
-                  <p className={`text-sm mt-1 ${theme === "dark" ? "text-gray-300" : "text-gray-600"}`}>
-                    {verificationStatus?.status === 'needs_resubmission'
-                      ? 'Please resubmit corrected documents as requested by our team.'
-                      : 'You cannot upload new documents while verification is in progress to prevent confusion.'}
+                  <p
+                    className={`text-sm mt-1 ${theme === "dark" ? "text-gray-300" : "text-gray-600"}`}
+                  >
+                    {verificationStatus?.status === "needs_resubmission"
+                      ? "Please resubmit corrected documents as requested by our team."
+                      : "You cannot upload new documents while verification is in progress to prevent confusion."}
                   </p>
                 </div>
               </div>
@@ -2498,7 +3463,7 @@ const BuyerRenter = () => {
               <button
                 onClick={() => {
                   setShowVerificationRestriction(false);
-                  if (verificationStatus?.status === 'needs_resubmission') {
+                  if (verificationStatus?.status === "needs_resubmission") {
                     setShowDocumentUpload(true);
                   } else {
                     handleManualVerificationCheck();
@@ -2506,7 +3471,9 @@ const BuyerRenter = () => {
                 }}
                 className="flex-1 py-3 font-medium bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white rounded-xl transition-all duration-300"
               >
-                {verificationStatus?.status === 'needs_resubmission' ? 'Resubmit Documents' : 'Check Status'}
+                {verificationStatus?.status === "needs_resubmission"
+                  ? "Resubmit Documents"
+                  : "Check Status"}
               </button>
             </div>
           </div>
@@ -2517,15 +3484,18 @@ const BuyerRenter = () => {
 
   const InformationCenter = () => {
     const currentCard = infoCards[activeInfoCard];
-    const isBuyer = userType === 'buyer';
+    const isBuyer = userType === "buyer";
 
     return (
       <div className="mb-16">
         <div className="text-center mb-12">
-          <div className={`inline-flex items-center gap-3 mb-4 px-6 py-3 rounded-full ${theme === "dark"
-            ? "bg-gradient-to-r from-amber-500/10 to-orange-500/10 border border-amber-500/20"
-            : "bg-gradient-to-r from-amber-100 to-orange-100 border border-amber-200"
-            }`}>
+          <div
+            className={`inline-flex items-center gap-3 mb-4 px-6 py-3 rounded-full ${
+              theme === "dark"
+                ? "bg-gradient-to-r from-amber-500/10 to-orange-500/10 border border-amber-500/20"
+                : "bg-gradient-to-r from-amber-100 to-orange-100 border border-amber-200"
+            }`}
+          >
             <Sparkles className="w-5 h-5 text-amber-500 animate-pulse" />
             <span className="font-semibold text-amber-600 ">
               {isBuyer ? "Property Ownership Journey" : "Perfect Home Search"}
@@ -2533,39 +3503,50 @@ const BuyerRenter = () => {
             <Sparkles className="w-5 h-5 text-amber-500 animate-pulse" />
           </div>
 
-          <h2 className={`text-4xl md:text-5xl font-bold mb-6 bg-gradient-to-r ${isBuyer
-            ? "from-amber-500 to-amber-700"
-            : "from-amber-700 to-amber-500"
-            } bg-clip-text text-transparent`}>
-            {isBuyer ? "Your Ethiopian Dream Property Awaits" : "Find Your Perfect Ethiopian Home"}
+          <h2
+            className={`text-4xl md:text-5xl font-bold mb-6 bg-gradient-to-r ${
+              isBuyer
+                ? "from-amber-500 to-amber-700"
+                : "from-amber-700 to-amber-500"
+            } bg-clip-text text-transparent`}
+          >
+            {isBuyer
+              ? "Your Ethiopian Dream Property Awaits"
+              : "Find Your Perfect Ethiopian Home"}
           </h2>
 
-          <p className={`text-xl max-w-3xl mx-auto leading-relaxed ${theme === "dark" ? "text-gray-300" : "text-gray-600"
-            }`}>
+          <p
+            className={`text-xl max-w-3xl mx-auto leading-relaxed ${
+              theme === "dark" ? "text-gray-300" : "text-gray-600"
+            }`}
+          >
             {isBuyer
               ? "Navigate Ethiopia's vibrant real estate landscape with confidence. From prime investments to family homes, experience seamless ownership with local expertise."
-              : "Discover comfortable, secure rentals across Ethiopia. Verified properties, transparent contracts, and a stress-free moving experience designed for you."
-            }
+              : "Discover comfortable, secure rentals across Ethiopia. Verified properties, transparent contracts, and a stress-free moving experience designed for you."}
           </p>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-12">
           <div
-            className={`relative overflow-hidden p-8 transition-all duration-500 hover:scale-[1.02] cursor-pointer group ${theme === "dark"
-              ? "bg-gradient-to-br from-gray-800 via-gray-900 to-black border border-amber-500/20"
-              : "bg-gradient-to-br from-white via-amber-50 to-white border border-amber-200 shadow-xl"
-              }`}
+            className={`relative overflow-hidden p-8 transition-all duration-500 hover:scale-[1.02] cursor-pointer group ${
+              theme === "dark"
+                ? "bg-gradient-to-br from-gray-800 via-gray-900 to-black border border-amber-500/20"
+                : "bg-gradient-to-br from-white via-amber-50 to-white border border-amber-200 shadow-xl"
+            }`}
             onClick={currentCard.action}
-            onMouseEnter={() => setHoveredCard('featured')}
+            onMouseEnter={() => setHoveredCard("featured")}
             onMouseLeave={() => setHoveredCard(null)}
           >
             <div className="absolute inset-0 bg-gradient-to-br from-transparent via-amber-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-700"></div>
             <div className="relative flex flex-col lg:flex-row items-center gap-8">
               <div className="flex-1">
-                <div className={`inline-flex items-center gap-3 px-5 py-3 rounded-full mb-6 backdrop-blur-sm ${theme === "dark"
-                  ? "bg-gradient-to-r from-amber-900/30 to-orange-900/30 border border-amber-700/30"
-                  : "bg-gradient-to-r from-amber-100 to-orange-100 border border-amber-200"
-                  }`}>
+                <div
+                  className={`inline-flex items-center gap-3 px-5 py-3 rounded-full mb-6 backdrop-blur-sm ${
+                    theme === "dark"
+                      ? "bg-gradient-to-r from-amber-900/30 to-orange-900/30 border border-amber-700/30"
+                      : "bg-gradient-to-r from-amber-100 to-orange-100 border border-amber-200"
+                  }`}
+                >
                   <div className="p-2 rounded-lg bg-gradient-to-r from-amber-500 to-orange-500">
                     <currentCard.icon className="w-5 h-5 text-white" />
                   </div>
@@ -2573,10 +3554,14 @@ const BuyerRenter = () => {
                     {currentCard.highlight}
                   </span>
                 </div>
-                <h3 className={`text-3xl font-bold mb-4 ${theme === "dark" ? "text-white" : "text-gray-900"}`}>
+                <h3
+                  className={`text-3xl font-bold mb-4 ${theme === "dark" ? "text-white" : "text-gray-900"}`}
+                >
                   {currentCard.title}
                 </h3>
-                <p className={`text-lg mb-6 leading-relaxed ${theme === "dark" ? "text-gray-300" : "text-gray-600"}`}>
+                <p
+                  className={`text-lg mb-6 leading-relaxed ${theme === "dark" ? "text-gray-300" : "text-gray-600"}`}
+                >
                   {currentCard.description}
                 </p>
                 <div className="flex items-center gap-6 mb-8">
@@ -2591,12 +3576,13 @@ const BuyerRenter = () => {
                           e.stopPropagation();
                           setActiveInfoCard(idx);
                         }}
-                        className={`w-3 h-3 rounded-full transition-all duration-300 ${activeInfoCard === idx
-                          ? "bg-gradient-to-r from-amber-500 to-orange-500 scale-125"
-                          : theme === "dark"
-                            ? "bg-gray-600 hover:bg-amber-400"
-                            : "bg-gray-300 hover:bg-amber-400"
-                          }`}
+                        className={`w-3 h-3 rounded-full transition-all duration-300 ${
+                          activeInfoCard === idx
+                            ? "bg-gradient-to-r from-amber-500 to-orange-500 scale-125"
+                            : theme === "dark"
+                              ? "bg-gray-600 hover:bg-amber-400"
+                              : "bg-gray-300 hover:bg-amber-400"
+                        }`}
                       />
                     ))}
                   </div>
@@ -2609,7 +3595,11 @@ const BuyerRenter = () => {
               <div className="flex-1">
                 <div className="relative h-64 lg:h-80 group-hover:scale-105 transition-transform duration-500">
                   <img
-                    src={isBuyer ? "/vectors/SellHouse.svg" : "/vectors/RentHouse.svg"}
+                    src={
+                      isBuyer
+                        ? "/vectors/SellHouse.svg"
+                        : "/vectors/RentHouse.svg"
+                    }
                     alt={currentCard.title}
                     className="w-full h-full object-contain p-4 drop-shadow-xl"
                   />
@@ -2621,40 +3611,56 @@ const BuyerRenter = () => {
           </div>
           <div className="grid grid-cols-2 gap-4">
             {infoCards
-              .filter(card => card.id !== activeInfoCard)
+              .filter((card) => card.id !== activeInfoCard)
               .map((card) => (
                 <div
                   key={card.id}
-                  className={`p-6 rounded-2xl transition-all duration-300 hover:scale-[1.03] cursor-pointer group relative overflow-hidden ${theme === "dark"
-                    ? "bg-gradient-to-br from-gray-800/80 to-gray-900/80 hover:from-gray-700/80 hover:to-gray-800/80 border border-gray-700"
-                    : "bg-gradient-to-br from-white to-gray-50 hover:from-amber-50 hover:to-orange-50 border border-gray-200 shadow-lg"
-                    } ${hoveredCard === card.id ? 'ring-2 ring-amber-400 ' : ''}`}
+                  className={`p-6 rounded-2xl transition-all duration-300 hover:scale-[1.03] cursor-pointer group relative overflow-hidden ${
+                    theme === "dark"
+                      ? "bg-gradient-to-br from-gray-800/80 to-gray-900/80 hover:from-gray-700/80 hover:to-gray-800/80 border border-gray-700"
+                      : "bg-gradient-to-br from-white to-gray-50 hover:from-amber-50 hover:to-orange-50 border border-gray-200 shadow-lg"
+                  } ${hoveredCard === card.id ? "ring-2 ring-amber-400 " : ""}`}
                   onClick={card.action}
                   onMouseEnter={() => setHoveredCard(card.id)}
                   onMouseLeave={() => setHoveredCard(null)}
                 >
                   <div className="absolute inset-0 bg-gradient-to-br from-amber-500/0 via-transparent to-orange-500/0 opacity-0 group-hover:opacity-10 transition-opacity duration-500"></div>
                   <div className="relative flex items-start gap-4 mb-4">
-                    <div className={`p-3 rounded-xl transition-all duration-300 group-hover:scale-110 ${theme === "dark"
-                      ? "bg-gradient-to-br from-amber-900/30 to-orange-900/30"
-                      : "bg-gradient-to-br from-amber-100 to-orange-100"
-                      }`}>
-                      <card.icon className={`w-7 h-7 ${theme === "dark" ? "text-amber-400" : "text-amber-600"
-                        } group-hover:scale-110 transition-transform`} />
+                    <div
+                      className={`p-3 rounded-xl transition-all duration-300 group-hover:scale-110 ${
+                        theme === "dark"
+                          ? "bg-gradient-to-br from-amber-900/30 to-orange-900/30"
+                          : "bg-gradient-to-br from-amber-100 to-orange-100"
+                      }`}
+                    >
+                      <card.icon
+                        className={`w-7 h-7 ${
+                          theme === "dark" ? "text-amber-400" : "text-amber-600"
+                        } group-hover:scale-110 transition-transform`}
+                      />
                     </div>
                     <div className="flex-1">
-                      <h4 className={`font-bold text-lg mb-2 ${theme === "dark" ? "text-white" : "text-gray-900"
-                        }`}>
+                      <h4
+                        className={`font-bold text-lg mb-2 ${
+                          theme === "dark" ? "text-white" : "text-gray-900"
+                        }`}
+                      >
                         {card.title}
                       </h4>
-                      <p className={`text-sm font-medium ${theme === "dark" ? "text-amber-300" : "text-amber-600"
-                        }`}>
+                      <p
+                        className={`text-sm font-medium ${
+                          theme === "dark" ? "text-amber-300" : "text-amber-600"
+                        }`}
+                      >
                         {card.highlight}
                       </p>
                     </div>
                   </div>
-                  <p className={`text-sm relative ${theme === "dark" ? "text-gray-300" : "text-gray-700"
-                    }  transition-colors`}>
+                  <p
+                    className={`text-sm relative ${
+                      theme === "dark" ? "text-gray-300" : "text-gray-700"
+                    }  transition-colors`}
+                  >
                     {card.description.substring(0, 80)}...
                     <span className="absolute bottom-0 right-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
                       <ArrowRight className="w-4 h-4 text-amber-500" />
@@ -2667,62 +3673,96 @@ const BuyerRenter = () => {
 
         <div className="mb-16">
           <div className="text-center mb-10">
-            <h3 className={`text-3xl font-bold mb-4 ${theme === "dark" ? "text-white" : "text-gray-900"
-              }`}>
-              Your <span className="bg-gradient-to-r from-amber-500 to-orange-600 bg-clip-text text-transparent">
-                {isBuyer ? 'Purchase' : 'Rental'} Journey
+            <h3
+              className={`text-3xl font-bold mb-4 ${
+                theme === "dark" ? "text-white" : "text-gray-900"
+              }`}
+            >
+              Your{" "}
+              <span className="bg-gradient-to-r from-amber-500 to-orange-600 bg-clip-text text-transparent">
+                {isBuyer ? "Purchase" : "Rental"} Journey
               </span>
             </h3>
-            <p className={`text-lg max-w-2xl mx-auto ${theme === "dark" ? "text-gray-300" : "text-gray-600"
-              }`}>
-              Follow these simple steps to find your perfect {isBuyer ? 'property' : 'home'} in Ethiopia
+            <p
+              className={`text-lg max-w-2xl mx-auto ${
+                theme === "dark" ? "text-gray-300" : "text-gray-600"
+              }`}
+            >
+              Follow these simple steps to find your perfect{" "}
+              {isBuyer ? "property" : "home"} in Ethiopia
             </p>
           </div>
           <div className="relative">
-            <div className={`absolute left-0 right=0 top-12 h-1 ${theme === "dark" ? "bg-gradient-to-r from-gray-700 via-gray-600 to-gray-700" : "bg-gradient-to-r from-gray-300 via-gray-200 to-gray-300"
-              } overflow-hidden`}>
+            <div
+              className={`absolute left-0 right=0 top-12 h-1 ${
+                theme === "dark"
+                  ? "bg-gradient-to-r from-gray-700 via-gray-600 to-gray-700"
+                  : "bg-gradient-to-r from-gray-300 via-gray-200 to-gray-300"
+              } overflow-hidden`}
+            >
               <div className="absolute inset-0 bg-gradient-to-r from-amber-500 via-orange-500 to-amber-500 animate-[shimmer_2s_infinite]"></div>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 relative">
               {journeySteps.map((step, index) => (
                 <div key={step.step} className="relative">
-                  <div className={`absolute z-20 -top-6 left-8 w-12 h-12 rounded-full flex items-center justify-center font-bold shadow-lg ${hoveredCard === `step-${step.step}`
-                    ? 'bg-gradient-to-r from-amber-500 to-orange-500 animate-pulse'
-                    : 'bg-gradient-to-r from-amber-400 to-orange-500'
-                    } text-white transition-all duration-300`}>
+                  <div
+                    className={`absolute z-20 -top-6 left-8 w-12 h-12 rounded-full flex items-center justify-center font-bold shadow-lg ${
+                      hoveredCard === `step-${step.step}`
+                        ? "bg-gradient-to-r from-amber-500 to-orange-500 animate-pulse"
+                        : "bg-gradient-to-r from-amber-400 to-orange-500"
+                    } text-white transition-all duration-300`}
+                  >
                     {step.step}
                   </div>
                   <div
-                    className={`p-10 transition-all duration-500 hover:scale-[1.05] cursor-pointer group relative overflow-hidden ${theme === "dark"
-                      ? "bg-gradient-to-br from-gray-800/60 to-gray-900/60 hover:from-gray-700/80 hover:to-gray-800/80 border border-gray-700/50"
-                      : "bg-gradient-to-br from-white to-gray-50 hover:from-amber-50 hover:to-orange-50 border border-gray-200 shadow-xl"
-                      }`}
+                    className={`p-10 transition-all duration-500 hover:scale-[1.05] cursor-pointer group relative overflow-hidden ${
+                      theme === "dark"
+                        ? "bg-gradient-to-br from-gray-800/60 to-gray-900/60 hover:from-gray-700/80 hover:to-gray-800/80 border border-gray-700/50"
+                        : "bg-gradient-to-br from-white to-gray-50 hover:from-amber-50 hover:to-orange-50 border border-gray-200 shadow-xl"
+                    }`}
                     onMouseEnter={() => setHoveredCard(`step-${step.step}`)}
                     onMouseLeave={() => setHoveredCard(null)}
                   >
                     <div className="flex items-center gap-4 mb-6">
-                      <div className={`p-4 rounded-xl transition-all duration-300 group-hover:scale-110 group-hover:rotate-12 ${theme === "dark"
-                        ? "bg-gradient-to-br from-amber-900/30 to-orange-900/30"
-                        : "bg-gradient-to-br from-amber-100 to-orange-100"
-                        }`}>
-                        <step.icon className={`w-8 h-8 ${theme === "dark" ? "text-amber-400" : "text-amber-600"
-                          } group-hover:text-orange-500 transition-colors`} />
+                      <div
+                        className={`p-4 rounded-xl transition-all duration-300 group-hover:scale-110 group-hover:rotate-12 ${
+                          theme === "dark"
+                            ? "bg-gradient-to-br from-amber-900/30 to-orange-900/30"
+                            : "bg-gradient-to-br from-amber-100 to-orange-100"
+                        }`}
+                      >
+                        <step.icon
+                          className={`w-8 h-8 ${
+                            theme === "dark"
+                              ? "text-amber-400"
+                              : "text-amber-600"
+                          } group-hover:text-orange-500 transition-colors`}
+                        />
                       </div>
                       <div>
-                        <span className={`text-sm font-semibold px-3 py-1.5 rounded-full ${theme === "dark"
-                          ? "bg-gray-700 text-gray-300 group-hover:bg-amber-500 group-hover:text-white"
-                          : "bg-gray-100 text-gray-600 group-hover:bg-amber-500 group-hover:text-white"
-                          } transition-all duration-300`}>
+                        <span
+                          className={`text-sm font-semibold px-3 py-1.5 rounded-full ${
+                            theme === "dark"
+                              ? "bg-gray-700 text-gray-300 group-hover:bg-amber-500 group-hover:text-white"
+                              : "bg-gray-100 text-gray-600 group-hover:bg-amber-500 group-hover:text-white"
+                          } transition-all duration-300`}
+                        >
                           {step.time}
                         </span>
                       </div>
                     </div>
-                    <h4 className={`text-xl font-bold mb-3 ${theme === "dark" ? "text-white" : "text-gray-900"
-                      } group-hover:bg-gradient-to-r group-hover:from-amber-600 group-hover:to-orange-600 group-hover:bg-clip-text group-hover:text-transparent`}>
+                    <h4
+                      className={`text-xl font-bold mb-3 ${
+                        theme === "dark" ? "text-white" : "text-gray-900"
+                      } group-hover:bg-gradient-to-r group-hover:from-amber-600 group-hover:to-orange-600 group-hover:bg-clip-text group-hover:text-transparent`}
+                    >
                       {step.title}
                     </h4>
-                    <p className={`text-sm leading-relaxed ${theme === "dark" ? "text-gray-300" : "text-gray-600"
-                      } transition-colors`}>
+                    <p
+                      className={`text-sm leading-relaxed ${
+                        theme === "dark" ? "text-gray-300" : "text-gray-600"
+                      } transition-colors`}
+                    >
                       {step.description}
                     </p>
                     <div className="absolute bottom-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
@@ -2741,14 +3781,15 @@ const BuyerRenter = () => {
   };
 
   return (
-    <div className={`min-h-screen ${theme === "dark"
-      ? "bg-gradient-to-br from-gray-950 via-black to-gray-950"
-      : "bg-gradient-to-br from-amber-50 via-white to-gray-100"
-      } relative overflow-x-hidden`}>
-
+    <div
+      className={`min-h-screen ${
+        theme === "dark"
+          ? "bg-gradient-to-br from-gray-950 via-black to-gray-950"
+          : "bg-gradient-to-br from-amber-50 via-white to-gray-100"
+      } relative overflow-x-hidden`}
+    >
       {isLoading && <Loader theme={theme} />}
       <ThemeToggle theme={theme} onToggle={toggleTheme} />
-
 
       {/* Hero Background */}
       <div
@@ -2771,17 +3812,26 @@ const BuyerRenter = () => {
               <nav className="w-full sm:w-auto flex-wrap">
                 <ul className="flex flex-wrap justify-center items-center space-x-4 sm:space-x-6 md:space-x-16 lg:space-x-28 sm:-left-52 md:-left-80 lg:-left-12 text-white">
                   <li>
-                    <Link to="/properties" className="nav-link hover:text-amber-400 transition-colors">
+                    <Link
+                      to="/properties"
+                      className="nav-link hover:text-amber-400 transition-colors"
+                    >
                       Properties
                     </Link>
                   </li>
                   <li>
-                    <Link to="/help" className="nav-link hover:text-amber-400 transition-colors">
+                    <Link
+                      to="/help"
+                      className="nav-link hover:text-amber-400 transition-colors"
+                    >
                       Help
                     </Link>
                   </li>
                   <li>
-                    <Link to="/seller-leaser" className="nav-link hover:text-amber-400 transition-colors">
+                    <Link
+                      to="/seller-leaser"
+                      className="nav-link hover:text-amber-400 transition-colors"
+                    >
                       List Property
                     </Link>
                   </li>
@@ -2803,7 +3853,10 @@ const BuyerRenter = () => {
                         />
                       </div>
                     ) : (
-                      <Link to="/login-register" className="nav-link bg-amber-500 hover:bg-amber-600 px-4 py-2 rounded-lg transition-all hover:scale-105">
+                      <Link
+                        to="/login-register"
+                        className="nav-link bg-amber-500 hover:bg-amber-600 px-4 py-2 rounded-lg transition-all hover:scale-105"
+                      >
                         Sign In
                       </Link>
                     )}
@@ -2823,7 +3876,7 @@ const BuyerRenter = () => {
                   "Find Your Dream Home in Ethiopia",
                   "Verified Properties • Trusted Brokers",
                   "Secure Transactions • Easy Process",
-                  "Your Journey Starts Here"
+                  "Your Journey Starts Here",
                 ]}
                 typingSpeed={80}
                 pauseTime={2000}
@@ -2831,7 +3884,7 @@ const BuyerRenter = () => {
               />
             </h1>
             <p className="text-xl md:text-2xl mb-8 opacity-90">
-              {userType === 'buyer'
+              {userType === "buyer"
                 ? "Your journey to property ownership starts here"
                 : "Find your perfect rental home with trusted brokers"}
             </p>
@@ -2847,10 +3900,13 @@ const BuyerRenter = () => {
         <div className="container mx-auto px-4 relative z-10">
           {/* User Type Toggle */}
           <div className="max-w-2xl mx-auto mb-12">
-            <div className={`p-4 shadow-2xl ${theme === "dark"
-              ? "bg-gradient-to-r from-gray-800 to-gray-900 border border-amber-500/20"
-              : "bg-gradient-to-r from-white to-gray-50 border border-amber-200"
-              }`}>
+            <div
+              className={`p-4 shadow-2xl ${
+                theme === "dark"
+                  ? "bg-gradient-to-r from-gray-800 to-gray-900 border border-amber-500/20"
+                  : "bg-gradient-to-r from-white to-gray-50 border border-amber-200"
+              }`}
+            >
               <div className="flex space-x-4">
                 <button
                   onClick={() => {
@@ -2860,25 +3916,34 @@ const BuyerRenter = () => {
                     }
                     setUserType("buyer");
                   }}
-                  className={`flex-1 py-5 px-8 font-bold transition-all duration-300 group ${userType === "buyer"
-                    ? "bg-gradient-to-r from-amber-500 to-amber-600 text-white shadow-xl scale-105"
-                    : theme === "dark"
-                      ? canChangeUserType
-                        ? "bg-gradient-to-r from-gray-700 to-gray-800 text-gray-300 hover:from-gray-600 hover:to-gray-700"
-                        : "bg-gradient-to-r from-gray-800 to-gray-900 text-gray-500 cursor-not-allowed"
-                      : canChangeUserType
-                        ? "bg-gradient-to-r from-gray-200 to-gray-300 text-amber-100 hover:bg-gradient-to-r hover:from-amber-100 hover:to-gray-400"
-                        : "bg-gradient-to-r from-gray-300 to-gray-400 text-gray-400 cursor-not-allowed"
-                    }`}
+                  className={`flex-1 py-5 px-8 font-bold transition-all duration-300 group ${
+                    userType === "buyer"
+                      ? "bg-gradient-to-r from-amber-500 to-amber-600 text-white shadow-xl scale-105"
+                      : theme === "dark"
+                        ? canChangeUserType
+                          ? "bg-gradient-to-r from-gray-700 to-gray-800 text-gray-300 hover:from-gray-600 hover:to-gray-700"
+                          : "bg-gradient-to-r from-gray-800 to-gray-900 text-gray-500 cursor-not-allowed"
+                        : canChangeUserType
+                          ? "bg-gradient-to-r from-gray-200 to-gray-300 text-amber-100 hover:bg-gradient-to-r hover:from-amber-100 hover:to-gray-400"
+                          : "bg-gradient-to-r from-gray-300 to-gray-400 text-gray-400 cursor-not-allowed"
+                  }`}
                   disabled={!canChangeUserType && userType !== "buyer"}
                 >
                   <div className="flex items-center justify-center gap-3">
-                    <Home className={`w-6 h-6 transition-transform group-hover:scale-110 ${userType === "buyer" ? "text-white" : "text-amber-500"
-                      }`} />
-                    <span className={`transition-transform font-semibold ${userType === "buyer" ? "text-white" : "text-amber-500"
-                      }`}>
+                    <Home
+                      className={`w-6 h-6 transition-transform group-hover:scale-110 ${
+                        userType === "buyer" ? "text-white" : "text-amber-500"
+                      }`}
+                    />
+                    <span
+                      className={`transition-transform font-semibold ${
+                        userType === "buyer" ? "text-white" : "text-amber-500"
+                      }`}
+                    >
                       Buyer Dashboard
-                      {!canChangeUserType && userType === "buyer" && " (Locked)"}
+                      {!canChangeUserType &&
+                        userType === "buyer" &&
+                        " (Locked)"}
                     </span>
                   </div>
                 </button>
@@ -2890,25 +3955,34 @@ const BuyerRenter = () => {
                     }
                     setUserType("renter");
                   }}
-                  className={`flex-1 py-5 px-8 font-bold transition-all duration-300 group ${userType === "renter"
-                    ? "bg-gradient-to-r from-amber-500 to-amber-600 text-white shadow-xl scale-105"
-                    : theme === "dark"
-                      ? canChangeUserType
-                        ? "bg-gradient-to-r from-gray-700 to-gray-800 text-gray-300 hover:from-gray-600 hover:to-gray-700"
-                        : "bg-gradient-to-r from-gray-800 to-gray-900 text-gray-500 cursor-not-allowed"
-                      : canChangeUserType
-                        ? "bg-gradient-to-r from-gray-200 to-gray-300 text-amber-100 hover:bg-gradient-to-r hover:from-amber-100 hover:to-gray-400"
-                        : "bg-gradient-to-r from-gray-300 to-gray-400 text-gray-400 cursor-not-allowed"
-                    }`}
+                  className={`flex-1 py-5 px-8 font-bold transition-all duration-300 group ${
+                    userType === "renter"
+                      ? "bg-gradient-to-r from-amber-500 to-amber-600 text-white shadow-xl scale-105"
+                      : theme === "dark"
+                        ? canChangeUserType
+                          ? "bg-gradient-to-r from-gray-700 to-gray-800 text-gray-300 hover:from-gray-600 hover:to-gray-700"
+                          : "bg-gradient-to-r from-gray-800 to-gray-900 text-gray-500 cursor-not-allowed"
+                        : canChangeUserType
+                          ? "bg-gradient-to-r from-gray-200 to-gray-300 text-amber-100 hover:bg-gradient-to-r hover:from-amber-100 hover:to-gray-400"
+                          : "bg-gradient-to-r from-gray-300 to-gray-400 text-gray-400 cursor-not-allowed"
+                  }`}
                   disabled={!canChangeUserType && userType !== "renter"}
                 >
                   <div className="flex items-center justify-center gap-3">
-                    <Key className={`w-6 h-6 transition-transform group-hover:scale-110 ${userType === "renter" ? "text-white" : "text-amber-500"
-                      }`} />
-                    <span className={`transition-transform font-semibold ${userType === "buyer" ? "text-amber-500" : "text-white"
-                      }`}>
+                    <Key
+                      className={`w-6 h-6 transition-transform group-hover:scale-110 ${
+                        userType === "renter" ? "text-white" : "text-amber-500"
+                      }`}
+                    />
+                    <span
+                      className={`transition-transform font-semibold ${
+                        userType === "buyer" ? "text-amber-500" : "text-white"
+                      }`}
+                    >
                       Renter Dashboard
-                      {!canChangeUserType && userType === "renter" && " (Locked)"}
+                      {!canChangeUserType &&
+                        userType === "renter" &&
+                        " (Locked)"}
                     </span>
                   </div>
                 </button>
@@ -2916,14 +3990,22 @@ const BuyerRenter = () => {
 
               {/* Warning message when type is locked */}
               {!canChangeUserType && (
-                <div className={`mt-4 p-3 rounded-lg text-sm ${theme === "dark"
-                  ? "bg-amber-900/20 text-amber-300 border border-amber-700/30"
-                  : "bg-amber-50 text-amber-700 border border-amber-200"}`}>
+                <div
+                  className={`mt-4 p-3 rounded-lg text-sm ${
+                    theme === "dark"
+                      ? "bg-amber-900/20 text-amber-300 border border-amber-700/30"
+                      : "bg-amber-50 text-amber-700 border border-amber-200"
+                  }`}
+                >
                   <div className="flex items-center gap-3 ">
                     <Lock className="w-4 h-4" />
                     <span className="font-medium">User Type Locked:</span>
-                    <p> Your account type is now locked as a <strong>{userType}</strong> after verification completion.
-                      Contact support if you need to change account types.</p>
+                    <p>
+                      {" "}
+                      Your account type is now locked as a{" "}
+                      <strong>{userType}</strong> after verification completion.
+                      Contact support if you need to change account types.
+                    </p>
                   </div>
                 </div>
               )}
@@ -2934,20 +4016,25 @@ const BuyerRenter = () => {
           <InformationCenter />
 
           {/* Verification Restriction Modal */}
-          {showVerificationRestriction && (
-            <VerificationRestrictionModal />
-          )}
+          {showVerificationRestriction && <VerificationRestrictionModal />}
 
           {/* Progress Tracker Section */}
           <div ref={progressSectionRef} className="mb-20">
             <div className="text-center mb-12">
-              <h3 className={`text-3xl font-bold mb-4 ${theme === "dark" ? "text-white" : "text-gray-900"}`}>
-                Your <span className="bg-gradient-to-r from-amber-500 to-orange-600 bg-clip-text text-transparent">
+              <h3
+                className={`text-3xl font-bold mb-4 ${theme === "dark" ? "text-white" : "text-gray-900"}`}
+              >
+                Your{" "}
+                <span className="bg-gradient-to-r from-amber-500 to-orange-600 bg-clip-text text-transparent">
                   Step-by-Step Journey
                 </span>
               </h3>
-              <p className={`text-lg max-w-2xl mx-auto ${theme === "dark" ? "text-gray-300" : "text-gray-600"}`}>
-                Follow these simple steps to achieve your {userType === 'buyer' ? 'property ownership' : 'perfect rental'} goals in Ethiopia
+              <p
+                className={`text-lg max-w-2xl mx-auto ${theme === "dark" ? "text-gray-300" : "text-gray-600"}`}
+              >
+                Follow these simple steps to achieve your{" "}
+                {userType === "buyer" ? "property ownership" : "perfect rental"}{" "}
+                goals in Ethiopia
               </p>
             </div>
 
@@ -2968,32 +4055,49 @@ const BuyerRenter = () => {
 
             {/* Enhanced Step Content */}
             <div
-              className={`p-10 rounded-3xl border-2 transition-all duration-700 ${theme === "dark"
-                ? "bg-gradient-to-br from-white-900/80 to-gray-800/80 border-amber-500/30"
-                : "bg-gradient-to-br from-white to-amber-50 border border-amber-200"
-                } shadow-2xl backdrop-blur-sm`}
+              className={`p-10 rounded-3xl border-2 transition-all duration-700 ${
+                theme === "dark"
+                  ? "bg-gradient-to-br from-white-900/80 to-gray-800/80 border-amber-500/30"
+                  : "bg-gradient-to-br from-white to-amber-50 border border-amber-200"
+              } shadow-2xl backdrop-blur-sm`}
               style={{
                 transform: `translateY(${scrolledProgress * 20}px)`,
-                opacity: 0.8 + (scrolledProgress * 0.2)
+                opacity: 0.8 + scrolledProgress * 0.2,
               }}
             >
               <div className="flex items-center justify-between mb-10">
                 <div className="flex-1">
                   <div className="flex items-center gap-4 mb-4">
-                    <div className={`p-3 rounded-xl ${theme === "dark"
-                      ? "bg-gradient-to-r from-amber-900/30 to-orange-900/30"
-                      : "bg-gradient-to-r from-amber-100 to-orange-100"
-                      }`}>
-                      {React.createElement(currentSteps.find(s => s.number === activeStep)?.icon, {
-                        className: `w-8 h-8 ${currentSteps.find(s => s.number === activeStep)?.iconColor}`
-                      })}
+                    <div
+                      className={`p-3 rounded-xl ${
+                        theme === "dark"
+                          ? "bg-gradient-to-r from-amber-900/30 to-orange-900/30"
+                          : "bg-gradient-to-r from-amber-100 to-orange-100"
+                      }`}
+                    >
+                      {React.createElement(
+                        currentSteps.find((s) => s.number === activeStep)?.icon,
+                        {
+                          className: `w-8 h-8 ${currentSteps.find((s) => s.number === activeStep)?.iconColor}`,
+                        },
+                      )}
                     </div>
                     <div>
-                      <h3 className={`text-3xl font-bold ${theme === "dark" ? "text-white" : "text-gray-900"}`}>
-                        {currentSteps.find(s => s.number === activeStep)?.title}
+                      <h3
+                        className={`text-3xl font-bold ${theme === "dark" ? "text-white" : "text-gray-900"}`}
+                      >
+                        {
+                          currentSteps.find((s) => s.number === activeStep)
+                            ?.title
+                        }
                       </h3>
-                      <p className={`mt-2 text-lg ${theme === "dark" ? "text-gray-300" : "text-gray-600"}`}>
-                        {currentSteps.find(s => s.number === activeStep)?.description}
+                      <p
+                        className={`mt-2 text-lg ${theme === "dark" ? "text-gray-300" : "text-gray-600"}`}
+                      >
+                        {
+                          currentSteps.find((s) => s.number === activeStep)
+                            ?.description
+                        }
                       </p>
                     </div>
                   </div>
@@ -3002,10 +4106,11 @@ const BuyerRenter = () => {
                   {activeStep > 1 && (
                     <button
                       onClick={() => setActiveStep(activeStep - 1)}
-                      className={`flex items-center gap-2 px-4 py-2 font-semibold transition-all duration-300 ${theme === "dark"
-                        ? "bg-gradient-to-r from-gray-700 to-gray-800 text-gray-300 hover:from-gray-600 hover:to-gray-700"
-                        : "bg-gradient-to-r from-gray-200 to-gray-300 text-gray-700 hover:from-gray-300 hover:to-gray-400"
-                        }`}
+                      className={`flex items-center gap-2 px-4 py-2 font-semibold transition-all duration-300 ${
+                        theme === "dark"
+                          ? "bg-gradient-to-r from-gray-700 to-gray-800 text-gray-300 hover:from-gray-600 hover:to-gray-700"
+                          : "bg-gradient-to-r from-gray-200 to-gray-300 text-gray-700 hover:from-gray-300 hover:to-gray-400"
+                      }`}
                     >
                       <ArrowLeft className="w-5 h-5" />
                       Previous
@@ -3016,8 +4121,12 @@ const BuyerRenter = () => {
                       onClick={handleContinueStep}
                       className="flex items-center gap-2 px-4 py-2 Button2"
                       disabled={
-                        (activeStep === 2 && isVerificationInProgress && verificationStatus?.status !== 'verified') ||
-                        (activeStep === 3 && isVerificationInProgress && verificationStatus?.status !== 'verified')
+                        (activeStep === 2 &&
+                          isVerificationInProgress &&
+                          verificationStatus?.status !== "verified") ||
+                        (activeStep === 3 &&
+                          isVerificationInProgress &&
+                          verificationStatus?.status !== "verified")
                       }
                     >
                       Continue
@@ -3034,36 +4143,52 @@ const BuyerRenter = () => {
                     <div className="text-center py-8">
                       <div className="relative mx-auto w-36 h-36 mb-8">
                         <div className="absolute inset-0 bg-gradient-to-r from-green-500 to-green-600 rounded-full"></div>
-                        <div className={`absolute inset-4 ${theme === "dark" ? "bg-gray-800" : "bg-white"} rounded-full flex items-center justify-center`}>
+                        <div
+                          className={`absolute inset-4 ${theme === "dark" ? "bg-gray-800" : "bg-white"} rounded-full flex items-center justify-center`}
+                        >
                           <CheckCircle className="w-16 h-16 text-green-500" />
                         </div>
                       </div>
-                      <h4 className={`text-2xl font-bold mb-6 ${theme === "dark" ? "text-white" : "text-gray-800"}`}>
+                      <h4
+                        className={`text-2xl font-bold mb-6 ${theme === "dark" ? "text-white" : "text-gray-800"}`}
+                      >
                         Profile Setup Complete
                       </h4>
                       <div className="max-w-2xl mx-auto mb-10">
-                        <p className={`text-lg mb-6 ${theme === "dark" ? "text-gray-300" : "text-gray-600"}`}>
-                          Your profile has been successfully set up. You can update your preferences anytime.
+                        <p
+                          className={`text-lg mb-6 ${theme === "dark" ? "text-gray-300" : "text-gray-600"}`}
+                        >
+                          Your profile has been successfully set up. You can
+                          update your preferences anytime.
                         </p>
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-                          <div className={`p-4 rounded-xl text-center ${theme === "dark"
-                            ? "bg-green-900/20 border border-green-700"
-                            : "bg-green-50 border border-green-200"
-                            }`}>
+                          <div
+                            className={`p-4 rounded-xl text-center ${
+                              theme === "dark"
+                                ? "bg-green-900/20 border border-green-700"
+                                : "bg-green-50 border border-green-200"
+                            }`}
+                          >
                             <CheckCircle className="w-8 h-8 mx-auto mb-2 text-green-500" />
                             <p className="font-medium">Profile Created</p>
                           </div>
-                          <div className={`p-4 rounded-xl text-center ${theme === "dark"
-                            ? "bg-green-900/20 border border-green-700"
-                            : "bg-green-50 border border-green-200"
-                            }`}>
+                          <div
+                            className={`p-4 rounded-xl text-center ${
+                              theme === "dark"
+                                ? "bg-green-900/20 border border-green-700"
+                                : "bg-green-50 border border-green-200"
+                            }`}
+                          >
                             <Map className="w-8 h-8 mx-auto mb-2 text-green-500" />
                             <p className="font-medium">Preferences Saved</p>
                           </div>
-                          <div className={`p-4 rounded-xl text-center ${theme === "dark"
-                            ? "bg-green-900/20 border border-green-700"
-                            : "bg-green-50 border border-green-200"
-                            }`}>
+                          <div
+                            className={`p-4 rounded-xl text-center ${
+                              theme === "dark"
+                                ? "bg-green-900/20 border border-green-700"
+                                : "bg-green-50 border border-green-200"
+                            }`}
+                          >
                             <Users className="w-8 h-8 mx-auto mb-2 text-green-500" />
                             <p className="font-medium">Ready to Verify</p>
                           </div>
@@ -3080,36 +4205,54 @@ const BuyerRenter = () => {
                     <div className="text-center py-8">
                       <div className="relative mx-auto w-36 h-36 mb-8">
                         <div className="absolute inset-0 bg-gradient-to-r from-amber-500 to-amber-800 rounded-full animate-pulse"></div>
-                        <div className={`absolute inset-4 ${theme === "dark" ? "bg-gray-800" : "bg-white"} rounded-full flex items-center justify-center`}>
-                          <Users className={`w-16 h-16 ${theme === "dark" ? "text-amber-200" : "text-amber-500"} `} />
+                        <div
+                          className={`absolute inset-4 ${theme === "dark" ? "bg-gray-800" : "bg-white"} rounded-full flex items-center justify-center`}
+                        >
+                          <Users
+                            className={`w-16 h-16 ${theme === "dark" ? "text-amber-200" : "text-amber-500"} `}
+                          />
                         </div>
                       </div>
-                      <h4 className={`text-2xl font-bold mb-6 ${theme === "dark" ? "text-white" : "text-gray-800"}`}>
+                      <h4
+                        className={`text-2xl font-bold mb-6 ${theme === "dark" ? "text-white" : "text-gray-800"}`}
+                      >
                         Complete Your Personalized Profile
                       </h4>
                       <div className="max-w-2xl mx-auto mb-10">
-                        <p className={`text-lg mb-6 ${theme === "dark" ? "text-gray-300" : "text-gray-600"}`}>
-                          Share your preferences, budget, and desired locations to receive personalized property recommendations.
+                        <p
+                          className={`text-lg mb-6 ${theme === "dark" ? "text-gray-300" : "text-gray-600"}`}
+                        >
+                          Share your preferences, budget, and desired locations
+                          to receive personalized property recommendations.
                         </p>
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-                          <div className={`p-4 rounded-xl text-center ${theme === "dark"
-                            ? "bg-gray-800/50 border border-gray-700"
-                            : "bg-amber-50 border border-amber-200"
-                            }`}>
+                          <div
+                            className={`p-4 rounded-xl text-center ${
+                              theme === "dark"
+                                ? "bg-gray-800/50 border border-gray-700"
+                                : "bg-amber-50 border border-amber-200"
+                            }`}
+                          >
                             <Target className="w-8 h-8 mx-auto mb-2 text-amber-500" />
                             <p className="font-medium">Set Preferences</p>
                           </div>
-                          <div className={`p-4 rounded-xl text-center ${theme === "dark"
-                            ? "bg-gray-800/50 border border-gray-700"
-                            : "bg-amber-50 border border-amber-200"
-                            }`}>
+                          <div
+                            className={`p-4 rounded-xl text-center ${
+                              theme === "dark"
+                                ? "bg-gray-800/50 border border-gray-700"
+                                : "bg-amber-50 border border-amber-200"
+                            }`}
+                          >
                             <Map className="w-8 h-8 mx-auto mb-2 text-amber-500" />
                             <p className="font-medium">Choose Locations</p>
                           </div>
-                          <div className={`p-4 rounded-xl text-center ${theme === "dark"
-                            ? "bg-gray-800/50 border border-gray-700"
-                            : "bg-amber-50 border border-amber-200"
-                            }`}>
+                          <div
+                            className={`p-4 rounded-xl text-center ${
+                              theme === "dark"
+                                ? "bg-gray-800/50 border border-gray-700"
+                                : "bg-amber-50 border border-amber-200"
+                            }`}
+                          >
                             <DollarSign className="w-8 h-8 mx-auto mb-2 text-amber-500" />
                             <p className="font-medium">Define Budget</p>
                           </div>
@@ -3138,23 +4281,37 @@ const BuyerRenter = () => {
                     <div className="text-center py-8">
                       <div className="relative mx-auto w-36 h-36 mb-8">
                         <div className="absolute inset-0 bg-gradient-to-r from-green-500 to-green-600 rounded-full"></div>
-                        <div className={`absolute inset-4 ${theme === "dark" ? "bg-gray-800" : "bg-white"} rounded-full flex items-center justify-center`}>
+                        <div
+                          className={`absolute inset-4 ${theme === "dark" ? "bg-gray-800" : "bg-white"} rounded-full flex items-center justify-center`}
+                        >
                           <CheckCircle className="w-16 h-16 text-green-500" />
                         </div>
                       </div>
-                      <h4 className={`text-2xl font-bold mb-6 ${theme === "dark" ? "text-white" : "text-gray-800"}`}>
+                      <h4
+                        className={`text-2xl font-bold mb-6 ${theme === "dark" ? "text-white" : "text-gray-800"}`}
+                      >
                         Properties Explored
                       </h4>
                       <div className="max-w-2xl mx-auto mb-10">
-                        <p className={`text-lg mb-6 ${theme === "dark" ? "text-gray-300" : "text-gray-600"}`}>
-                          You've successfully explored properties. Continue to save properties and schedule viewings.
+                        <p
+                          className={`text-lg mb-6 ${theme === "dark" ? "text-gray-300" : "text-gray-600"}`}
+                        >
+                          You've successfully explored properties. Continue to
+                          save properties and schedule viewings.
                         </p>
-                        <div className={`p-6 rounded-xl mb-6 ${theme === "dark" ? "bg-green-900/20 border border-green-700" : "bg-green-50 border border-green-200"}`}>
+                        <div
+                          className={`p-6 rounded-xl mb-6 ${theme === "dark" ? "bg-green-900/20 border border-green-700" : "bg-green-50 border border-green-200"}`}
+                        >
                           <div className="flex items-center justify-center gap-4 mb-4">
                             <Heart className="w-8 h-8 text-green-500" />
-                            <span className="text-xl font-semibold">{savedProperties.length} Saved Properties</span>
+                            <span className="text-xl font-semibold">
+                              {savedProperties.length} Saved Properties
+                            </span>
                           </div>
-                          <p className="text-sm mb-4">Save more properties to schedule viewings in the next step.</p>
+                          <p className="text-sm mb-4">
+                            Save more properties to schedule viewings in the
+                            next step.
+                          </p>
                         </div>
                       </div>
                       <button
@@ -3167,28 +4324,45 @@ const BuyerRenter = () => {
                   ) : (
                     <div>
                       <div className="text-center mb-8">
-                        <h4 className={`text-2xl font-semibold mb-4 ${theme === "dark" ? "text-white" : "text-gray-800"}`}>
+                        <h4
+                          className={`text-2xl font-semibold mb-4 ${theme === "dark" ? "text-white" : "text-gray-800"}`}
+                        >
                           Discover Amazing Properties
                         </h4>
-                        <p className={`mb-6 ${theme === "dark" ? "text-gray-300" : "text-gray-600"}`}>
-                          Explore hand-picked properties matching your preferences
+                        <p
+                          className={`mb-6 ${theme === "dark" ? "text-gray-300" : "text-gray-600"}`}
+                        >
+                          Explore hand-picked properties matching your
+                          preferences
                         </p>
 
                         {savedProperties.length > 0 && (
-                          <div className={`inline-flex items-center gap-2 px-4 py-2 rounded-full mb-4 ${theme === "dark" ? "bg-amber-900/30 text-amber-300" : "bg-amber-100 text-amber-700"}`}>
+                          <div
+                            className={`inline-flex items-center gap-2 px-4 py-2 rounded-full mb-4 ${theme === "dark" ? "bg-amber-900/30 text-amber-300" : "bg-amber-100 text-amber-700"}`}
+                          >
                             <Heart className="w-4 h-4" />
-                            <span className="text-sm font-medium">You have {savedProperties.length} saved properties</span>
+                            <span className="text-sm font-medium">
+                              You have {savedProperties.length} saved properties
+                            </span>
                           </div>
                         )}
                       </div>
 
                       {!completedSteps[3] && (
-                        <div className={`mb-6 p-4 rounded-lg ${theme === "dark" ? "bg-amber-900/20 border border-amber-800/30" : "bg-amber-50 border border-amber-200"}`}>
+                        <div
+                          className={`mb-6 p-4 rounded-lg ${theme === "dark" ? "bg-amber-900/20 border border-amber-800/30" : "bg-amber-50 border border-amber-200"}`}
+                        >
                           <div className="flex items-center justify-center gap-3">
                             <Heart className="w-5 h-5 text-amber-500" />
                             <div>
-                              <p className={`font-medium text-center ${theme === "dark" ? "dark:text-amber-400" : " text-amber-600"}`}>Complete Step 3</p>
-                              <p className={`text-sm ${theme === "dark" ? "dark:text-amber-400" : " text-amber-600"}`}>
+                              <p
+                                className={`font-medium text-center ${theme === "dark" ? "dark:text-amber-400" : " text-amber-600"}`}
+                              >
+                                Complete Step 3
+                              </p>
+                              <p
+                                className={`text-sm ${theme === "dark" ? "dark:text-amber-400" : " text-amber-600"}`}
+                              >
                                 Save at least one property to complete this step
                               </p>
                             </div>
@@ -3198,7 +4372,9 @@ const BuyerRenter = () => {
 
                       {savedProperties.length > 0 && (
                         <div className="mb-8">
-                          <h5 className={`text-xl font-semibold mb-4 ${theme === "dark" ? "text-amber-300" : "text-amber-600"}`}>
+                          <h5
+                            className={`text-xl font-semibold mb-4 ${theme === "dark" ? "text-amber-300" : "text-amber-600"}`}
+                          >
                             <div className="flex items-center gap-2">
                               <Heart className="w-5 h-5" />
                               Your Saved Properties
@@ -3224,8 +4400,11 @@ const BuyerRenter = () => {
                             ))}
                           </div>
                           {savedProperties.length > 3 && (
-                            <p className={`text-sm text-center mt-3 ${theme === "dark" ? "text-gray-400" : "text-gray-600"}`}>
-                              + {savedProperties.length - 3} more saved properties
+                            <p
+                              className={`text-sm text-center mt-3 ${theme === "dark" ? "text-gray-400" : "text-gray-600"}`}
+                            >
+                              + {savedProperties.length - 3} more saved
+                              properties
                             </p>
                           )}
                         </div>
@@ -3233,40 +4412,51 @@ const BuyerRenter = () => {
 
                       {recommendedProperties.length > 0 && (
                         <div className="mb-8">
-                          <h5 className={`text-xl font-semibold mb-4 ${theme === "dark" ? "text-amber-300" : "text-amber-600"}`}>
+                          <h5
+                            className={`text-xl font-semibold mb-4 ${theme === "dark" ? "text-amber-300" : "text-amber-600"}`}
+                          >
                             <div className="flex items-center gap-2">
                               <Sparkles className="w-5 h-5" />
-                              {hasPreferences ? "Properties Matching Your Preferences" : "Recommended For You"}
+                              {hasPreferences
+                                ? "Properties Matching Your Preferences"
+                                : "Recommended For You"}
                             </div>
                           </h5>
                           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                            {recommendedProperties.slice(0, 3).map((property) => (
-                              <PropertyCard
-                                key={property.id}
-                                property={property}
-                                theme={theme}
-                                onViewDetails={handleViewPropertyDetails}
-                                onSave={handleSaveProperty}
-                                onApply={() => {
-                                  setSelectedProperty(property);
-                                  setShowApplicationModal(true);
-                                }}
-                                isSaved={savedProperties.some(savedProp => savedProp.id === property.id)}
-                                broker={property.broker}
-                                user={user}
-                                isSaving={savingProperty === property.id}
-                              />
-                            ))}
+                            {recommendedProperties
+                              .slice(0, 3)
+                              .map((property) => (
+                                <PropertyCard
+                                  key={property.id}
+                                  property={property}
+                                  theme={theme}
+                                  onViewDetails={handleViewPropertyDetails}
+                                  onSave={handleSaveProperty}
+                                  onApply={() => {
+                                    setSelectedProperty(property);
+                                    setShowApplicationModal(true);
+                                  }}
+                                  isSaved={savedProperties.some(
+                                    (savedProp) => savedProp.id === property.id,
+                                  )}
+                                  broker={property.broker}
+                                  user={user}
+                                  isSaving={savingProperty === property.id}
+                                />
+                              ))}
                           </div>
                         </div>
                       )}
 
                       {properties.length > 0 && (
                         <div className="mb-8">
-                          <h5 className={`text-xl font-semibold mb-4 ${theme === "dark" ? "text-white" : "text-gray-900"}`}>
+                          <h5
+                            className={`text-xl font-semibold mb-4 ${theme === "dark" ? "text-white" : "text-gray-900"}`}
+                          >
                             <div className="flex items-center gap-2">
                               <Compass className="w-5 h-5" />
-                              {savedProperties.length > 0 || recommendedProperties.length > 0
+                              {savedProperties.length > 0 ||
+                              recommendedProperties.length > 0
                                 ? "Explore More Properties"
                                 : "Available Properties"}
                             </div>
@@ -3283,7 +4473,9 @@ const BuyerRenter = () => {
                                   setSelectedProperty(property);
                                   setShowApplicationModal(true);
                                 }}
-                                isSaved={savedProperties.some(p => p.id === property.id)}
+                                isSaved={savedProperties.some(
+                                  (p) => p.id === property.id,
+                                )}
                                 broker={property.broker}
                                 user={user}
                                 isSaving={savingProperty === property.id}
@@ -3293,52 +4485,69 @@ const BuyerRenter = () => {
                         </div>
                       )}
 
-                      {savedProperties.length === 0 && recommendedProperties.length === 0 && properties.length === 0 && (
-                        <div className={`text-center py-12 rounded-xl ${theme === "dark" ? "bg-gray-800" : "bg-white"} border border-amber-200 dark:border-amber-800`}>
-                          <Home className="mx-auto text-amber-500 mb-4" size={48} />
-                          <h6 className={`text-lg font-semibold mb-2 ${theme === "dark" ? "text-white" : "text-gray-900"}`}>
-                            No Properties Available
-                          </h6>
-                          <p className={`text-sm mb-6 ${theme === "dark" ? "text-gray-300" : "text-gray-600"}`}>
-                            {user
-                              ? "No properties match your current preferences. Try updating your profile preferences or browse all properties."
-                              : "No properties available at the moment. Please check back later."
-                            }
-                          </p>
-                          <div className="flex flex-col sm:flex-row gap-3 justify-center">
-                            {user && (
-                              <>
-                                <button
-                                  onClick={() => setShowProfileSetup(true)}
-                                  className="bg-amber-500 hover:bg-amber-600 text-white px-6 py-3 rounded-lg font-medium"
-                                >
-                                  Update Preferences
-                                </button>
-                                <button
-                                  onClick={() => navigate("/properties")}
-                                  className="bg-transparent border-2 border-amber-500 text-amber-500 hover:bg-amber-500 hover:text-white px-6 py-3 rounded-lg font-medium"
-                                >
-                                  Browse All Properties
-                                </button>
-                              </>
-                            )}
+                      {savedProperties.length === 0 &&
+                        recommendedProperties.length === 0 &&
+                        properties.length === 0 && (
+                          <div
+                            className={`text-center py-12 rounded-xl ${theme === "dark" ? "bg-gray-800" : "bg-white"} border border-amber-200 dark:border-amber-800`}
+                          >
+                            <Home
+                              className="mx-auto text-amber-500 mb-4"
+                              size={48}
+                            />
+                            <h6
+                              className={`text-lg font-semibold mb-2 ${theme === "dark" ? "text-white" : "text-gray-900"}`}
+                            >
+                              No Properties Available
+                            </h6>
+                            <p
+                              className={`text-sm mb-6 ${theme === "dark" ? "text-gray-300" : "text-gray-600"}`}
+                            >
+                              {user
+                                ? "No properties match your current preferences. Try updating your profile preferences or browse all properties."
+                                : "No properties available at the moment. Please check back later."}
+                            </p>
+                            <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                              {user && (
+                                <>
+                                  <button
+                                    onClick={() => setShowProfileSetup(true)}
+                                    className="bg-amber-500 hover:bg-amber-600 text-white px-6 py-3 rounded-lg font-medium"
+                                  >
+                                    Update Preferences
+                                  </button>
+                                  <button
+                                    onClick={() => navigate("/properties")}
+                                    className="bg-transparent border-2 border-amber-500 text-amber-500 hover:bg-amber-500 hover:text-white px-6 py-3 rounded-lg font-medium"
+                                  >
+                                    Browse All Properties
+                                  </button>
+                                </>
+                              )}
+                            </div>
                           </div>
-                        </div>
-                      )}
+                        )}
 
                       <div className="text-center mt-8">
                         <button
                           onClick={() => navigate("/properties")}
                           className="bg-transparent border-2 Button2 font-bold py-3 px-8"
-                          disabled={isVerificationInProgress && verificationStatus?.status !== 'verified'}
+                          disabled={
+                            isVerificationInProgress &&
+                            verificationStatus?.status !== "verified"
+                          }
                         >
                           Explore All Properties
                         </button>
-                        {isVerificationInProgress && verificationStatus?.status !== 'verified' && (
-                          <p className={`text-sm mt-3 ${theme === "dark" ? "text-amber-400" : "text-amber-600"}`}>
-                            Please wait for verification to complete before exploring properties
-                          </p>
-                        )}
+                        {isVerificationInProgress &&
+                          verificationStatus?.status !== "verified" && (
+                            <p
+                              className={`text-sm mt-3 ${theme === "dark" ? "text-amber-400" : "text-amber-600"}`}
+                            >
+                              Please wait for verification to complete before
+                              exploring properties
+                            </p>
+                          )}
                       </div>
                     </div>
                   )
@@ -3347,23 +4556,37 @@ const BuyerRenter = () => {
                     <div className="text-center py-8">
                       <div className="relative mx-auto w-36 h-36 mb-8">
                         <div className="absolute inset-0 bg-gradient-to-r from-green-500 to-green-600 rounded-full"></div>
-                        <div className={`absolute inset-4 ${theme === "dark" ? "bg-gray-800" : "bg-white"} rounded-full flex items-center justify-center`}>
+                        <div
+                          className={`absolute inset-4 ${theme === "dark" ? "bg-gray-800" : "bg-white"} rounded-full flex items-center justify-center`}
+                        >
                           <CheckCircle className="w-16 h-16 text-green-500" />
                         </div>
                       </div>
-                      <h4 className={`text-2xl font-bold mb-6 ${theme === "dark" ? "text-white" : "text-gray-800"}`}>
+                      <h4
+                        className={`text-2xl font-bold mb-6 ${theme === "dark" ? "text-white" : "text-gray-800"}`}
+                      >
                         Viewing Scheduled
                       </h4>
                       <div className="max-w-2xl mx-auto mb-10">
-                        <p className={`text-lg mb-6 ${theme === "dark" ? "text-gray-300" : "text-gray-600"}`}>
-                          Your property viewing has been successfully scheduled. The broker will contact you shortly.
+                        <p
+                          className={`text-lg mb-6 ${theme === "dark" ? "text-gray-300" : "text-gray-600"}`}
+                        >
+                          Your property viewing has been successfully scheduled.
+                          The broker will contact you shortly.
                         </p>
-                        <div className={`p-6 rounded-xl mb-6 ${theme === "dark" ? "bg-green-900/20 border border-green-700" : "bg-green-50 border border-green-200"}`}>
+                        <div
+                          className={`p-6 rounded-xl mb-6 ${theme === "dark" ? "bg-green-900/20 border border-green-700" : "bg-green-50 border border-green-200"}`}
+                        >
                           <div className="flex items-center justify-center gap-4 mb-4">
                             <Calendar className="w-8 h-8 text-green-500" />
-                            <span className="text-xl font-semibold">Viewing Confirmed</span>
+                            <span className="text-xl font-semibold">
+                              Viewing Confirmed
+                            </span>
                           </div>
-                          <p className="text-sm mb-4">Check your email for viewing details and instructions.</p>
+                          <p className="text-sm mb-4">
+                            Check your email for viewing details and
+                            instructions.
+                          </p>
                         </div>
                       </div>
                       <button
@@ -3376,29 +4599,43 @@ const BuyerRenter = () => {
                   ) : (
                     <div className="py-8">
                       <div className="text-center mb-8">
-                        <h4 className={`text-2xl font-semibold mb-4 ${theme === "dark" ? "text-white" : "text-gray-800"}`}>
+                        <h4
+                          className={`text-2xl font-semibold mb-4 ${theme === "dark" ? "text-white" : "text-gray-800"}`}
+                        >
                           Schedule a Property Viewing
                         </h4>
-                        <p className={`mb-6 ${theme === "dark" ? "text-gray-300" : "text-gray-600"}`}>
-                          Book a viewing appointment with certified brokers to inspect properties in person
+                        <p
+                          className={`mb-6 ${theme === "dark" ? "text-gray-300" : "text-gray-600"}`}
+                        >
+                          Book a viewing appointment with certified brokers to
+                          inspect properties in person
                         </p>
                       </div>
 
                       {isLoading ? (
                         <div className="text-center py-8">
                           <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-amber-600"></div>
-                          <p className="mt-4 text-gray-600 dark:text-gray-300">Loading your saved properties...</p>
+                          <p className="mt-4 text-gray-600 dark:text-gray-300">
+                            Loading your saved properties...
+                          </p>
                         </div>
                       ) : savedProperties.length > 0 ? (
                         <div className="mb-8">
-                          <div className={`p-4 rounded-xl mb-4 ${theme === "dark" ? "bg-amber-900/20 border border-amber-800" : "bg-amber-50 border border-amber-200"}`}>
+                          <div
+                            className={`p-4 rounded-xl mb-4 ${theme === "dark" ? "bg-amber-900/20 border border-amber-800" : "bg-amber-50 border border-amber-200"}`}
+                          >
                             <div className="flex items-center gap-3 mb-4">
                               <div className="p-2 rounded-full bg-amber-500 text-white">
                                 <Heart className="w-5 h-5" />
                               </div>
                               <div>
-                                <h5 className="font-semibold text-lg">Your Saved Properties ({savedProperties.length})</h5>
-                                <p className="text-sm opacity-80">Select a property to schedule viewing</p>
+                                <h5 className="font-semibold text-lg">
+                                  Your Saved Properties (
+                                  {savedProperties.length})
+                                </h5>
+                                <p className="text-sm opacity-80">
+                                  Select a property to schedule viewing
+                                </p>
                               </div>
                             </div>
 
@@ -3420,29 +4657,44 @@ const BuyerRenter = () => {
                                   <div className="flex items-start gap-3">
                                     <div className="w-16 h-16 rounded-lg overflow-hidden flex-shrink-0">
                                       <img
-                                        src={property.main_image || property.images?.[0] || '/imgs/default-property.jpg'}
+                                        src={
+                                          property.main_image ||
+                                          property.images?.[0] ||
+                                          "/imgs/default-property.jpg"
+                                        }
                                         alt={property.title}
                                         className="w-full h-full object-cover"
                                         onError={(e) => {
-                                          e.target.src = '/imgs/default-property.jpg';
+                                          e.target.src =
+                                            "/imgs/default-property.jpg";
                                         }}
                                       />
                                     </div>
                                     <div className="flex-1">
-                                      <h6 className="font-medium text-sm line-clamp-1">{property.title || 'Untitled Property'}</h6>
-                                      <p className="text-xs opacity-70">{property.location || 'Location not specified'}</p>
+                                      <h6 className="font-medium text-sm line-clamp-1">
+                                        {property.title || "Untitled Property"}
+                                      </h6>
+                                      <p className="text-xs opacity-70">
+                                        {property.location ||
+                                          "Location not specified"}
+                                      </p>
                                       <p className="text-sm font-bold mt-1 text-amber-600">
-                                        {property.listing_type === 'rent' ? 'For Rent' : 'For Sale'}: {formatCurrency(property.price || 0)}
+                                        {property.listing_type === "rent"
+                                          ? "For Rent"
+                                          : "For Sale"}
+                                        : {formatCurrency(property.price || 0)}
                                       </p>
                                       <div className="flex items-center gap-3 mt-2">
                                         {property.beds && (
                                           <span className="text-xs px-2 py-1 rounded bg-gray-100 dark:bg-gray-700">
-                                            {property.beds} bed{property.beds > 1 ? 's' : ''}
+                                            {property.beds} bed
+                                            {property.beds > 1 ? "s" : ""}
                                           </span>
                                         )}
                                         {property.baths && (
                                           <span className="text-xs px-2 py-1 rounded bg-gray-100 dark:bg-gray-700">
-                                            {property.baths} bath{property.baths > 1 ? 's' : ''}
+                                            {property.baths} bath
+                                            {property.baths > 1 ? "s" : ""}
                                           </span>
                                         )}
                                       </div>
@@ -3477,7 +4729,8 @@ const BuyerRenter = () => {
                               Schedule Viewing
                             </button>
                             <p className="text-sm mt-3 opacity-70">
-                              Click on any property above or use the button to schedule a viewing
+                              Click on any property above or use the button to
+                              schedule a viewing
                             </p>
                             <div className="flex flex-col sm:flex-row gap-3 justify-center mt-4">
                               <button
@@ -3496,13 +4749,20 @@ const BuyerRenter = () => {
                           </div>
                         </div>
                       ) : (
-                        <div className={`p-6 rounded-xl ${theme === "dark" ? "bg-gray-800" : "bg-white"} border border-amber-200 dark:border-amber-800`}>
+                        <div
+                          className={`p-6 rounded-xl ${theme === "dark" ? "bg-gray-800" : "bg-white"} border border-amber-200 dark:border-amber-800`}
+                        >
                           <div className="text-center">
                             <Heart className="w-12 h-12 text-amber-500 mx-auto mb-4" />
-                            <h6 className="text-lg font-semibold mb-2">No Properties Saved Yet</h6>
+                            <h6 className="text-lg font-semibold mb-2">
+                              No Properties Saved Yet
+                            </h6>
                             <p className="text-sm text-gray-600 dark:text-gray-300 mb-4">
-                              You need to save properties first to schedule viewings.
-                              {user ? ' Browse available properties and click the heart icon (❤️) to save them.' : ' Please login to save properties.'}
+                              You need to save properties first to schedule
+                              viewings.
+                              {user
+                                ? " Browse available properties and click the heart icon (❤️) to save them."
+                                : " Please login to save properties."}
                             </p>
                             <div className="flex flex-col sm:flex-row gap-3 justify-center">
                               {user ? (
@@ -3510,7 +4770,9 @@ const BuyerRenter = () => {
                                   <button
                                     onClick={() => {
                                       setActiveStep(3);
-                                      toast('Go to Step 3 to browse and save properties');
+                                      toast(
+                                        "Go to Step 3 to browse and save properties",
+                                      );
                                     }}
                                     className="bg-amber-500 hover:bg-amber-600 text-white px-6 py-2 rounded-lg"
                                   >
@@ -3542,31 +4804,50 @@ const BuyerRenter = () => {
                     <div className="text-center py-8">
                       <div className="relative mx-auto w-36 h-36 mb-8">
                         <div className="absolute inset-0 bg-gradient-to-r from-green-500 to-green-600 rounded-full"></div>
-                        <div className={`absolute inset-4 ${theme === "dark" ? "bg-gray-800" : "bg-white"} rounded-full flex items-center justify-center`}>
+                        <div
+                          className={`absolute inset-4 ${theme === "dark" ? "bg-gray-800" : "bg-white"} rounded-full flex items-center justify-center`}
+                        >
                           <CheckCircle className="w-16 h-16 text-green-500" />
                         </div>
                       </div>
-                      <h4 className={`text-2xl font-bold mb-6 ${theme === "dark" ? "text-white" : "text-gray-800"}`}>
+                      <h4
+                        className={`text-2xl font-bold mb-6 ${theme === "dark" ? "text-white" : "text-gray-800"}`}
+                      >
                         Application Submitted
                       </h4>
                       <div className="max-w-2xl mx-auto mb-10">
-                        <p className={`text-lg mb-6 ${theme === "dark" ? "text-gray-300" : "text-gray-600"}`}>
-                          Your {userType === 'buyer' ? 'purchase' : 'rental'} application has been successfully submitted and is now under review.
+                        <p
+                          className={`text-lg mb-6 ${theme === "dark" ? "text-gray-300" : "text-gray-600"}`}
+                        >
+                          Your {userType === "buyer" ? "purchase" : "rental"}{" "}
+                          application has been successfully submitted and is now
+                          under review.
                         </p>
-                        <div className={`p-6 rounded-xl mb-6 ${theme === "dark" ? "bg-green-900/20 border border-green-700" : "bg-green-50 border border-green-200"}`}>
+                        <div
+                          className={`p-6 rounded-xl mb-6 ${theme === "dark" ? "bg-green-900/20 border border-green-700" : "bg-green-50 border border-green-200"}`}
+                        >
                           <div className="flex items-center justify-center gap-4 mb-4">
                             <FileText className="w-8 h-8 text-green-500" />
-                            <span className="text-xl font-semibold">Application Status: Pending Review</span>
+                            <span className="text-xl font-semibold">
+                              Application Status: Pending Review
+                            </span>
                           </div>
-                          <p className="text-sm mb-4">You will be notified once your application is reviewed by the property owner.</p>
+                          <p className="text-sm mb-4">
+                            You will be notified once your application is
+                            reviewed by the property owner.
+                          </p>
                         </div>
                       </div>
                       <button
                         onClick={() => {
                           if (applications.length > 0) {
-                            toast.success(`You have ${applications.length} application(s) submitted`);
+                            toast.success(
+                              `You have ${applications.length} application(s) submitted`,
+                            );
                           } else {
-                            toast("No applications found. Submit an application first.");
+                            toast(
+                              "No applications found. Submit an application first.",
+                            );
                           }
                         }}
                         className="px-10 py-4 font-bold text-lg bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white shadow-xl hover:shadow-2xl transition-all duration-300 hover:scale-105"
@@ -3578,39 +4859,57 @@ const BuyerRenter = () => {
                     <div className="text-center py-8">
                       <div className="relative mx-auto w-36 h-36 mb-8">
                         <div className="absolute inset-0 bg-gradient-to-r from-amber-500 to-amber-800 rounded-full animate-pulse"></div>
-                        <div className={`absolute inset-4 ${theme === "dark" ? "bg-gray-800" : "bg-white"} rounded-full flex items-center justify-center`}>
-                          <FileText className={`w-16 h-16 ${theme === "dark" ? "text-amber-200" : "text-amber-500"}`} />
+                        <div
+                          className={`absolute inset-4 ${theme === "dark" ? "bg-gray-800" : "bg-white"} rounded-full flex items-center justify-center`}
+                        >
+                          <FileText
+                            className={`w-16 h-16 ${theme === "dark" ? "text-amber-200" : "text-amber-500"}`}
+                          />
                         </div>
                       </div>
-                      <h4 className={`text-2xl font-bold mb-6 ${theme === "dark" ? "text-white" : "text-gray-800"}`}>
-                        {userType === 'buyer' ? 'Make an Offer' : 'Submit Rental Application'}
+                      <h4
+                        className={`text-2xl font-bold mb-6 ${theme === "dark" ? "text-white" : "text-gray-800"}`}
+                      >
+                        {userType === "buyer"
+                          ? "Make an Offer"
+                          : "Submit Rental Application"}
                       </h4>
                       <div className="max-w-2xl mx-auto mb-10">
-                        <p className={`text-lg mb-6 ${theme === "dark" ? "text-gray-300" : "text-gray-600"}`}>
-                          {userType === 'buyer'
+                        <p
+                          className={`text-lg mb-6 ${theme === "dark" ? "text-gray-300" : "text-gray-600"}`}
+                        >
+                          {userType === "buyer"
                             ? "Submit your purchase application for properties you're interested in. Our brokers will guide you through the negotiation process."
-                            : "Complete your rental application with the required information. Landlords typically respond within 24-48 hours."
-                          }
+                            : "Complete your rental application with the required information. Landlords typically respond within 24-48 hours."}
                         </p>
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-                          <div className={`p-4 rounded-xl text-center ${theme === "dark"
-                            ? "bg-gray-800/50 border border-gray-700"
-                            : "bg-amber-50 border border-amber-200"
-                            }`}>
+                          <div
+                            className={`p-4 rounded-xl text-center ${
+                              theme === "dark"
+                                ? "bg-gray-800/50 border border-gray-700"
+                                : "bg-amber-50 border border-amber-200"
+                            }`}
+                          >
                             <FileText className="w-8 h-8 mx-auto mb-2 text-amber-500" />
                             <p className="font-medium">Submit Application</p>
                           </div>
-                          <div className={`p-4 rounded-xl text-center ${theme === "dark"
-                            ? "bg-gray-800/50 border border-gray-700"
-                            : "bg-amber-50 border border-amber-200"
-                            }`}>
+                          <div
+                            className={`p-4 rounded-xl text-center ${
+                              theme === "dark"
+                                ? "bg-gray-800/50 border border-gray-700"
+                                : "bg-amber-50 border border-amber-200"
+                            }`}
+                          >
                             <Clock className="w-8 h-8 mx-auto mb-2 text-amber-500" />
                             <p className="font-medium">Wait for Review</p>
                           </div>
-                          <div className={`p-4 rounded-xl text-center ${theme === "dark"
-                            ? "bg-gray-800/50 border border-gray-700"
-                            : "bg-amber-50 border border-amber-200"
-                            }`}>
+                          <div
+                            className={`p-4 rounded-xl text-center ${
+                              theme === "dark"
+                                ? "bg-gray-800/50 border border-gray-700"
+                                : "bg-amber-50 border border-amber-200"
+                            }`}
+                          >
                             <CheckCircle className="w-8 h-8 mx-auto mb-2 text-amber-500" />
                             <p className="font-medium">Get Approval</p>
                           </div>
@@ -3625,7 +4924,9 @@ const BuyerRenter = () => {
                             }}
                             className="px-10 py-4 font-semibold Button2 hover:text-white bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white shadow-xl hover:shadow-2xl transition-all duration-300 hover:scale-105"
                           >
-                            {userType === 'buyer' ? 'Submit Purchase Application' : 'Submit Rental Application'}
+                            {userType === "buyer"
+                              ? "Submit Purchase Application"
+                              : "Submit Rental Application"}
                           </button>
                           <button
                             onClick={handleContinueStep}
@@ -3635,8 +4936,12 @@ const BuyerRenter = () => {
                           </button>
                         </div>
                       ) : (
-                        <div className={`p-6 rounded-xl ${theme === "dark" ? "bg-gray-800" : "bg-white"} border border-amber-200 dark:border-amber-800`}>
-                          <p className="text-sm mb-4">Save properties first to submit applications.</p>
+                        <div
+                          className={`p-6 rounded-xl ${theme === "dark" ? "bg-gray-800" : "bg-white"} border border-amber-200 dark:border-amber-800`}
+                        >
+                          <p className="text-sm mb-4">
+                            Save properties first to submit applications.
+                          </p>
                           <button
                             onClick={() => setActiveStep(3)}
                             className="bg-amber-500 hover:bg-amber-600 text-white px-6 py-2 rounded-lg"
@@ -3649,95 +4954,138 @@ const BuyerRenter = () => {
                   )
                 ) : activeStep === 6 ? (
                   <div className="py-8">
-
                     {/* Payment Status Summary */}
                     {!completedSteps[6] && (
-                      <div className={`mb-8 p-6 rounded-xl ${theme === "dark"
-                        ? "bg-gradient-to-br from-gray-800/60 to-gray-900/60 border border-amber-500/30"
-                        : "bg-gradient-to-br from-white to-amber-50 border border-amber-200"
-                        }`}>
+                      <div
+                        className={`mb-8 p-6 rounded-xl ${
+                          theme === "dark"
+                            ? "bg-gradient-to-br from-gray-800/60 to-gray-900/60 border border-amber-500/30"
+                            : "bg-gradient-to-br from-white to-amber-50 border border-amber-200"
+                        }`}
+                      >
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                           <div className="text-center">
-                            <div className={`inline-flex items-center justify-center w-12 h-12 rounded-full mb-3 ${theme === "dark"
-                              ? "bg-gradient-to-r from-amber-500/20 to-orange-500/20"
-                              : "bg-gradient-to-r from-amber-100 to-orange-100"
-                              }`}>
+                            <div
+                              className={`inline-flex items-center justify-center w-12 h-12 rounded-full mb-3 ${
+                                theme === "dark"
+                                  ? "bg-gradient-to-r from-amber-500/20 to-orange-500/20"
+                                  : "bg-gradient-to-r from-amber-100 to-orange-100"
+                              }`}
+                            >
                               <DollarSign className="w-6 h-6 text-amber-500" />
                             </div>
-                            <h5 className={`font-semibold mb-1 ${theme === "dark" ? "text-white" : "text-gray-900"}`}>
+                            <h5
+                              className={`font-semibold mb-1 ${theme === "dark" ? "text-white" : "text-gray-900"}`}
+                            >
                               Payment Required
                             </h5>
-                            <p className={`text-sm ${theme === "dark" ? "text-gray-300" : "text-gray-600"}`}>
+                            <p
+                              className={`text-sm ${theme === "dark" ? "text-gray-300" : "text-gray-600"}`}
+                            >
                               Complete your payment to proceed
                             </p>
                           </div>
 
                           <div className="text-center">
-                            <div className={`inline-flex items-center justify-center w-12 h-12 rounded-full mb-3 ${theme === "dark"
-                              ? "bg-gradient-to-r from-blue-500/20 to-cyan-500/20"
-                              : "bg-gradient-to-r from-blue-100 to-cyan-100"
-                              }`}>
+                            <div
+                              className={`inline-flex items-center justify-center w-12 h-12 rounded-full mb-3 ${
+                                theme === "dark"
+                                  ? "bg-gradient-to-r from-blue-500/20 to-cyan-500/20"
+                                  : "bg-gradient-to-r from-blue-100 to-cyan-100"
+                              }`}
+                            >
                               <FileText className="w-6 h-6 text-blue-500" />
                             </div>
-                            <h5 className={`font-semibold mb-1 ${theme === "dark" ? "text-white" : "text-gray-900"}`}>
-                              {userType === 'buyer' ? 'Contract Signing' : 'Lease Agreement'}
+                            <h5
+                              className={`font-semibold mb-1 ${theme === "dark" ? "text-white" : "text-gray-900"}`}
+                            >
+                              {userType === "buyer"
+                                ? "Contract Signing"
+                                : "Lease Agreement"}
                             </h5>
-                            <p className={`text-sm ${theme === "dark" ? "text-gray-300" : "text-gray-600"}`}>
-                              {userType === 'buyer' ? 'Sign purchase contract' : 'Sign rental agreement'}
+                            <p
+                              className={`text-sm ${theme === "dark" ? "text-gray-300" : "text-gray-600"}`}
+                            >
+                              {userType === "buyer"
+                                ? "Sign purchase contract"
+                                : "Sign rental agreement"}
                             </p>
                           </div>
 
                           <div className="text-center">
-                            <div className={`inline-flex items-center justify-center w-12 h-12 rounded-full mb-3 ${theme === "dark"
-                              ? "bg-gradient-to-r from-green-500/20 to-emerald-500/20"
-                              : "bg-gradient-to-r from-green-100 to-emerald-100"
-                              }`}>
-                              {userType === 'buyer' ? (
+                            <div
+                              className={`inline-flex items-center justify-center w-12 h-12 rounded-full mb-3 ${
+                                theme === "dark"
+                                  ? "bg-gradient-to-r from-green-500/20 to-emerald-500/20"
+                                  : "bg-gradient-to-r from-green-100 to-emerald-100"
+                              }`}
+                            >
+                              {userType === "buyer" ? (
                                 <Home className="w-6 h-6 text-green-500" />
                               ) : (
                                 <Key className="w-6 h-6 text-green-500" />
                               )}
                             </div>
-                            <h5 className={`font-semibold mb-1 ${theme === "dark" ? "text-white" : "text-gray-900"}`}>
-                              {userType === 'buyer' ? 'Ownership Transfer' : 'Move In'}
+                            <h5
+                              className={`font-semibold mb-1 ${theme === "dark" ? "text-white" : "text-gray-900"}`}
+                            >
+                              {userType === "buyer"
+                                ? "Ownership Transfer"
+                                : "Move In"}
                             </h5>
-                            <p className={`text-sm ${theme === "dark" ? "text-gray-300" : "text-gray-600"}`}>
-                              {userType === 'buyer' ? 'Get property keys & documents' : 'Get keys & access property'}
+                            <p
+                              className={`text-sm ${theme === "dark" ? "text-gray-300" : "text-gray-600"}`}
+                            >
+                              {userType === "buyer"
+                                ? "Get property keys & documents"
+                                : "Get keys & access property"}
                             </p>
                           </div>
                         </div>
 
                         <div className="mt-6 text-center">
-
-                          <p className={`text-xs mt-3 ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`}>
-                            {userType === 'buyer'
-                              ? 'Secure your property with a secure payment. Transactions protected by Wubland.'
-                              : 'Secure your rental with first month payment. 100% payment protection.'
-                            }
+                          <p
+                            className={`text-xs mt-3 ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`}
+                          >
+                            {userType === "buyer"
+                              ? "Secure your property with a secure payment. Transactions protected by Wubland."
+                              : "Secure your rental with first month payment. 100% payment protection."}
                           </p>
                         </div>
                       </div>
                     )}
 
                     {/* Payment History Section */}
-                    <div className={`mb-8 ${theme === "dark"
-                      ? "bg-gradient-to-br from-gray-800/80 to-gray-900/80 border border-gray-700"
-                      : "bg-gradient-to-br from-white to-gray-50 border border-gray-200"
-                      } rounded-xl overflow-hidden`}>
-                      <div className={`p-6 border-b ${theme === "dark" ? "border-gray-700" : "border-gray-200"}`}>
+                    <div
+                      className={`mb-8 ${
+                        theme === "dark"
+                          ? "bg-gradient-to-br from-gray-800/80 to-gray-900/80 border border-gray-700"
+                          : "bg-gradient-to-br from-white to-gray-50 border border-gray-200"
+                      } rounded-xl overflow-hidden`}
+                    >
+                      <div
+                        className={`p-6 border-b ${theme === "dark" ? "border-gray-700" : "border-gray-200"}`}
+                      >
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-3">
-                            <div className={`p-2 rounded-lg ${theme === "dark"
-                              ? "bg-gradient-to-r from-green-500/20 to-emerald-500/20"
-                              : "bg-gradient-to-r from-green-100 to-emerald-100"
-                              }`}>
+                            <div
+                              className={`p-2 rounded-lg ${
+                                theme === "dark"
+                                  ? "bg-gradient-to-r from-green-500/20 to-emerald-500/20"
+                                  : "bg-gradient-to-r from-green-100 to-emerald-100"
+                              }`}
+                            >
                               <CreditCard className="w-5 h-5 text-green-500" />
                             </div>
                             <div>
-                              <h5 className={`font-bold text-lg ${theme === "dark" ? "text-white" : "text-gray-900"}`}>
+                              <h5
+                                className={`font-bold text-lg ${theme === "dark" ? "text-white" : "text-gray-900"}`}
+                              >
                                 Payment History
                               </h5>
-                              <p className={`text-sm ${theme === "dark" ? "text-gray-300" : "text-gray-600"}`}>
+                              <p
+                                className={`text-sm ${theme === "dark" ? "text-gray-300" : "text-gray-600"}`}
+                              >
                                 Track all your transactions and receipts
                               </p>
                             </div>
@@ -3769,29 +5117,42 @@ const BuyerRenter = () => {
 
                     {/* Recent Applications Summary */}
                     {applications.length > 0 && (
-                      <div className={`mb-8 p-6 rounded-xl ${theme === "dark"
-                        ? "bg-gradient-to-br from-blue-900/20 to-cyan-900/20 border border-blue-800/30"
-                        : "bg-gradient-to-br from-blue-50 to-cyan-50 border border-blue-200"
-                        }`}>
+                      <div
+                        className={`mb-8 p-6 rounded-xl ${
+                          theme === "dark"
+                            ? "bg-gradient-to-br from-blue-900/20 to-cyan-900/20 border border-blue-800/30"
+                            : "bg-gradient-to-br from-blue-50 to-cyan-50 border border-blue-200"
+                        }`}
+                      >
                         <div className="flex items-center justify-between mb-4">
                           <div className="flex items-center gap-3">
                             <div className="p-2 rounded-lg bg-gradient-to-r from-blue-500 to-cyan-500">
                               <FileText className="w-5 h-5 text-white" />
                             </div>
                             <div>
-                              <h5 className={`font-bold text-lg ${theme === "dark" ? "text-white" : "text-gray-900"}`}>
+                              <h5
+                                className={`font-bold text-lg ${theme === "dark" ? "text-white" : "text-gray-900"}`}
+                              >
                                 Recent Applications
                               </h5>
-                              <p className={`text-sm ${theme === "dark" ? "text-gray-300" : "text-gray-600"}`}>
+                              <p
+                                className={`text-sm ${theme === "dark" ? "text-gray-300" : "text-gray-600"}`}
+                              >
                                 Track your property applications
                               </p>
                             </div>
                           </div>
-                          <span className={`px-3 py-1 rounded-full text-sm font-medium ${theme === "dark"
-                            ? "bg-blue-900/30 text-blue-300"
-                            : "bg-blue-100 text-blue-700"
-                            }`}>
-                            {applications.length} {applications.length === 1 ? 'application' : 'applications'}
+                          <span
+                            className={`px-3 py-1 rounded-full text-sm font-medium ${
+                              theme === "dark"
+                                ? "bg-blue-900/30 text-blue-300"
+                                : "bg-blue-100 text-blue-700"
+                            }`}
+                          >
+                            {applications.length}{" "}
+                            {applications.length === 1
+                              ? "application"
+                              : "applications"}
                           </span>
                         </div>
 
@@ -3799,35 +5160,55 @@ const BuyerRenter = () => {
                           {applications.slice(0, 3).map((app, index) => (
                             <div
                               key={index}
-                              className={`p-4 rounded-lg ${theme === "dark"
-                                ? "bg-gray-800/50 hover:bg-gray-700/50"
-                                : "bg-white hover:bg-gray-50"
-                                } border ${theme === "dark" ? "border-gray-700" : "border-gray-200"} transition-colors`}
+                              className={`p-4 rounded-lg ${
+                                theme === "dark"
+                                  ? "bg-gray-800/50 hover:bg-gray-700/50"
+                                  : "bg-white hover:bg-gray-50"
+                              } border ${theme === "dark" ? "border-gray-700" : "border-gray-200"} transition-colors`}
                             >
                               <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-3">
                                   <div className="w-10 h-10 rounded-lg overflow-hidden flex-shrink-0">
                                     <img
-                                      src={app.propertyImage || '/imgs/default-property.jpg'}
+                                      src={
+                                        app.propertyImage ||
+                                        "/imgs/default-property.jpg"
+                                      }
                                       alt="Property"
                                       className="w-full h-full object-cover"
                                     />
                                   </div>
                                   <div>
-                                    <h6 className={`font-medium ${theme === "dark" ? "text-white" : "text-gray-900"}`}>
-                                      {app.propertyTitle || 'Property Application'}
+                                    <h6
+                                      className={`font-medium ${theme === "dark" ? "text-white" : "text-gray-900"}`}
+                                    >
+                                      {app.propertyTitle ||
+                                        "Property Application"}
                                     </h6>
-                                    <p className={`text-xs ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`}>
-                                      Submitted {app.submittedDate ? new Date(app.submittedDate).toLocaleDateString() : 'Recently'}
+                                    <p
+                                      className={`text-xs ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`}
+                                    >
+                                      Submitted{" "}
+                                      {app.submittedDate
+                                        ? new Date(
+                                            app.submittedDate,
+                                          ).toLocaleDateString()
+                                        : "Recently"}
                                     </p>
                                   </div>
                                 </div>
-                                <span className={`px-3 py-1 rounded-full text-xs font-medium ${app.status === 'approved' ? 'bg-green-100 text-green-700' :
-                                  app.status === 'rejected' ? 'bg-red-100 text-red-700' :
-                                    app.status === 'pending' ? 'bg-yellow-100 text-yellow-700' :
-                                      'bg-gray-100 text-gray-700'
-                                  }`}>
-                                  {app.status || 'pending'}
+                                <span
+                                  className={`px-3 py-1 rounded-full text-xs font-medium ${
+                                    app.status === "approved"
+                                      ? "bg-green-100 text-green-700"
+                                      : app.status === "rejected"
+                                        ? "bg-red-100 text-red-700"
+                                        : app.status === "pending"
+                                          ? "bg-yellow-100 text-yellow-700"
+                                          : "bg-gray-100 text-gray-700"
+                                  }`}
+                                >
+                                  {app.status || "pending"}
                                 </span>
                               </div>
                             </div>
@@ -3840,10 +5221,11 @@ const BuyerRenter = () => {
                     <div className="flex flex-col sm:flex-row gap-4 justify-center pt-6 border-t border-gray-200 dark:border-gray-700">
                       <button
                         onClick={() => setActiveStep(5)}
-                        className={`px-6 py-3 font-semibold transition-all duration-300 ${theme === "dark"
-                          ? "bg-gradient-to-r from-gray-700 to-gray-800 text-gray-300 hover:from-gray-600 hover:to-gray-700"
-                          : "bg-gradient-to-r from-gray-200 to-gray-300 text-gray-700 hover:from-gray-300 hover:to-gray-400"
-                          } flex items-center gap-2`}
+                        className={`px-6 py-3 font-semibold transition-all duration-300 ${
+                          theme === "dark"
+                            ? "bg-gradient-to-r from-gray-700 to-gray-800 text-gray-300 hover:from-gray-600 hover:to-gray-700"
+                            : "bg-gradient-to-r from-gray-200 to-gray-300 text-gray-700 hover:from-gray-300 hover:to-gray-400"
+                        } flex items-center gap-2`}
                       >
                         <ArrowLeft className="w-4 h-4" />
                         Back to Step 5
@@ -3867,20 +5249,28 @@ const BuyerRenter = () => {
                     </div>
 
                     {/* Help Section */}
-                    <div className={`mt-8 p-6 rounded-xl ${theme === "dark"
-                      ? "bg-gradient-to-br from-amber-900/10 to-orange-900/10 border border-amber-700/30"
-                      : "bg-gradient-to-br from-amber-50 to-orange-50 border border-amber-200"
-                      }`}>
+                    <div
+                      className={`mt-8 p-6 rounded-xl ${
+                        theme === "dark"
+                          ? "bg-gradient-to-br from-amber-900/10 to-orange-900/10 border border-amber-700/30"
+                          : "bg-gradient-to-br from-amber-50 to-orange-50 border border-amber-200"
+                      }`}
+                    >
                       <div className="flex items-start gap-4">
                         <div className="p-2 rounded-lg bg-gradient-to-r from-amber-500 to-orange-500">
                           <HelpCircle className="w-6 h-6 text-white" />
                         </div>
                         <div>
-                          <h6 className={`font-bold text-lg mb-2 ${theme === "dark" ? "text-amber-300" : "text-amber-700"}`}>
+                          <h6
+                            className={`font-bold text-lg mb-2 ${theme === "dark" ? "text-amber-300" : "text-amber-700"}`}
+                          >
                             Need Help with Payments?
                           </h6>
-                          <p className={`text-sm mb-3 ${theme === "dark" ? "text-gray-300" : "text-gray-600"}`}>
-                            Our support team is here to help you with any payment-related questions or issues.
+                          <p
+                            className={`text-sm mb-3 ${theme === "dark" ? "text-gray-300" : "text-gray-600"}`}
+                          >
+                            Our support team is here to help you with any
+                            payment-related questions or issues.
                           </p>
                           <div className="flex gap-3">
                             <button
@@ -3895,7 +5285,9 @@ const BuyerRenter = () => {
                                   setSelectedBroker(brokers[0]);
                                   setShowChat(true);
                                 } else {
-                                  toast.error("No brokers available at the moment");
+                                  toast.error(
+                                    "No brokers available at the moment",
+                                  );
                                 }
                               }}
                               className="px-4 py-2 text-sm font-medium bg-amber-500 hover:bg-amber-600 text-white rounded-lg transition-colors"
@@ -3912,26 +5304,46 @@ const BuyerRenter = () => {
                   <div className="text-center py-8">
                     <div className="relative mx-auto w-36 h-36 mb-8">
                       <div className="absolute inset-0 bg-gradient-to-r from-amber-500 to-amber-800 rounded-full animate-pulse"></div>
-                      <div className={`absolute inset-4 ${theme === "dark" ? "bg-gray-800" : "bg-white"} rounded-full flex items-center justify-center`}>
-                        {React.createElement(currentSteps.find(s => s.number === activeStep)?.icon, {
-                          className: `w-16 h-16 ${theme === "dark" ? "text-amber-200" : "text-amber-500"}`
-                        })}
+                      <div
+                        className={`absolute inset-4 ${theme === "dark" ? "bg-gray-800" : "bg-white"} rounded-full flex items-center justify-center`}
+                      >
+                        {React.createElement(
+                          currentSteps.find((s) => s.number === activeStep)
+                            ?.icon,
+                          {
+                            className: `w-16 h-16 ${theme === "dark" ? "text-amber-200" : "text-amber-500"}`,
+                          },
+                        )}
                       </div>
                     </div>
-                    <h4 className={`text-2xl font-bold mb-6 ${theme === "dark" ? "text-white" : "text-gray-800"}`}>
-                      {currentSteps.find(s => s.number === activeStep)?.title}
+                    <h4
+                      className={`text-2xl font-bold mb-6 ${theme === "dark" ? "text-white" : "text-gray-800"}`}
+                    >
+                      {currentSteps.find((s) => s.number === activeStep)?.title}
                     </h4>
                     <div className="max-w-2xl mx-auto mb-10">
-                      <p className={`text-lg mb-6 ${theme === "dark" ? "text-gray-300" : "text-gray-600"}`}>
-                        {currentSteps.find(s => s.number === activeStep)?.description}
+                      <p
+                        className={`text-lg mb-6 ${theme === "dark" ? "text-gray-300" : "text-gray-600"}`}
+                      >
+                        {
+                          currentSteps.find((s) => s.number === activeStep)
+                            ?.description
+                        }
                       </p>
                     </div>
                     <div className="space-y-4">
                       <button
-                        onClick={() => currentSteps.find(s => s.number === activeStep)?.action()}
+                        onClick={() =>
+                          currentSteps
+                            .find((s) => s.number === activeStep)
+                            ?.action()
+                        }
                         className="px-10 py-4 font-bold text-lg bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white shadow-xl hover:shadow-2xl transition-all duration-300 hover:scale-105 rounded-xl"
                       >
-                        {currentSteps.find(s => s.number === activeStep)?.title}
+                        {
+                          currentSteps.find((s) => s.number === activeStep)
+                            ?.title
+                        }
                       </button>
                       {activeStep < 6 && (
                         <button
@@ -4043,7 +5455,8 @@ const BuyerRenter = () => {
           onClose={() => setShowScheduleViewingModal(false)}
           property={selectedProperty}
           broker={selectedBroker}
-          onSubmit={handleScheduleSubmit} // Make sure this prop is passed
+          user={user}
+          onSubmit={(appointmentData) => handleScheduleViewing(appointmentData)} // Fix here
         />
       )}
 

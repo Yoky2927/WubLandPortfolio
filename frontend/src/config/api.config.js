@@ -67,7 +67,48 @@ const API_CONFIG = {
 
   put: async (endpointKey, params = {}, data = {}, options = {}) => {
     return API_CONFIG.call(endpointKey, params, { ...options, method: 'PUT', data });
+  },
+
+  patch: async (endpointKey, params = {}, data = {}, options = {}) => {
+    return API_CONFIG.call(endpointKey, params, { ...options, method: 'PATCH', data });
+  },
+
+  delete: async (endpointKey, params = {}, options = {}) => {
+    return API_CONFIG.call(endpointKey, params, { ...options, method: 'DELETE' });
   }
 };
 
+// Named export for apiRequest (to fix the import error)
+export const apiRequest = async (endpointKey, params = {}, options = {}) => {
+  return API_CONFIG.call(endpointKey, params, options);
+};
+
+// Named export for getUrl as well (commonly used)
+export const getUrl = (endpointKey, params = {}) => {
+  return API_CONFIG.getUrl(endpointKey, params);
+};
+
+// Named export for convenience methods
+export const get = async (endpointKey, params = {}, options = {}) => {
+  return API_CONFIG.get(endpointKey, params, options);
+};
+
+export const post = async (endpointKey, data = {}, options = {}) => {
+  return API_CONFIG.post(endpointKey, data, options);
+};
+
+export const put = async (endpointKey, params = {}, data = {}, options = {}) => {
+  return API_CONFIG.put(endpointKey, params, data, options);
+};
+
+export const patch = async (endpointKey, params = {}, data = {}, options = {}) => {
+  return API_CONFIG.patch(endpointKey, params, data, options);
+};
+
+export const deleteRequest = async (endpointKey, params = {}, options = {}) => {
+  return API_CONFIG.delete(endpointKey, params, options);
+};
+
+// Export API_CONFIG as default
 export default API_CONFIG;
+

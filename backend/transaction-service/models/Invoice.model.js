@@ -1,3 +1,4 @@
+// models/Invoice.model.js - UPDATED WITH NULL HANDLING
 const db = require('../config/database');
 const { v4: uuidv4 } = require('uuid');
 
@@ -14,6 +15,31 @@ class Invoice {
     const invoiceUuid = uuidv4();
     const invoiceNumber = this.generateInvoiceNumber();
     
+    // Validate and convert all values
+    const params = [
+      invoiceUuid,
+      invoiceNumber,
+      invoiceData.invoice_type || 'general',
+      'draft',
+      invoiceData.from_user_id ? parseInt(invoiceData.from_user_id) : null,
+      invoiceData.to_user_id ? parseInt(invoiceData.to_user_id) : null,
+      invoiceData.property_id ? parseInt(invoiceData.property_id) : null,
+      invoiceData.transaction_id ? parseInt(invoiceData.transaction_id) : null,
+      parseFloat(invoiceData.amount) || 0,
+      parseFloat(invoiceData.tax_amount) || 0,
+      parseFloat(invoiceData.total_amount) || parseFloat(invoiceData.amount) || 0,
+      invoiceData.currency || 'ETB',
+      0, // paid_amount
+      parseFloat(invoiceData.total_amount) || parseFloat(invoiceData.amount) || 0, // balance_due
+      invoiceData.invoice_date || new Date(),
+      invoiceData.due_date || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+      JSON.stringify(invoiceData.line_items || []),
+      invoiceData.notes || '',
+      invoiceData.created_by_user_id ? parseInt(invoiceData.created_by_user_id) : null
+    ];
+    
+    console.log('Invoice.create params:', params);
+    
     const [result] = await db.execute(
       `INSERT INTO invoices (
         invoice_uuid, invoice_number, invoice_type, invoice_status,
@@ -21,27 +47,7 @@ class Invoice {
         amount, tax_amount, total_amount, currency, paid_amount, balance_due,
         invoice_date, due_date, line_items, notes, created_by_user_id
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [
-        invoiceUuid,
-        invoiceNumber,
-        invoiceData.invoice_type,
-        'draft',
-        invoiceData.from_user_id,
-        invoiceData.to_user_id,
-        invoiceData.property_id || null,
-        invoiceData.transaction_id || null,
-        invoiceData.amount,
-        invoiceData.tax_amount || 0,
-        invoiceData.total_amount || invoiceData.amount,
-        invoiceData.currency || 'ETB',
-        0,
-        invoiceData.total_amount || invoiceData.amount,
-        invoiceData.invoice_date || new Date(),
-        invoiceData.due_date || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
-        JSON.stringify(invoiceData.line_items || []),
-        invoiceData.notes || '',
-        invoiceData.created_by_user_id
-      ]
+      params
     );
     
     return this.findById(result.insertId);

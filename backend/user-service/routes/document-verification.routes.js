@@ -1,9 +1,9 @@
 // backend/user-service/routes/document-verification.routes.js
-import express from 'express';
-import multer from 'multer';
-import path from 'path';
-import { fileURLToPath } from 'url';
-import fs from 'fs';
+import express from "express";
+import multer from "multer";
+import path from "path";
+import { fileURLToPath } from "url";
+import fs from "fs";
 import {
   getUserVerificationStatus,
   uploadVerificationDocument,
@@ -21,9 +21,10 @@ import {
   getVerifiedUsers,
   getRejectedUsers,
   reviewIndividualDocument,
-  getDocumentFeedback
-} from '../controllers/document-verification.controller.js';
-import { verifyToken, verifyAdmin } from '../middleware/auth.middleware.js';
+  getDocumentFeedback,
+  updateDocumentStatus,
+} from "../controllers/document-verification.controller.js";
+import { verifyToken, verifyAdmin } from "../middleware/auth.middleware.js";
 
 const router = express.Router();
 
@@ -35,65 +36,90 @@ const __dirname = path.dirname(__filename);
 const uploadVerificationDoc = multer({
   storage: multer.diskStorage({
     destination: function (req, file, cb) {
-      const uploadDir = path.join(__dirname, '../Uploads/verification-documents');
+      const uploadDir = path.join(
+        __dirname,
+        "../Uploads/verification-documents"
+      );
       if (!fs.existsSync(uploadDir)) {
         fs.mkdirSync(uploadDir, { recursive: true });
       }
       cb(null, uploadDir);
     },
     filename: function (req, file, cb) {
-      const userId = req.user?.id || 'unknown';
+      const userId = req.user?.id || "unknown";
       const timestamp = Date.now();
-      const originalName = path.parse(file.originalname).name;
+      const originalName = path
+        .parse(file.originalname)
+        .name.replace(/[^a-zA-Z0-9]/g, "_");
       const ext = path.extname(file.originalname);
-      const safeName = `${userId}_${timestamp}_${originalName}${ext}`.replace(/[^a-zA-Z0-9._-]/g, '_');
+      const safeName = `${userId}_${timestamp}_${originalName}${ext}`;
       cb(null, safeName);
-    }
+    },
   }),
   limits: {
-    fileSize: 10 * 1024 * 1024, // 10MB limit
+    fileSize: 10 * 1024 * 1024, // 10MB
   },
   fileFilter: function (req, file, cb) {
-    const allowedTypes = /jpeg|jpg|png|pdf|webp|svg/;
-    const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
-    const mimetype = allowedTypes.test(file.mimetype);
+    const allowedTypes = [
+      "image/jpeg",
+      "image/jpg",
+      "image/png",
+      "image/webp",
+      "image/svg+xml",
+      "application/pdf",
+    ];
 
-    if (mimetype && extname) {
-      return cb(null, true);
+    if (allowedTypes.includes(file.mimetype)) {
+      cb(null, true);
     } else {
-      cb(new Error('Only image, PDF, and document files are allowed'));
+      cb(new Error("Invalid file type. Only images and PDFs are allowed."));
     }
-  }
+  },
 });
+
+// SIMPLIFY the upload route - remove complex handling
+router.post(
+  "/documents/upload",
+  verifyToken,
+  uploadVerificationDoc.single("document"),
+  uploadVerificationDocument
+);
+
 const handleUpload = (req, res, next) => {
   // Check if request is JSON (not FormData)
-  const contentType = req.headers['content-type'];
-  if (contentType && contentType.includes('application/json')) {
+  const contentType = req.headers["content-type"];
+  if (contentType && contentType.includes("application/json")) {
     // Skip multer for JSON requests
     console.log("📝 JSON request detected, skipping multer");
     return next();
   }
   // Use multer for FormData requests
   console.log("📝 FormData request detected, using multer");
-  uploadVerificationDoc.single('document')(req, res, next);
+  uploadVerificationDoc.single("document")(req, res, next);
 };
 
 // User routes (requires authentication)
-router.get('/status', verifyToken, getUserVerificationStatus);
+router.get("/status", verifyToken, getUserVerificationStatus);
 
 // NEW: Get current user's documents
-router.get('/documents/my', verifyToken, getCurrentUserDocuments);
+router.get("/documents/my", verifyToken, getCurrentUserDocuments);
 
 // Get documents for a specific user (admin or user themselves)
-router.get('/documents/user/:userId', verifyToken, getDocumentsForUser);
+router.get("/documents/user/:userId", verifyToken, getDocumentsForUser);
+
+router.post('/documents/:documentId/status', verifyToken, verifyAdmin, updateDocumentStatus);
 
 // Single route that handles both JSON and FormData
-router.post('/documents/upload', verifyToken, handleUpload, uploadVerificationDocument);
-
+router.post(
+  "/documents/upload",
+  verifyToken,
+  handleUpload,
+  uploadVerificationDocument
+);
 
 export const uploadTimeoutMiddleware = (req, res, next) => {
   // Only apply timeout to upload routes
-  if (req.path.includes('/documents/upload')) {
+  if (req.path.includes("/documents/upload")) {
     const timeout = 30000; // 30 seconds
 
     // Set timeout
@@ -117,7 +143,7 @@ export const uploadTimeoutMiddleware = (req, res, next) => {
         res.status(408).json({
           success: false,
           message: "Upload timeout. Please try again with a smaller file.",
-          code: 'UPLOAD_TIMEOUT'
+          code: "UPLOAD_TIMEOUT",
         });
       }
     }, timeout);
@@ -127,32 +153,67 @@ export const uploadTimeoutMiddleware = (req, res, next) => {
 };
 
 // In your routes file, use it like this:
-router.post('/documents/upload',
+router.post(
+  "/documents/upload",
   verifyToken,
   uploadTimeoutMiddleware,
   handleUpload,
   uploadVerificationDocument
 );
 
-
 // Admin routes (requires admin role)
-router.get('/admin/pending', verifyToken, verifyAdmin, getPendingVerifications);
-router.post('/admin/document/:documentId/review', verifyToken, verifyAdmin, reviewDocument);
-router.post('/admin/user/:userId/verify', verifyToken, verifyAdmin, completeUserVerification);
-router.get('/admin/stats', verifyToken, verifyAdmin, getVerificationStats);
+router.get("/admin/pending", verifyToken, verifyAdmin, getPendingVerifications);
+router.post(
+  "/admin/document/:documentId/review",
+  verifyToken,
+  verifyAdmin,
+  reviewDocument
+);
+router.post(
+  "/admin/user/:userId/verify",
+  verifyToken,
+  verifyAdmin,
+  completeUserVerification
+);
+router.get("/admin/stats", verifyToken, verifyAdmin, getVerificationStats);
 // Individual document review (for document-level feedback)
-router.post('/admin/document/:documentId/review-individual', verifyToken, verifyAdmin, reviewIndividualDocument);
+router.post(
+  "/admin/document/:documentId/review-individual",
+  verifyToken,
+  verifyAdmin,
+  reviewIndividualDocument
+);
 
 // NEW: Feedback and status routes
-router.post('/reject/:userId', verifyToken, verifyAdmin, rejectWithFeedback);
-router.post('/request-resubmission/:userId', verifyToken, verifyAdmin, requestResubmission);
-router.get('/history/:userId', verifyToken, verifyAdmin, getVerificationHistory);
-router.get('/status/:userId', verifyToken, verifyAdmin, getVerificationStatusById);
-router.post('/update-step/:userId', verifyToken, verifyAdmin, updateVerificationStep);
-router.get('/documents/:documentId/feedback', verifyToken, getDocumentFeedback);
+router.post("/reject/:userId", verifyToken, verifyAdmin, rejectWithFeedback);
+router.post(
+  "/request-resubmission/:userId",
+  verifyToken,
+  verifyAdmin,
+  requestResubmission
+);
+router.get(
+  "/history/:userId",
+  verifyToken,
+  verifyAdmin,
+  getVerificationHistory
+);
+router.get(
+  "/status/:userId",
+  verifyToken,
+  verifyAdmin,
+  getVerificationStatusById
+);
+router.post(
+  "/update-step/:userId",
+  verifyToken,
+  verifyAdmin,
+  updateVerificationStep
+);
+router.get("/documents/:documentId/feedback", verifyToken, getDocumentFeedback);
 
 // NEW: Filtered user lists
-router.get('/admin/verified', verifyToken, verifyAdmin, getVerifiedUsers);
-router.get('/admin/rejected', verifyToken, verifyAdmin, getRejectedUsers);
+router.get("/admin/verified", verifyToken, verifyAdmin, getVerifiedUsers);
+router.get("/admin/rejected", verifyToken, verifyAdmin, getRejectedUsers);
 
 export default router;

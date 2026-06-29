@@ -1,5 +1,5 @@
 // communication-service/models/appointmentAttendee.model.js
-import db from '../../shared/db.js';
+import db from "../../shared/db.js";
 
 class AppointmentAttendeeModel {
   // Add attendee to appointment
@@ -7,25 +7,27 @@ class AppointmentAttendeeModel {
     try {
       const {
         broker_id = null,
-        attendee_role = 'client',
-        attendee_status = 'invited',
+        attendee_role = "client",
+        attendee_status = "invited",
         is_broker = false,
         send_reminder = true,
         additional_guests = 0,
-        notes = null
+        // REMOVE notes from here since it doesn't exist in DB
       } = attendeeData;
 
       const query = `
-        INSERT INTO appointment_attendees (
-          appointment_id, user_id, broker_id, attendee_role,
-          attendee_status, is_broker, send_reminder,
-          additional_guests, notes
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ON DUPLICATE KEY UPDATE
-          attendee_status = VALUES(attendee_status),
-          updated_at = CURRENT_TIMESTAMP
-      `;
-      
+      INSERT INTO appointment_attendees (
+        appointment_id, user_id, broker_id, attendee_role,
+        attendee_status, is_broker, send_reminder,
+        additional_guests
+        -- REMOVED notes column
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      -- Changed from 9 to 8 values
+      ON DUPLICATE KEY UPDATE
+        attendee_status = VALUES(attendee_status),
+        updated_at = CURRENT_TIMESTAMP
+    `;
+
       const values = [
         appointmentId,
         userId,
@@ -35,14 +37,13 @@ class AppointmentAttendeeModel {
         is_broker,
         send_reminder,
         additional_guests,
-        notes
+        // REMOVED notes value
       ];
-      
+
       const [result] = await db.execute(query, values);
       return result.insertId;
-      
     } catch (error) {
-      console.error('Error adding attendee:', error);
+      console.error("Error adding attendee:", error);
       throw error;
     }
   }
@@ -62,12 +63,11 @@ class AppointmentAttendeeModel {
         WHERE aa.appointment_id = ?
         ORDER BY aa.created_at ASC
       `;
-      
+
       const [rows] = await db.execute(query, [appointmentId]);
       return rows;
-      
     } catch (error) {
-      console.error('Error getting appointment attendees:', error);
+      console.error("Error getting appointment attendees:", error);
       throw error;
     }
   }
@@ -85,12 +85,16 @@ class AppointmentAttendeeModel {
             END
         WHERE appointment_id = ? AND user_id = ?
       `;
-      
-      const [result] = await db.execute(query, [status, status, appointmentId, userId]);
+
+      const [result] = await db.execute(query, [
+        status,
+        status,
+        appointmentId,
+        userId,
+      ]);
       return result.affectedRows > 0;
-      
     } catch (error) {
-      console.error('Error updating attendee status:', error);
+      console.error("Error updating attendee status:", error);
       throw error;
     }
   }
@@ -102,12 +106,11 @@ class AppointmentAttendeeModel {
         DELETE FROM appointment_attendees 
         WHERE appointment_id = ? AND user_id = ?
       `;
-      
+
       const [result] = await db.execute(query, [appointmentId, userId]);
       return result.affectedRows > 0;
-      
     } catch (error) {
-      console.error('Error removing attendee:', error);
+      console.error("Error removing attendee:", error);
       throw error;
     }
   }
@@ -129,46 +132,45 @@ class AppointmentAttendeeModel {
         LEFT JOIN users b ON a.broker_id = b.id
         WHERE aa.user_id = ? AND a.deleted_at IS NULL
       `;
-      
+
       const values = [userId];
-      
+
       if (filters.status) {
-        query += ' AND a.status = ?';
+        query += " AND a.status = ?";
         values.push(filters.status);
       }
-      
+
       if (filters.attendee_status) {
-        query += ' AND aa.attendee_status = ?';
+        query += " AND aa.attendee_status = ?";
         values.push(filters.attendee_status);
       }
-      
+
       if (filters.start_date) {
-        query += ' AND a.scheduled_date >= ?';
+        query += " AND a.scheduled_date >= ?";
         values.push(filters.start_date);
       }
-      
+
       if (filters.end_date) {
-        query += ' AND a.scheduled_date <= ?';
+        query += " AND a.scheduled_date <= ?";
         values.push(filters.end_date);
       }
-      
-      query += ' ORDER BY a.start_time DESC';
-      
+
+      query += " ORDER BY a.start_time DESC";
+
       if (filters.limit) {
-        query += ' LIMIT ?';
+        query += " LIMIT ?";
         values.push(filters.limit);
       }
-      
+
       if (filters.offset) {
-        query += ' OFFSET ?';
+        query += " OFFSET ?";
         values.push(filters.offset);
       }
-      
+
       const [rows] = await db.execute(query, values);
       return rows;
-      
     } catch (error) {
-      console.error('Error getting user appointments as attendee:', error);
+      console.error("Error getting user appointments as attendee:", error);
       throw error;
     }
   }
@@ -181,12 +183,11 @@ class AppointmentAttendeeModel {
         FROM appointment_attendees
         WHERE appointment_id = ? AND user_id = ?
       `;
-      
+
       const [rows] = await db.execute(query, [appointmentId, userId]);
       return rows[0].count > 0;
-      
     } catch (error) {
-      console.error('Error checking if user is attendee:', error);
+      console.error("Error checking if user is attendee:", error);
       throw error;
     }
   }
@@ -204,12 +205,19 @@ class AppointmentAttendeeModel {
         FROM appointment_attendees
         WHERE appointment_id = ?
       `;
-      
+
       const [rows] = await db.execute(query, [appointmentId]);
-      return rows[0] || { total: 0, confirmed: 0, attended: 0, no_show: 0, additional_guests: 0 };
-      
+      return (
+        rows[0] || {
+          total: 0,
+          confirmed: 0,
+          attended: 0,
+          no_show: 0,
+          additional_guests: 0,
+        }
+      );
     } catch (error) {
-      console.error('Error getting attendee count:', error);
+      console.error("Error getting attendee count:", error);
       throw error;
     }
   }
@@ -223,12 +231,11 @@ class AppointmentAttendeeModel {
             updated_at = CURRENT_TIMESTAMP
         WHERE appointment_id = ? AND user_id = ?
       `;
-      
+
       const [result] = await db.execute(query, [appointmentId, userId]);
       return result.affectedRows > 0;
-      
     } catch (error) {
-      console.error('Error marking attendee as attended:', error);
+      console.error("Error marking attendee as attended:", error);
       throw error;
     }
   }

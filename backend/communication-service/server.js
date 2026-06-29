@@ -102,10 +102,11 @@ const corsOptions = {
 // Rate limiting
 const apiLimiter = rateLimit({
     windowMs: 15 * 60 * 1000,
-    max: 100,
+    max: 500,
     message: 'Too many requests from this IP, please try again later.',
     standardHeaders: true,
     legacyHeaders: false,
+    skipSuccessfulRequests: true,
 });
 
 const authLimiter = rateLimit({

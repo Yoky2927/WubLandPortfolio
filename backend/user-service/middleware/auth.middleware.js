@@ -2,13 +2,55 @@
 import jwt from "jsonwebtoken";
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
+import crypto from 'crypto';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
+// Store processed request IDs to avoid duplicate logging
+const processedRequests = new Map();
+const CLEANUP_INTERVAL = 60000; // 1 minute
+
+// Clean up old entries periodically
+setInterval(() => {
+  const now = Date.now();
+  for (const [requestId, timestamp] of processedRequests.entries()) {
+    if (now - timestamp > CLEANUP_INTERVAL) {
+      processedRequests.delete(requestId);
+    }
+  }
+}, CLEANUP_INTERVAL);
+
+// Helper to check if we should log for this request
+function shouldLog(req, type) {
+  const requestId = req.requestId;
+  const logKey = `${requestId}_${type}`;
+  
+  if (processedRequests.has(logKey)) {
+    return false;
+  }
+  
+  processedRequests.set(logKey, Date.now());
+  return true;
+}
+
+// Generate or get request ID
+function getRequestId(req) {
+  if (!req.requestId) {
+    req.requestId = req.headers['x-request-id'] || crypto.randomBytes(4).toString('hex');
+  }
+  return req.requestId;
+}
+
 export const verifyToken = async (req, res, next) => {
+  // Set request ID
+  const requestId = getRequestId(req);
+  
   try {
-    console.log('=== VERIFY TOKEN ===');
+    // Only log in development and only once per request
+    if (process.env.NODE_ENV === 'development' && shouldLog(req, 'verifyToken_start')) {
+      console.log(`[${requestId}] === VERIFY TOKEN ===`);
+    }
 
     // Get token
     let token = req.cookies?.jwt;
@@ -16,44 +58,56 @@ export const verifyToken = async (req, res, next) => {
     if (!token && req.headers.authorization) {
       if (req.headers.authorization.startsWith('Bearer ')) {
         token = req.headers.authorization.substring(7);
-        console.log('Token from Authorization header');
+        if (process.env.NODE_ENV === 'development' && shouldLog(req, 'token_source')) {
+          console.log(`[${requestId}] Token from Authorization header`);
+        }
       }
     }
 
-    console.log('Token exists:', !!token);
-
     if (!token || token === 'null' || token === 'undefined' || token.trim() === '') {
-      console.log('❌ No token provided');
+      console.log(`[${requestId}] ❌ No token provided`);
       return res.status(401).json({ message: 'Authentication required' });
     }
 
     // Decode token
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    console.log('🔐 Decoded token user ID:', decoded.userId);
+    
+    if (process.env.NODE_ENV === 'development' && shouldLog(req, 'token_decoded')) {
+      console.log(`[${requestId}] 🔐 Decoded token user ID:`, decoded.userId);
+    }
 
-    // FIXED: Use the correct path
+    // Import database
     const db = await import("../../shared/db.js").then(mod => mod.default);
-    console.log('✅ Database imported successfully from ../../shared/db.js');
+    
+    if (process.env.NODE_ENV === 'development' && shouldLog(req, 'db_import')) {
+      console.log(`[${requestId}] ✅ Database imported successfully`);
+    }
 
     const userId = decoded.userId;
-    console.log('Looking for user with ID:', userId);
+    
+    // Only log user lookup in development and not too frequently
+    if (process.env.NODE_ENV === 'development' && shouldLog(req, 'user_lookup')) {
+      console.log(`[${requestId}] Looking for user with ID:`, userId);
+    }
 
     const [users] = await db.query(
       "SELECT id, username, email, role, status, verified FROM users WHERE id = ?",
       [userId]
     );
 
-    console.log('Database query result:', users.length, 'users found');
-
     if (users.length === 0) {
-      console.log('❌ User not found in database. User ID:', userId);
+      console.log(`[${requestId}] ❌ User not found in database. User ID:`, userId);
       return res.status(404).json({ message: 'User not found' });
     }
 
     const user = users[0];
-    console.log('✅ User found:', user.id, user.username, user.role);
+    
+    // Only log user found once per request
+    if (process.env.NODE_ENV === 'development' && shouldLog(req, 'user_found')) {
+      console.log(`[${requestId}] ✅ User found:`, user.id, user.username, user.role);
+    }
 
-    // IMPORTANT: Attach ALL user properties to req.user
+    // Attach ALL user properties to req.user
     req.user = {
       id: user.id,
       username: user.username,
@@ -63,12 +117,15 @@ export const verifyToken = async (req, res, next) => {
       verified: user.verified
     };
 
-    console.log('✅ req.user object set:', req.user);
+    // Log only once per request
+    if (process.env.NODE_ENV === 'development' && shouldLog(req, 'user_set')) {
+      console.log(`[${requestId}] ✅ req.user object set`);
+    }
 
     next();
 
   } catch (error) {
-    console.error('❌ Token verification error:', error.message);
+    console.error(`[${requestId}] ❌ Token verification error:`, error.message);
 
     if (error.name === 'JsonWebTokenError') {
       return res.status(401).json({ message: 'Invalid token' });
@@ -82,25 +139,23 @@ export const verifyToken = async (req, res, next) => {
   }
 };
 
-
 export const protectRoute = async (req, res, next) => {
+  const requestId = getRequestId(req);
+  
   try {
-    console.log('🔐 PROTECT ROUTE ===');
+    if (process.env.NODE_ENV === 'development' && shouldLog(req, 'protectRoute')) {
+      console.log(`[${requestId}] 🔐 PROTECT ROUTE ===`);
+    }
 
     const token = req.cookies?.jwt || req.headers.authorization?.replace('Bearer ', '');
-    console.log('Token exists:', !!token);
-
+    
     if (!token) return res.status(401).json({ message: "Unauthorized - No Token" });
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    console.log('Decoded token user ID:', decoded.userId);
-
+    
     const db = await import("../../shared/db.js").then(mod => mod.default);
-    console.log('✅ Database imported successfully in protectRoute');
-
     const userId = decoded.userId;
 
-    // FIX: Query for ALL necessary fields like verifyToken does
     const [users] = await db.query(
       `SELECT id, first_name, last_name, username, email, role, 
               privilege_tier, status, profile_picture, verified,
@@ -111,14 +166,12 @@ export const protectRoute = async (req, res, next) => {
     );
 
     if (users.length === 0) {
-      console.log('❌ User not found in protectRoute');
+      console.log(`[${requestId}] ❌ User not found in protectRoute`);
       return res.status(404).json({ message: "User not found" });
     }
 
     const user = users[0];
-    console.log('✅ User authenticated:', user.id, user.username);
-
-    // FIX: Make sure req.user has ALL necessary properties
+    
     req.user = {
       id: user.id,
       username: user.username,
@@ -128,14 +181,12 @@ export const protectRoute = async (req, res, next) => {
       verified: user.verified,
       privilege_tier: user.privilege_tier,
       password_change_required: user.password_change_required,
-      // Add broker_type if user is a broker
       ...(user.role.includes('broker') ? { broker_type: await getBrokerType(user.id) } : {})
     };
 
-    console.log('✅ req.user set in protectRoute:', req.user);
     next();
   } catch (err) {
-    console.error("❌ protectRoute error:", err.message);
+    console.error(`[${requestId}] ❌ protectRoute error:`, err.message);
 
     if (err.name === 'JsonWebTokenError') {
       return res.status(401).json({ message: "Invalid token" });
@@ -170,24 +221,26 @@ async function getBrokerType(userId) {
 // Add this alias for authenticateToken
 export const authenticateToken = protectRoute;
 
-// Enhanced role verification
+// Enhanced role verification with reduced logging
 export const verifyAdmin = async (req, res, next) => {
-  console.log('🟡 VERIFY ADMIN CALLED');
-  console.log('🟡 req.user:', req.user);
-  console.log('🟡 req.user.id:', req.user?.id);
-  console.log('🟡 req.user.role:', req.user?.role);
+  const requestId = getRequestId(req);
+  
+  // Only log in development and once per request
+  if (process.env.NODE_ENV === 'development' && shouldLog(req, 'verifyAdmin')) {
+    console.log(`[${requestId}] 🟡 VERIFY ADMIN CALLED`);
+  }
 
   const adminRoles = ['admin', 'super_admin', 'support_admin'];
 
   // Check if req.user exists
   if (!req.user) {
-    console.log('❌ verifyAdmin: req.user is undefined');
+    console.log(`[${requestId}] ❌ verifyAdmin: req.user is undefined`);
     return res.status(401).json({ message: 'User not found' });
   }
 
   if (!adminRoles.includes(req.user.role)) {
-    console.log('❌ verifyAdmin: Access denied for role:', req.user.role);
-    console.log('❌ Allowed roles:', adminRoles);
+    // Always log access denied for security
+    console.log(`[${requestId}] ❌ verifyAdmin: Access denied for role:`, req.user.role);
     return res.status(403).json({
       message: 'Admin access required',
       userRole: req.user.role,
@@ -195,21 +248,26 @@ export const verifyAdmin = async (req, res, next) => {
     });
   }
 
-  console.log('✅ verifyAdmin passed');
+  // Only log success in development
+  if (process.env.NODE_ENV === 'development' && shouldLog(req, 'verifyAdmin_success')) {
+    console.log(`[${requestId}] ✅ verifyAdmin passed`);
+  }
+  
   next();
 };
 
 export const verifySupportStaff = async (req, res, next) => {
+  const requestId = getRequestId(req);
+  
   try {
-    console.log('=== VERIFY SUPPORT STAFF ===');
-    console.log('User role:', req.user?.role);
-    console.log('User ID:', req.user?.id);
+    if (process.env.NODE_ENV === 'development' && shouldLog(req, 'verifySupportStaff')) {
+      console.log(`[${requestId}] === VERIFY SUPPORT STAFF ===`);
+    }
 
     const supportRoles = ['support_agent', 'support_lead', 'support_admin', 'super_admin', 'admin'];
 
     if (!supportRoles.includes(req.user?.role)) {
-      console.log('❌ Access denied. User role not in allowed roles:', req.user?.role);
-      console.log('Allowed roles:', supportRoles);
+      console.log(`[${requestId}] ❌ Access denied. User role not in allowed roles:`, req.user?.role);
       return res.status(403).json({
         message: 'Support staff access required',
         userRole: req.user?.role,
@@ -217,26 +275,42 @@ export const verifySupportStaff = async (req, res, next) => {
       });
     }
 
-    console.log('✅ Support staff verification passed');
+    if (process.env.NODE_ENV === 'development' && shouldLog(req, 'verifySupportStaff_success')) {
+      console.log(`[${requestId}] ✅ Support staff verification passed`);
+    }
+    
     next();
   } catch (error) {
-    console.error('❌ verifySupportStaff error:', error);
+    console.error(`[${requestId}] ❌ verifySupportStaff error:`, error);
     res.status(500).json({ message: 'Role verification failed' });
   }
 };
 
 export const verifySupportLead = async (req, res, next) => {
+  const requestId = getRequestId(req);
   const leadRoles = ['support_lead', 'support_admin', 'super_admin'];
+  
   if (!leadRoles.includes(req.user.role)) {
+    console.log(`[${requestId}] ❌ verifySupportLead failed for role:`, req.user.role);
     return res.status(403).json({ message: 'Support lead access required' });
   }
+  
   next();
 };
 
 export const verifySupportAdmin = async (req, res, next) => {
+  const requestId = getRequestId(req);
   const adminRoles = ['support_admin', 'super_admin'];
+  
   if (!adminRoles.includes(req.user.role)) {
+    console.log(`[${requestId}] ❌ verifySupportAdmin failed for role:`, req.user.role);
     return res.status(403).json({ message: 'Support admin access required' });
   }
+  
   next();
+};
+
+// Add a cleanup function for testing
+export const clearProcessedRequests = () => {
+  processedRequests.clear();
 };

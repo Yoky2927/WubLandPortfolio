@@ -36,6 +36,8 @@ import {
 } from "lucide-react";
 import { toast } from "react-hot-toast";
 
+
+
 const BrokerProfessionalTools = ({ brokerId, propertyRequestId, onComplete, clientData = null }) => {
   const { theme } = useTheme();
   const [activeStep, setActiveStep] = useState(1);

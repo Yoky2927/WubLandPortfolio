@@ -1,8 +1,0 @@
-﻿# Chapa Configuration
-CHAPA_SECRET_KEY=CHASECK_TEST-vdQIck4Kn83Bbr2HVNPHOJmQKtWfm4nE
-CHAPA_PUBLIC_KEY=CHAPUBK_TEST-s71PeAIStOAtPEGr0dxnatJVV0mYKShX
-CHAPA_WEBHOOK_SECRET=rftJ1V4QnKe3sPwHX9vLFEuYTGI0MZRaciqNU8lo
-CHAPA_BASE_URL=https://api.chapa.co/v1
-
-# Ngrok URL
-NGROK_URL=https://unexigible-econometrical-allena.ngrok-free.dev

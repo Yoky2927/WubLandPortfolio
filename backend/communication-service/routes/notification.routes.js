@@ -16,6 +16,7 @@ router.put('/:notificationId/read', NotificationController.markAsRead);
 router.put('/mark-all-read', NotificationController.markAllAsRead);
 router.put('/:notificationId/archive', NotificationController.archiveNotification);
 router.delete('/:notificationId', NotificationController.deleteNotification);
+router.post('/trigger', NotificationController.triggerNotification);
 
 // ========== INTERNAL API (for other services) ==========
 // Add a route for internal services to create notifications

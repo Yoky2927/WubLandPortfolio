@@ -22,9 +22,9 @@ const AccountStatusBanner = ({
           action: "Contact support to appeal",
           showContact: true,
           showResend: false,
-          titleColor: "text-red-800 dark:text-red-300",
-          textColor: "text-gray-900 dark:text-gray-200",
-          secondaryTextColor: "text-gray-700 dark:text-gray-300"
+          titleColor: "text-black dark:text-white",
+          textColor: "text-black dark:text-white",
+          secondaryTextColor: "text-black/80 dark:text-white/80"
         };
       case 'inactive':
         return {
@@ -36,9 +36,9 @@ const AccountStatusBanner = ({
           action: "Contact support to reactivate",
           showContact: true,
           showResend: false,
-          titleColor: "text-yellow-800 dark:text-yellow-300",
-          textColor: "text-gray-900 dark:text-gray-200",
-          secondaryTextColor: "text-gray-700 dark:text-gray-300"
+          titleColor: "text-black dark:text-white",
+          textColor: "text-black dark:text-white",
+          secondaryTextColor: "text-black/80 dark:text-white/80"
         };
       case 'unverified':
         return {
@@ -50,9 +50,9 @@ const AccountStatusBanner = ({
           action: "Check your inbox for verification link",
           showContact: false,
           showResend: true,
-          titleColor: "text-blue-800 dark:text-blue-300",
-          textColor: "text-gray-900 dark:text-gray-200",
-          secondaryTextColor: "text-gray-700 dark:text-gray-300"
+          titleColor: "text-black dark:text-white",
+          textColor: "text-black dark:text-white",
+          secondaryTextColor: "text-black/80 dark:text-white/80"
         };
       case 'password_change_required':
         return {
@@ -64,9 +64,9 @@ const AccountStatusBanner = ({
           action: "Change password now",
           showContact: false,
           showResend: false,
-          titleColor: "text-amber-800 dark:text-amber-300",
-          textColor: "text-gray-900 dark:text-gray-200",
-          secondaryTextColor: "text-gray-700 dark:text-gray-300"
+          titleColor: "text-black dark:text-white",
+          textColor: "text-black dark:text-white",
+          secondaryTextColor: "text-black/80 dark:text-white/80"
         };
       default:
         return {
@@ -78,9 +78,9 @@ const AccountStatusBanner = ({
           action: null,
           showContact: false,
           showResend: false,
-          titleColor: "text-green-800 dark:text-green-300",
-          textColor: "text-gray-900 dark:text-gray-200",
-          secondaryTextColor: "text-gray-700 dark:text-gray-300"
+          titleColor: "text-black dark:text-white",
+          textColor: "text-black dark:text-white",
+          secondaryTextColor: "text-black/80 dark:text-white/80"
         };
     }
   };
@@ -132,7 +132,7 @@ const AccountStatusBanner = ({
           <div className="mb-3">
             <div className={`p-3 rounded-full ${theme === 'dark' ? 'bg-black/20' : 'bg-white/50'}`}>
               {React.cloneElement(config.icon, {
-                className: `w-8 h-8 ${config.titleColor}`
+                className: `w-8 h-8 ${theme === 'dark' ? 'text-white' : 'text-black'}`
               })}
             </div>
           </div>
@@ -151,8 +151,8 @@ const AccountStatusBanner = ({
           <div className="flex flex-col items-center mb-5">
             <div className={`inline-flex items-center gap-2 px-4 py-2 rounded-full ${theme === 'dark' ? 'bg-black/20' : 'bg-white/50'} ${config.secondaryTextColor} text-sm`}>
               <span className="font-medium">{userInfo.email}</span>
-              <span className={`${theme === 'dark' ? 'text-gray-400' : 'text-gray-600'}`}>•</span>
-              <span className={`font-semibold ${theme === 'dark' ? 'text-amber-300' : 'text-amber-600'}`}>
+              <span className={theme === 'dark' ? 'text-white/60' : 'text-black/60'}>•</span>
+              <span className={`font-semibold ${theme === 'dark' ? 'text-white' : 'text-black'}`}>
                 {userInfo.role}
               </span>
             </div>
@@ -211,8 +211,8 @@ const AccountStatusBanner = ({
           onClick={onClose}
           className={`absolute top-3 right-3 p-1.5 rounded-full transition-colors 
             ${theme === 'dark' 
-              ? 'hover:bg-gray-700 text-gray-400 hover:text-gray-200' 
-              : 'hover:bg-gray-200 text-gray-500 hover:text-gray-700'
+              ? 'hover:bg-gray-700 text-white hover:text-white' 
+              : 'hover:bg-gray-200 text-black hover:text-black'
             }`}
         >
           <X className="w-4 h-4" />

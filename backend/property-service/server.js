@@ -1,4 +1,4 @@
-// backend/property-service/server.js - CORRECTED VERSION
+// backend/property-service/server.js - UPDATED WITH WORKFLOW
 import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
@@ -9,10 +9,16 @@ import cookieParser from "cookie-parser";
 import path from "path";
 import { fileURLToPath } from "url";
 import fs from "fs";
+import multer from "multer";
 
 // Import controllers
 import BuyerController from "./controllers/buyerController.js";
-import { authenticate } from './middlewares/auth.middleware.js';
+import { authenticate } from "./middlewares/auth.middleware.js";
+import { checkRole } from "./middlewares/role.middleware.js";
+
+// Import Workflow Controller
+import WorkflowController from "./controllers/workflow.controller.js";
+import PropertyRequestController from "./controllers/propertyRequest.controller.js";
 
 dotenv.config();
 
@@ -23,8 +29,46 @@ const PORT = process.env.PORT || 5002;
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-console.log('\n🚀 PROPERTY SERVICE STARTING...\n');
+console.log("\n🚀 PROPERTY SERVICE STARTING...\n");
 
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    // Create temp directory if it doesn't exist
+    const tempDir = path.join(__dirname, "uploads/temp/");
+    if (!fs.existsSync(tempDir)) {
+      fs.mkdirSync(tempDir, { recursive: true });
+    }
+    cb(null, tempDir);
+  },
+  filename: function (req, file, cb) {
+    // Keep the original filename for debugging
+    const safeName = file.originalname.replace(/[^a-zA-Z0-9._-]/g, "_");
+    cb(
+      null,
+      Date.now() + "-" + Math.round(Math.random() * 1e9) + "-" + safeName,
+    );
+  },
+});
+
+// Update multer config to be more tolerant
+const upload = multer({
+  storage: storage,
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit
+  fileFilter: function (req, file, cb) {
+    console.log("📁 Multer checking file:", {
+      originalname: file.originalname,
+      mimetype: file.mimetype,
+      // Don't log size - it might be undefined for browser-generated files
+    });
+
+    // Accept all image files
+    if (file.mimetype && file.mimetype.startsWith("image/")) {
+      cb(null, true);
+    } else {
+      cb(new Error("Only image files are allowed!"), false);
+    }
+  },
+});
 // ============================================
 // 1. BASIC MIDDLEWARE CONFIGURATION
 // ============================================
@@ -35,27 +79,33 @@ const limiter = rateLimit({
   max: 200,
   message: {
     success: false,
-    message: "Too many requests from this IP, please try again later."
-  }
+    message: "Too many requests from this IP, please try again later.",
+  },
 });
 
 // Security middleware
-app.use(helmet({
-  contentSecurityPolicy: false,
-  crossOriginResourcePolicy: { policy: "cross-origin" },
-}));
+app.use(
+  helmet({
+    contentSecurityPolicy: false,
+    crossOriginResourcePolicy: { policy: "cross-origin" },
+  }),
+);
 
 // CORS configuration
-app.use(cors({
-  origin: process.env.CLIENT_URL || "http://localhost:5173",
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
-}));
+app.use(
+  cors({
+    origin: process.env.CLIENT_URL || "http://localhost:5173",
+    credentials: true,
+    methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"],
+    // Allow FormData headers
+    exposedHeaders: ["Content-Disposition"],
+  }),
+);
 
 // Body parsing middleware - MUST BE BEFORE ROUTES
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+app.use(express.json({ limit: "10mb" }));
+app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 app.use(cookieParser());
 
 // Logging
@@ -67,7 +117,7 @@ app.use("/api/", limiter);
 // Request logging middleware
 app.use((req, res, next) => {
   console.log(`📡 ${req.method} ${req.originalUrl}`);
-  if (req.method === 'POST' || req.method === 'PUT') {
+  if (req.method === "POST" || req.method === "PUT") {
     console.log(`📦 Request body:`, JSON.stringify(req.body, null, 2));
   }
   next();
@@ -103,14 +153,14 @@ let pool;
 try {
   const dbModule = await import("./config/database.js");
   pool = dbModule.default || dbModule.pool;
-  console.log('✅ Database module loaded');
+  console.log("✅ Database module loaded");
 
   // Test database connection
-  const [rows] = await pool.execute('SELECT 1 as test');
-  console.log('✅ Database connection test successful');
+  const [rows] = await pool.execute("SELECT 1 as test");
+  console.log("✅ Database connection test successful");
 } catch (error) {
-  console.error('❌ Database connection failed:', error.message);
-  console.error('❌ Stack:', error.stack);
+  console.error("❌ Database connection failed:", error.message);
+  console.error("❌ Stack:", error.stack);
   process.exit(1);
 }
 
@@ -122,27 +172,50 @@ try {
 app.get("/", (req, res) => {
   res.json({
     service: "property-service",
-    version: "1.0.0",
+    version: "2.0.0", // Updated version
     status: "running",
     timestamp: new Date().toISOString(),
+    features: ["property-management", "workflow-system", "buyer-features"],
     endpoints: {
       health: "/health",
+      workflow: "/workflow",
       properties: "/api/properties",
       buyer: {
         savedProperties: "/api/buyer/saved-properties",
         saveProperty: "POST /api/buyer/properties/:id/save",
         unsaveProperty: "DELETE /api/buyer/properties/:id/save",
         checkSaved: "/api/buyer/properties/:id/is-saved",
-        recommended: "/api/buyer/recommended-properties"
+        recommended: "/api/buyer/recommended-properties",
+      },
+      workflowEndpoints: {
+        // Client side
+        clientApprovalQueue: "GET /api/workflow/client/approval-queue",
+        clientApprove: "POST /api/workflow/properties/:id/client-approve",
+        clientRequestChanges:
+          "POST /api/workflow/properties/:id/request-changes",
+
+        // Broker side
+        brokerDrafts: "GET /api/workflow/broker/drafts",
+        createDraft: "POST /api/workflow/drafts/create-from-request/:requestId",
+        updateDraft: "PUT /api/workflow/properties/:id/update-draft",
+
+        // Admin side
+        adminApprovalQueue: "GET /api/workflow/admin/approval-queue",
+        adminApprove: "POST /api/workflow/admin/properties/:id/approve",
+        adminReject: "POST /api/workflow/admin/properties/:id/reject",
+
+        // Public
+        homepageListings: "GET /api/workflow/homepage-listings",
+        workflowStatus: "GET /api/workflow/properties/:id/status",
       },
       applications: "/api/applications",
       debug: {
         database: "/api/debug/database-check",
         savedProperties: "/api/debug/saved-properties/:userId",
         saveTest: "/api/debug/save-test",
-        checkSaves: "/api/debug/check-saves/:propertyId"
-      }
-    }
+        checkSaves: "/api/debug/check-saves/:propertyId",
+      },
+    },
   });
 });
 
@@ -150,7 +223,7 @@ app.get("/", (req, res) => {
 app.get("/health", async (req, res) => {
   try {
     // Test database connection
-    const [result] = await pool.execute('SELECT 1 as db_status');
+    const [result] = await pool.execute("SELECT 1 as db_status");
 
     res.json({
       status: "healthy",
@@ -158,7 +231,8 @@ app.get("/health", async (req, res) => {
       database: result[0].db_status === 1 ? "connected" : "disconnected",
       uptime: process.uptime(),
       timestamp: new Date().toISOString(),
-      version: "1.0.0",
+      version: "2.0.0",
+      features: ["workflow", "properties", "buyer"],
     });
   } catch (error) {
     res.status(500).json({
@@ -166,19 +240,235 @@ app.get("/health", async (req, res) => {
       service: "property-service",
       database: "disconnected",
       error: error.message,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     });
   }
 });
 
+// Workflow documentation
+app.get("/workflow", (req, res) => {
+  res.json({
+    name: "Property Workflow System",
+    description: "End-to-end property listing workflow management",
+    status: "active",
+    workflow_steps: [
+      "1. Broker creates draft from request",
+      "2. Client reviews and approves",
+      "3. Admin verifies and publishes",
+      "4. Premium listings appear on homepage",
+    ],
+    roles: {
+      broker: ["create_drafts", "update_drafts", "submit_for_approval"],
+      client: ["review_drafts", "approve", "request_changes"],
+      admin: ["final_approval", "reject", "publish"],
+    },
+    endpoints: {
+      base: "/api/workflow",
+      docs: "/api/workflow/docs",
+    },
+  });
+});
+
 // ============================================
-// 5. PROPERTY ENDPOINTS - MUST COME BEFORE :id
+// 5. PROPERTY REQUEST ENDPOINTS (ADD THIS SECTION)
+// ============================================
+
+// Create property request (Seller/Landlord)
+app.post(
+  "/api/requests",
+  authenticate,
+  checkRole(["seller", "landlord", "user"]),
+  upload.array("property_images", 10), // Accept up to 10 images
+  PropertyRequestController.createRequest,
+);
+
+// Get user's requests
+app.get(
+  "/api/requests/my-requests",
+  authenticate,
+  checkRole(["seller", "landlord", "user"]),
+  PropertyRequestController.getUserRequests,
+);
+
+app.post(
+  "/api/requests/:requestId/assign-broker",
+  authenticate,
+  checkRole(["seller", "landlord", "user"]),
+  PropertyRequestController.assignBroker, // Make sure this function exists
+);
+
+// Get broker's assigned requests
+app.get(
+  "/api/requests/broker",
+  authenticate,
+  checkRole(["internal_broker", "external_broker", "admin", "super_admin"]),
+  PropertyRequestController.getBrokerRequests,
+);
+
+// Get pending requests (for brokers to claim)
+app.get(
+  "/api/requests/pending",
+  authenticate,
+  checkRole(["internal_broker", "external_broker", "admin", "super_admin"]),
+  PropertyRequestController.getPendingRequests,
+);
+
+// Broker accept request
+app.post(
+  "/api/requests/:requestId/accept",
+  authenticate,
+  checkRole(["internal_broker", "external_broker", "admin", "super_admin"]),
+  PropertyRequestController.brokerAcceptRequest,
+);
+
+
+
+// Create property from request (Broker action)
+app.post(
+  "/api/requests/:requestId/create-property",
+  authenticate,
+  checkRole(["internal_broker", "external_broker", "admin", "super_admin"]),
+  PropertyRequestController.createPropertyFromRequest,
+);
+
+// Client approve property draft
+app.post(
+  "/api/properties/:propertyId/client-approve",
+  authenticate,
+  checkRole(["seller", "landlord", "user"]),
+  PropertyRequestController.clientApproveDraft,
+);
+
+// Client request changes to draft
+app.post(
+  "/api/properties/:propertyId/request-changes",
+  authenticate,
+  checkRole(["seller", "landlord", "user"]),
+  PropertyRequestController.clientRequestChanges,
+);
+
+// Get request workflow status
+app.get(
+  "/api/requests/:requestId/workflow",
+  authenticate,
+  PropertyRequestController.getRequestWorkflow,
+);
+
+// Get workflow stats
+app.get(
+  "/api/requests/workflow-stats",
+  authenticate,
+  checkRole(["internal_broker", "external_broker", "admin", "super_admin"]),
+  PropertyRequestController.getWorkflowStats,
+);
+
+// ============================================
+// 5. WORKFLOW ENDPOINTS
+// ============================================
+
+// ========== CLIENT WORKFLOW ENDPOINTS ==========
+
+// Get client approval queue
+app.get(
+  "/api/workflow/client/approval-queue",
+  authenticate,
+  checkRole(["seller", "landlord", "user"]),
+  WorkflowController.getClientApprovalQueue,
+);
+
+// Client approves draft
+app.post(
+  "/api/workflow/properties/:id/client-approve",
+  authenticate,
+  checkRole(["seller", "landlord", "user"]),
+  WorkflowController.clientApproveDraft,
+);
+
+// Client requests changes
+app.post(
+  "/api/workflow/properties/:id/request-changes",
+  authenticate,
+  checkRole(["seller", "landlord", "user"]),
+  WorkflowController.clientRequestChanges,
+);
+
+// ========== BROKER WORKFLOW ENDPOINTS ==========
+
+// Get broker drafts
+app.get(
+  "/api/workflow/broker/drafts",
+  authenticate,
+  checkRole(["internal_broker", "external_broker", "admin", "super_admin"]),
+  WorkflowController.getBrokerDrafts,
+);
+
+// Broker creates draft from request
+app.post(
+  "/api/workflow/drafts/create-from-request/:requestId",
+  authenticate,
+  checkRole(["internal_broker", "external_broker", "admin", "super_admin"]),
+  WorkflowController.createDraftFromRequest,
+);
+
+app.use('/uploads/temp', express.static(path.join(__dirname, 'uploads', 'temp')));
+
+// Broker updates draft
+app.put(
+  "/api/workflow/properties/:id/update-draft",
+  authenticate,
+  checkRole(["internal_broker", "external_broker"]),
+  WorkflowController.brokerUpdateDraft,
+);
+
+// ========== ADMIN WORKFLOW ENDPOINTS ==========
+
+// Get admin approval queue
+app.get(
+  "/api/workflow/admin/approval-queue",
+  authenticate,
+  checkRole(["admin", "super_admin", "support_admin"]),
+  WorkflowController.getAdminApprovalQueue,
+);
+
+// Admin approves property
+app.post(
+  "/api/workflow/admin/properties/:id/approve",
+  authenticate,
+  checkRole(["admin", "super_admin", "support_admin"]),
+  WorkflowController.adminApproveProperty,
+);
+
+// Admin rejects property
+app.post(
+  "/api/workflow/admin/properties/:id/reject",
+  authenticate,
+  checkRole(["admin", "super_admin", "support_admin"]),
+  WorkflowController.adminRejectProperty,
+);
+
+// ========== PUBLIC WORKFLOW ENDPOINTS ==========
+
+// Get homepage listings (premium + featured)
+app.get(
+  "/api/workflow/homepage-listings",
+  WorkflowController.getHomepageListings,
+);
+
+// Get workflow status for a property
+app.get(
+  "/api/workflow/properties/:id/status",
+  authenticate,
+  WorkflowController.getPropertyWorkflowStatus,
+);
+
+// ============================================
+// 6. PROPERTY ENDPOINTS - MUST COME BEFORE :id
 // ============================================
 
 // Get all properties from database
 app.get("/api/properties", async (req, res) => {
   try {
-    console.log('📝 GET /api/properties called');
+    console.log("📝 GET /api/properties called");
 
     const {
       page = 1,
@@ -239,7 +529,8 @@ app.get("/api/properties", async (req, res) => {
     }
 
     if (search) {
-      whereClause += " AND (title LIKE ? OR address LIKE ? OR city LIKE ? OR description LIKE ?)";
+      whereClause +=
+        " AND (title LIKE ? OR address LIKE ? OR city LIKE ? OR description LIKE ?)";
       const searchTerm = `%${search}%`;
       params.push(searchTerm, searchTerm, searchTerm, searchTerm);
     }
@@ -265,12 +556,16 @@ app.get("/api/properties", async (req, res) => {
       LIMIT ? OFFSET ?
     `;
 
-    const [properties] = await pool.execute(query, [...params, parseInt(limit), offset]);
+    const [properties] = await pool.execute(query, [
+      ...params,
+      parseInt(limit),
+      offset,
+    ]);
 
     console.log(`✅ Found ${properties.length} properties from database`);
 
     // Parse JSON fields
-    const parsedProperties = properties.map(property => {
+    const parsedProperties = properties.map((property) => {
       // Helper function to safely parse JSON
       const safeParse = (str, defaultValue = []) => {
         try {
@@ -300,46 +595,46 @@ app.get("/api/properties", async (req, res) => {
         total,
         pages: Math.ceil(total / limit),
       },
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     });
   } catch (error) {
-    console.error('❌ Error fetching properties:', error);
+    console.error("❌ Error fetching properties:", error);
     res.status(500).json({
       success: false,
       message: error.message || "Failed to fetch properties",
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     });
   }
 });
 
 // ============================================
-// 6. SPECIFIC PROPERTY ENDPOINTS (MUST COME BEFORE :id)
+// 7. SPECIFIC PROPERTY ENDPOINTS (MUST COME BEFORE :id)
 // ============================================
 
 // Get company properties
 app.get("/api/properties/company", async (req, res) => {
   try {
-    console.log('📊 GET /api/properties/company called');
+    console.log("📊 GET /api/properties/company called");
 
     const [properties] = await pool.execute(
       `SELECT p.* FROM properties p
        WHERE p.property_source = 'company_owned'
        AND p.deleted_at IS NULL
-       ORDER BY p.created_at DESC`
+       ORDER BY p.created_at DESC`,
     );
 
     res.json({
       success: true,
       data: properties || [],
       count: properties?.length || 0,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     });
   } catch (error) {
-    console.error('❌ Error fetching company properties:', error);
+    console.error("❌ Error fetching company properties:", error);
     res.status(500).json({
       success: false,
       error: error.message,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     });
   }
 });
@@ -347,27 +642,27 @@ app.get("/api/properties/company", async (req, res) => {
 // Get pending properties
 app.get("/api/properties/pending", async (req, res) => {
   try {
-    console.log('📊 GET /api/properties/pending called');
+    console.log("📊 GET /api/properties/pending called");
 
     const [properties] = await pool.execute(
       `SELECT p.* FROM properties p
        WHERE p.property_status IN ('pending', 'draft')
        AND p.deleted_at IS NULL
-       ORDER BY p.created_at DESC`
+       ORDER BY p.created_at DESC`,
     );
 
     res.json({
       success: true,
       data: properties || [],
       count: properties?.length || 0,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     });
   } catch (error) {
-    console.error('❌ Error fetching pending properties:', error);
+    console.error("❌ Error fetching pending properties:", error);
     res.status(500).json({
       success: false,
       error: error.message,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     });
   }
 });
@@ -375,27 +670,27 @@ app.get("/api/properties/pending", async (req, res) => {
 // Get approved properties (active properties)
 app.get("/api/properties/approved", async (req, res) => {
   try {
-    console.log('📊 GET /api/properties/approved called');
+    console.log("📊 GET /api/properties/approved called");
 
     const [properties] = await pool.execute(
       `SELECT p.* FROM properties p
        WHERE p.property_status = 'active'
        AND p.deleted_at IS NULL
-       ORDER BY p.created_at DESC`
+       ORDER BY p.created_at DESC`,
     );
 
     res.json({
       success: true,
       data: properties || [],
       count: properties?.length || 0,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     });
   } catch (error) {
-    console.error('❌ Error fetching approved properties:', error);
+    console.error("❌ Error fetching approved properties:", error);
     res.status(500).json({
       success: false,
       error: error.message,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     });
   }
 });
@@ -403,7 +698,7 @@ app.get("/api/properties/approved", async (req, res) => {
 // Get rejected properties
 app.get("/api/properties/rejected", async (req, res) => {
   try {
-    console.log('📊 GET /api/properties/rejected called');
+    console.log("📊 GET /api/properties/rejected called");
 
     // Check if 'rejected' exists in the enum, otherwise use 'inactive'
     const [statusCheck] = await pool.execute(
@@ -411,10 +706,10 @@ app.get("/api/properties/rejected", async (req, res) => {
        FROM INFORMATION_SCHEMA.COLUMNS 
        WHERE TABLE_SCHEMA = DATABASE() 
          AND TABLE_NAME = 'properties' 
-         AND COLUMN_NAME = 'property_status'`
+         AND COLUMN_NAME = 'property_status'`,
     );
 
-    const columnType = statusCheck[0]?.COLUMN_TYPE || '';
+    const columnType = statusCheck[0]?.COLUMN_TYPE || "";
     const hasRejected = columnType.includes("'rejected'");
 
     let query;
@@ -425,7 +720,9 @@ app.get("/api/properties/rejected", async (req, res) => {
                ORDER BY p.created_at DESC`;
     } else {
       // Fallback to 'inactive' if 'rejected' doesn't exist
-      console.log('⚠️ "rejected" status not found in enum, using "inactive" as fallback');
+      console.log(
+        '⚠️ "rejected" status not found in enum, using "inactive" as fallback',
+      );
       query = `SELECT p.* FROM properties p
                WHERE p.property_status = 'inactive'
                AND p.deleted_at IS NULL
@@ -439,20 +736,22 @@ app.get("/api/properties/rejected", async (req, res) => {
       data: properties || [],
       count: properties?.length || 0,
       timestamp: new Date().toISOString(),
-      note: hasRejected ? 'Using "rejected" status' : 'Using "inactive" status as fallback for rejected'
+      note: hasRejected
+        ? 'Using "rejected" status'
+        : 'Using "inactive" status as fallback for rejected',
     });
   } catch (error) {
-    console.error('❌ Error fetching rejected properties:', error);
+    console.error("❌ Error fetching rejected properties:", error);
     res.status(500).json({
       success: false,
       error: error.message,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     });
   }
 });
 
 // ============================================
-// 7. PROPERTY BY ID (MUST COME AFTER SPECIFIC ROUTES)
+// 8. PROPERTY BY ID (MUST COME AFTER SPECIFIC ROUTES)
 // ============================================
 
 // Get property by ID - THIS MUST COME AFTER THE SPECIFIC ROUTES
@@ -465,32 +764,38 @@ app.get("/api/properties/:id", async (req, res) => {
       return res.status(400).json({
         success: false,
         message: "Invalid property ID",
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
       });
     }
 
     // Get property details
-    const [properties] = await pool.execute(`
+    const [properties] = await pool.execute(
+      `
       SELECT p.* FROM properties p
       WHERE p.id = ? AND p.deleted_at IS NULL
-    `, [id]);
+    `,
+      [id],
+    );
 
     if (properties.length === 0) {
       return res.status(404).json({
         success: false,
         message: "Property not found",
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
       });
     }
 
     const property = properties[0];
 
     // Get property images
-    const [images] = await pool.execute(`
+    const [images] = await pool.execute(
+      `
       SELECT * FROM property_images 
       WHERE property_id = ? 
       ORDER BY is_primary DESC, image_order ASC
-    `, [id]);
+    `,
+      [id],
+    );
 
     // Parse JSON fields
     const safeParse = (str, defaultValue = []) => {
@@ -516,61 +821,102 @@ app.get("/api/properties/:id", async (req, res) => {
       success: true,
       message: "Property retrieved successfully",
       data: property,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     });
   } catch (error) {
     console.error(`❌ Error fetching property ${req.params.id}:`, error);
     res.status(500).json({
       success: false,
       message: error.message || "Failed to fetch property",
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     });
   }
 });
 
+app.get(
+  "/api/requests/debug-images/:requestId",
+  authenticate,
+  PropertyRequestController.debugPropertyImages
+);
+
 // ============================================
-// 8. BUYER ENDPOINTS - USING CONTROLLER
+// 9. BUYER ENDPOINTS - USING CONTROLLER
 // ============================================
 // Get saved properties - PROTECTED
-app.get("/api/buyer/saved-properties", authenticate, BuyerController.getSavedProperties);
+app.get(
+  "/api/buyer/saved-properties",
+  authenticate,
+  BuyerController.getSavedProperties,
+);
 
 // Save property (POST) - PROTECTED
-app.post("/api/buyer/properties/:propertyId/save", authenticate, BuyerController.toggleSaveProperty);
+app.post(
+  "/api/buyer/properties/:propertyId/save",
+  authenticate,
+  BuyerController.toggleSaveProperty,
+);
 
 // Unsave property (DELETE) - PROTECTED
-app.delete("/api/buyer/properties/:propertyId/save", authenticate, BuyerController.toggleSaveProperty);
+app.delete(
+  "/api/buyer/properties/:propertyId/save",
+  authenticate,
+  BuyerController.toggleSaveProperty,
+);
 
 // Check if property is saved - PROTECTED
-app.get("/api/buyer/properties/:propertyId/is-saved", authenticate, BuyerController.checkSavedStatus);
+app.get(
+  "/api/buyer/properties/:propertyId/is-saved",
+  authenticate,
+  BuyerController.checkSavedStatus,
+);
 
 // Get recommended properties - PROTECTED
-app.get("/api/buyer/recommended-properties", authenticate, BuyerController.getRecommendedProperties);
+app.get(
+  "/api/buyer/recommended-properties",
+  authenticate,
+  BuyerController.getRecommendedProperties,
+);
 
 // Track property view - PROTECTED
-app.post("/api/buyer/properties/:propertyId/view", authenticate, BuyerController.trackPropertyView);
+app.post(
+  "/api/buyer/properties/:propertyId/view",
+  authenticate,
+  BuyerController.trackPropertyView,
+);
 
 // Get property stats - PROTECTED
-app.get("/api/buyer/properties/:propertyId/stats", authenticate, BuyerController.getPropertyStats);
+app.get(
+  "/api/buyer/properties/:propertyId/stats",
+  authenticate,
+  BuyerController.getPropertyStats,
+);
 
 app.get("/api/properties/broker/listings", authenticate, async (req, res) => {
   try {
-    console.log('📝 GET /api/properties/broker/listings called');
-    
+    console.log("📝 GET /api/properties/broker/listings called");
+
     const userId = req.user.id;
     const userRole = req.user.role;
-    
-    console.log(`🔍 Fetching listings for user ${userId} with role ${userRole}`);
-    
+
+    console.log(
+      `🔍 Fetching listings for user ${userId} with role ${userRole}`,
+    );
+
     // Check if user has broker role
-    const allowedRoles = ['internal_broker', 'external_broker', 'admin', 'super_admin'];
+    const allowedRoles = [
+      "internal_broker",
+      "external_broker",
+      "admin",
+      "super_admin",
+    ];
     if (!allowedRoles.includes(userRole)) {
       return res.status(403).json({
         success: false,
         message: "Access denied. Broker role required.",
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
       });
     }
-    
+
     // Query to get broker's listings
     const query = `
       SELECT p.*, 
@@ -586,13 +932,13 @@ app.get("/api/properties/broker/listings", authenticate, async (req, res) => {
         AND p.deleted_at IS NULL
       ORDER BY p.created_at DESC
     `;
-    
+
     const [properties] = await pool.execute(query, [userId]);
-    
+
     console.log(`✅ Found ${properties.length} listings for broker ${userId}`);
-    
+
     // Parse JSON fields
-    const parsedProperties = properties.map(property => {
+    const parsedProperties = properties.map((property) => {
       const safeParse = (str, defaultValue = []) => {
         try {
           return str ? JSON.parse(str) : defaultValue;
@@ -600,58 +946,62 @@ app.get("/api/properties/broker/listings", authenticate, async (req, res) => {
           return defaultValue;
         }
       };
-      
+
       return {
         ...property,
         features: safeParse(property.features),
         amenities: safeParse(property.amenities),
         saved_by_users: safeParse(property.saved_by_users),
         price_history: safeParse(property.price_history),
-        status_history: safeParse(property.status_history)
+        status_history: safeParse(property.status_history),
       };
     });
-    
+
     res.json({
       success: true,
       message: "Broker listings retrieved successfully",
       data: parsedProperties,
       count: parsedProperties.length,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     });
-    
   } catch (error) {
-    console.error('❌ Error fetching broker listings:', error);
+    console.error("❌ Error fetching broker listings:", error);
     res.status(500).json({
       success: false,
       message: error.message || "Failed to fetch broker listings",
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     });
   }
 });
 
 // ============================================
-// 9. APPLICATION ENDPOINTS
+// 10. APPLICATION ENDPOINTS
 // ============================================
 
 // Create application
-app.post("/api/applications", async (req, res) => {
+app.post("/api/applications", authenticate, async (req, res) => {
   try {
-    console.log('📝 POST /api/applications called');
+    console.log("📝 POST /api/applications called");
 
     const {
       property_id,
       message,
       offered_amount,
       cover_letter,
-      application_type = 'rent'
+      application_type = "rent",
     } = req.body;
+
+    // Get user_id from authenticated user
+    const user_id = req.user.id;
+
+    console.log("👤 User ID from auth:", user_id);
 
     // Validate required fields
     if (!property_id) {
       return res.status(400).json({
         success: false,
         message: "Property ID is required",
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
       });
     }
 
@@ -659,24 +1009,38 @@ app.post("/api/applications", async (req, res) => {
       return res.status(400).json({
         success: false,
         message: "Message is required",
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
       });
     }
 
-    const user_id = 21; // TODO: Get from auth token
+    // Generate UUID
+    const { v4: uuidv4 } = await import("uuid");
+    const application_uuid = uuidv4();
 
-    // Create application
-    const [result] = await pool.execute(`
+    // Create application - NOW INCLUDES application_uuid
+    const [result] = await pool.execute(
+      `
       INSERT INTO property_applications 
-      (property_id, user_id, application_type, status, message, 
+      (application_uuid, property_id, user_id, application_type, status, message, 
        offered_amount, cover_letter, submitted_at, created_at, updated_at)
-      VALUES (?, ?, ?, 'submitted', ?, ?, ?, NOW(), NOW(), NOW())
-    `, [property_id, user_id, application_type, message, offered_amount || null, cover_letter || '']);
+      VALUES (?, ?, ?, ?, 'submitted', ?, ?, ?, NOW(), NOW(), NOW())
+    `,
+      [
+        application_uuid,
+        property_id,
+        user_id,
+        application_type,
+        message,
+        offered_amount || null,
+        cover_letter || "",
+      ],
+    );
 
     const applicationId = result.insertId;
 
     // Get the created application
-    const [applications] = await pool.execute(`
+    const [applications] = await pool.execute(
+      `
       SELECT pa.*, 
         p.title as property_title,
         p.address as property_address,
@@ -684,34 +1048,40 @@ app.post("/api/applications", async (req, res) => {
       FROM property_applications pa
       JOIN properties p ON pa.property_id = p.id
       WHERE pa.id = ?
-    `, [applicationId]);
+    `,
+      [applicationId],
+    );
 
-    console.log(`✅ Application ${applicationId} created successfully`);
+    console.log(
+      `✅ Application ${applicationId} created successfully with UUID: ${application_uuid}`,
+    );
 
     res.status(201).json({
       success: true,
       message: "Application submitted successfully",
       data: applications[0],
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     });
   } catch (error) {
-    console.error('❌ Error creating application:', error);
+    console.error("❌ Error creating application:", error);
     res.status(500).json({
       success: false,
       message: error.message || "Failed to submit application",
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     });
   }
 });
 
 // Get user applications
-app.get("/api/applications", async (req, res) => {
+app.get("/api/applications", authenticate, async (req, res) => {
   try {
-    console.log('📝 GET /api/applications called');
+    console.log("📝 GET /api/applications called");
 
-    const user_id = 21; // TODO: Get from auth token
+    // ✅ FIX: Get user_id from authenticated user
+    const user_id = req.user.id;
 
-    const [applications] = await pool.execute(`
+    const [applications] = await pool.execute(
+      `
       SELECT pa.*, 
         p.title as property_title,
         p.address as property_address,
@@ -726,28 +1096,32 @@ app.get("/api/applications", async (req, res) => {
       JOIN properties p ON pa.property_id = p.id
       WHERE pa.user_id = ? AND pa.deleted_at IS NULL
       ORDER BY pa.created_at DESC
-    `, [user_id]);
+    `,
+      [user_id],
+    );
 
-    console.log(`✅ Retrieved ${applications.length} applications for user ${user_id}`);
+    console.log(
+      `✅ Retrieved ${applications.length} applications for user ${user_id}`,
+    );
 
     res.json({
       success: true,
       message: "Applications retrieved successfully",
       data: applications,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     });
   } catch (error) {
-    console.error('❌ Error fetching applications:', error);
+    console.error("❌ Error fetching applications:", error);
     res.status(500).json({
       success: false,
       message: error.message || "Failed to fetch applications",
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     });
   }
 });
 
 // ============================================
-// 10. DEBUG ENDPOINTS
+// 11. DEBUG ENDPOINTS
 // ============================================
 
 // Debug database check
@@ -759,10 +1133,14 @@ app.get("/api/debug/database-check", async (req, res) => {
     `);
 
     // Check total properties count
-    const [totalCount] = await pool.execute(`SELECT COUNT(*) as total FROM properties`);
+    const [totalCount] = await pool.execute(
+      `SELECT COUNT(*) as total FROM properties`,
+    );
 
     // Check properties with saves
-    const [savedCount] = await pool.execute(`SELECT COUNT(*) as saved FROM properties WHERE saves_count > 0`);
+    const [savedCount] = await pool.execute(
+      `SELECT COUNT(*) as saved FROM properties WHERE saves_count > 0`,
+    );
 
     // Get a sample property
     const [sample] = await pool.execute(`
@@ -778,7 +1156,7 @@ app.get("/api/debug/database-check", async (req, res) => {
       totalProperties: totalCount[0].total,
       propertiesWithSaves: savedCount[0].saved,
       sampleProperty: sample.length > 0 ? sample[0] : null,
-      savedByUsersSample: sample.length > 0 ? sample[0].saved_by_users : null
+      savedByUsersSample: sample.length > 0 ? sample[0].saved_by_users : null,
     });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -792,7 +1170,8 @@ app.get("/api/debug/saved-properties/:userId", async (req, res) => {
     console.log(`🔍 DEBUG: Checking saved properties for user ${userId}`);
 
     // Check the database directly
-    const [properties] = await pool.execute(`
+    const [properties] = await pool.execute(
+      `
       SELECT 
         id,
         title,
@@ -801,9 +1180,13 @@ app.get("/api/debug/saved-properties/:userId", async (req, res) => {
         saves_count
       FROM properties 
       WHERE JSON_CONTAINS(saved_by_users, ?)
-    `, [JSON.stringify(userId.toString())]);
+    `,
+      [JSON.stringify(userId.toString())],
+    );
 
-    console.log(`🔍 DEBUG: Found ${properties.length} properties with user ${userId} in saved_by_users`);
+    console.log(
+      `🔍 DEBUG: Found ${properties.length} properties with user ${userId} in saved_by_users`,
+    );
 
     // Also check all properties to see saved_by_users content
     const [allProperties] = await pool.execute(`
@@ -815,11 +1198,10 @@ app.get("/api/debug/saved-properties/:userId", async (req, res) => {
       userId,
       savedProperties: properties,
       sampleProperties: allProperties,
-      message: `Found ${properties.length} properties saved by user ${userId}`
+      message: `Found ${properties.length} properties saved by user ${userId}`,
     });
-
   } catch (error) {
-    console.error('❌ Debug error:', error);
+    console.error("❌ Debug error:", error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -837,7 +1219,8 @@ app.get("/api/debug/save-test", async (req, res) => {
 
     // Test 2: Check a specific property
     const propertyId = 1;
-    const [property] = await pool.execute(`
+    const [property] = await pool.execute(
+      `
       SELECT 
         id,
         title,
@@ -847,10 +1230,13 @@ app.get("/api/debug/save-test", async (req, res) => {
         JSON_LENGTH(saved_by_users) as json_length
       FROM properties 
       WHERE id = ?
-    `, [propertyId]);
+    `,
+      [propertyId],
+    );
 
     // Test 3: Try to find properties with user 21 saved
-    const [userSaved] = await pool.execute(`
+    const [userSaved] = await pool.execute(
+      `
       SELECT 
         id,
         title,
@@ -859,7 +1245,9 @@ app.get("/api/debug/save-test", async (req, res) => {
         JSON_SEARCH(saved_by_users, 'one', ?) as user_position
       FROM properties
       WHERE JSON_CONTAINS(saved_by_users, ?)
-    `, [JSON.stringify(user_id_str), user_id_str, JSON.stringify(user_id_str)]);
+    `,
+      [JSON.stringify(user_id_str), user_id_str, JSON.stringify(user_id_str)],
+    );
 
     res.json({
       success: true,
@@ -868,14 +1256,17 @@ app.get("/api/debug/save-test", async (req, res) => {
       userSaved: userSaved,
       user_id,
       user_id_str,
-      test_query: `JSON_CONTAINS(saved_by_users, '${JSON.stringify(user_id_str)}')`
+      test_query: `JSON_CONTAINS(saved_by_users, '${JSON.stringify(user_id_str)}')`,
     });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 });
 
-app.get("/api/buyer/properties/:propertyId/save", BuyerController.checkSavedStatus);
+app.get(
+  "/api/buyer/properties/:propertyId/save",
+  BuyerController.checkSavedStatus,
+);
 
 // Debug endpoint to check specific property saves
 app.get("/api/debug/check-saves/:propertyId", async (req, res) => {
@@ -884,7 +1275,8 @@ app.get("/api/debug/check-saves/:propertyId", async (req, res) => {
     const userId = 21;
     const userIdStr = "21";
 
-    const [property] = await pool.execute(`
+    const [property] = await pool.execute(
+      `
       SELECT 
         id,
         title,
@@ -896,7 +1288,9 @@ app.get("/api/debug/check-saves/:propertyId", async (req, res) => {
         JSON_CONTAINS(saved_by_users, ?) as contains_number
       FROM properties 
       WHERE id = ?
-    `, [JSON.stringify([userIdStr]), JSON.stringify([userId]), propertyId]);
+    `,
+      [JSON.stringify([userIdStr]), JSON.stringify([userId]), propertyId],
+    );
 
     if (property.length === 0) {
       return res.json({ error: "Property not found" });
@@ -925,27 +1319,27 @@ app.get("/api/debug/check-saves/:propertyId", async (req, res) => {
         json_type: prop.json_type,
         json_length: prop.json_length,
         contains_string: prop.contains_string,
-        contains_number: prop.contains_number
+        contains_number: prop.contains_number,
       },
       user: {
         id: userId,
         id_str: userIdStr,
-        is_in_array: savedUsers.includes(userIdStr) || savedUsers.includes(userId)
-      }
+        is_in_array:
+          savedUsers.includes(userIdStr) || savedUsers.includes(userId),
+      },
     });
-
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 });
 
 // ============================================
-// 11. REDIRECT ROUTES FOR FRONTEND
+// 12. REDIRECT ROUTES FOR FRONTEND
 // ============================================
 
 // Redirect /properties to /api/properties
 app.get("/properties", async (req, res) => {
-  console.log('🔄 Redirecting /properties to /api/properties');
+  console.log("🔄 Redirecting /properties to /api/properties");
   res.redirect(307, "/api/properties");
 });
 
@@ -957,7 +1351,7 @@ app.get("/properties/:id", async (req, res) => {
 });
 
 // ============================================
-// 12. 404 HANDLER
+// 13. 404 HANDLER
 // ============================================
 
 app.use((req, res) => {
@@ -972,6 +1366,7 @@ app.use((req, res) => {
     availableRoutes: [
       "GET /",
       "GET /health",
+      "GET /workflow",
       "GET /api/properties",
       "GET /api/properties/company",
       "GET /api/properties/pending",
@@ -979,39 +1374,53 @@ app.use((req, res) => {
       "GET /api/properties/rejected",
       "GET /api/properties/:id",
       "GET /api/buyer/saved-properties",
-      "GET /api/properties/broker/listings",  
+      "GET /api/properties/broker/listings",
       "POST /api/buyer/properties/:id/save",
       "DELETE /api/buyer/properties/:id/save",
       "GET /api/buyer/properties/:id/is-saved",
       "GET /api/buyer/recommended-properties",
+
+      // Workflow endpoints
+      "GET /api/workflow/client/approval-queue",
+      "POST /api/workflow/properties/:id/client-approve",
+      "POST /api/workflow/properties/:id/request-changes",
+      "GET /api/workflow/broker/drafts",
+      "POST /api/workflow/drafts/create-from-request/:requestId",
+      "PUT /api/workflow/properties/:id/update-draft",
+      "GET /api/workflow/admin/approval-queue",
+      "POST /api/workflow/admin/properties/:id/approve",
+      "POST /api/workflow/admin/properties/:id/reject",
+      "GET /api/workflow/homepage-listings",
+      "GET /api/workflow/properties/:id/status",
+
       "POST /api/applications",
       "GET /api/applications",
       "GET /api/debug/database-check",
       "GET /api/debug/saved-properties/:userId",
       "GET /api/debug/save-test",
-      "GET /api/debug/check-saves/:propertyId"
-    ]
+      "GET /api/debug/check-saves/:propertyId",
+    ],
   });
 });
 
 // ============================================
-// 13. ERROR HANDLER
+// 14. ERROR HANDLER
 // ============================================
 
 app.use((err, req, res, next) => {
-  console.error('🔥 ERROR:', err.message);
-  console.error('🔥 Stack:', err.stack);
+  console.error("🔥 ERROR:", err.message);
+  console.error("🔥 Stack:", err.stack);
 
   res.status(500).json({
     success: false,
     message: "Internal server error",
     error: err.message,
-    timestamp: new Date().toISOString()
+    timestamp: new Date().toISOString(),
   });
 });
 
 // ============================================
-// 14. START SERVER
+// 16. START SERVER
 // ============================================
 
 app.listen(PORT, () => {
@@ -1020,25 +1429,65 @@ app.listen(PORT, () => {
   console.log(`✨ ========================================`);
   console.log(`✅ Port: ${PORT}`);
   console.log(`✅ Database: Connected`);
+  console.log(`✅ Version: 2.0.0 (with Workflow)`);
   console.log(`\n🔗 MAIN ENDPOINTS:`);
   console.log(`  1. Health:          http://localhost:${PORT}/health`);
-  console.log(`  2. All Properties:  http://localhost:${PORT}/api/properties`);
+  console.log(`  2. Workflow Docs:   http://localhost:${PORT}/workflow`);
+  console.log(`  3. All Properties:  http://localhost:${PORT}/api/properties`);
+
+  console.log(`\n🔗 WORKFLOW ENDPOINTS:`);
+  console.log(
+    `  4. Client Queue:    http://localhost:${PORT}/api/workflow/client/approval-queue`,
+  );
+  console.log(
+    `  5. Broker Drafts:   http://localhost:${PORT}/api/workflow/broker/drafts`,
+  );
+  console.log(
+    `  6. Admin Queue:     http://localhost:${PORT}/api/workflow/admin/approval-queue`,
+  );
+  console.log(
+    `  7. Homepage Listings: http://localhost:${PORT}/api/workflow/homepage-listings`,
+  );
+
   console.log(`\n🔗 FILTERED PROPERTY ENDPOINTS:`);
-  console.log(`  3. Company:         http://localhost:${PORT}/api/properties/company`);
-  console.log(`  4. Pending:         http://localhost:${PORT}/api/properties/pending`);
-  console.log(`  5. Approved:        http://localhost:${PORT}/api/properties/approved`);
-  console.log(`  6. Rejected:        http://localhost:${PORT}/api/properties/rejected`);
-  console.log(`  7. Property by ID:  http://localhost:${PORT}/api/properties/1`);
+  console.log(
+    `  8. Company:         http://localhost:${PORT}/api/properties/company`,
+  );
+  console.log(
+    `  9. Pending:         http://localhost:${PORT}/api/properties/pending`,
+  );
+  console.log(
+    ` 10. Approved:        http://localhost:${PORT}/api/properties/approved`,
+  );
+  console.log(
+    ` 11. Rejected:        http://localhost:${PORT}/api/properties/rejected`,
+  );
+  console.log(
+    ` 12. Property by ID:  http://localhost:${PORT}/api/properties/1`,
+  );
+
   console.log(`\n🔗 BUYER ENDPOINTS:`);
-  console.log(`  8. Saved Properties: http://localhost:${PORT}/api/buyer/saved-properties`);
-  console.log(`  9. Save Property:    POST http://localhost:${PORT}/api/buyer/properties/1/save`);
-  console.log(` 10. Unsave Property:  DELETE http://localhost:${PORT}/api/buyer/properties/1/save`);
-  console.log(` 11. Check Saved:      http://localhost:${PORT}/api/buyer/properties/1/is-saved`);
-  console.log(` 12. Recommended:      http://localhost:${PORT}/api/buyer/recommended-properties`);
+  console.log(
+    ` 13. Saved Properties: http://localhost:${PORT}/api/buyer/saved-properties`,
+  );
+  console.log(
+    ` 14. Save Property:    POST http://localhost:${PORT}/api/buyer/properties/1/save`,
+  );
+  console.log(
+    ` 15. Check Saved:      http://localhost:${PORT}/api/buyer/properties/1/is-saved`,
+  );
+  console.log(
+    ` 16. Recommended:      http://localhost:${PORT}/api/buyer/recommended-properties`,
+  );
+
   console.log(`\n🔗 DEBUG ENDPOINTS:`);
-  console.log(` 13. Database Check:   http://localhost:${PORT}/api/debug/database-check`);
-  console.log(` 14. Save Test:        http://localhost:${PORT}/api/debug/save-test`);
-  console.log(` 15. Check Saves:      http://localhost:${PORT}/api/debug/check-saves/1`);
-  console.log(`\n📌 Note: Using BuyerController for save/unsave operations`);
+  console.log(
+    ` 17. Database Check:   http://localhost:${PORT}/api/debug/database-check`,
+  );
+  console.log(
+    ` 18. Save Test:        http://localhost:${PORT}/api/debug/save-test`,
+  );
+
+  console.log(`\n📌 Note: Workflow system integrated`);
   console.log(`✨ ========================================\n`);
 });
